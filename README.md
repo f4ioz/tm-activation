@@ -11,6 +11,21 @@ Internet.
 Développée par Olivier F4IOZ, puis extraite de son site pour être partagée
 avec les radio-clubs.
 
+## Téléchargement
+
+Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
+
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.0.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.0.0.tar.gz>
+- Empreintes SHA-256 et versions précédentes : dossier
+  [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
+
+Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
+
+```bash
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.0.0.tar.gz
+```
+
 ## Fonctionnalités
 
 - **Espace opérateurs** (`/activation`), protégé par un mot de passe commun :
@@ -79,6 +94,8 @@ L'application occupe environ 80 Mo de mémoire.
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
    `scp tm-activation-1.0.0.tar.gz utilisateur@tm50abc.local:`
+   (ou la télécharger directement sur le Pi avec `wget`, voir
+   [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
@@ -246,6 +263,9 @@ sudo systemctl restart tm-activation
 | `server.trusted_proxies` | adresses du reverse proxy autorisées à transmettre l'IP des visiteurs |
 
 ## Mise à jour
+
+Les nouvelles versions sont publiées sur
+<https://github.com/f4ioz/tm-activation> (dossier `releases/`).
 
 ```bash
 tar xzf tm-activation-X.Y.Z.tar.gz
