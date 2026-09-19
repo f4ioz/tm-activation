@@ -835,7 +835,12 @@ setup_https() {
   done
 }
 
+in_container() {  # conteneur (LXC Proxmox…) : l'horloge est celle de l'hôte
+  command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet
+}
+
 check_clock() {
+  if in_container; then return 0; fi
   if [[ $USE_SYSTEMD == yes ]] && command -v timedatectl >/dev/null \
      && [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" != yes ]]; then
     warn "l'horloge n'est pas synchronisée (NTP). Heure du système : $(date -u '+%d/%m/%Y %H:%M') UTC."
@@ -881,7 +886,13 @@ summary() {
   fi
   line "Données" "$DIR/var/ (sauvegardes automatiques : var/backups/)"
   line "Diagnostic" "sudo $DIR/install.sh --check"
-  line "Mise à jour" "sudo ./install.sh depuis la nouvelle version (réglages repris)"
+  if [[ -x /usr/local/sbin/tm-activation-update ]]; then
+    line "Mise à jour" "sudo tm-activation-update (dernière version GitHub, réglages repris)"
+  else
+    local tm_dir=""
+    if [[ $DIR != /opt/tm-activation ]]; then tm_dir="TM_DIR=$DIR "; fi
+    line "Mise à jour" "sudo ${tm_dir}bash $DIR/deploy/update-from-github.sh (dernière version GitHub)"
+  fi
   if [[ $MODE == tunnel ]]; then
     echo
     if [[ $TUNNEL_READY == 0 ]]; then
@@ -1090,7 +1101,9 @@ run_check() {
       echo
       echo "  Le tunnel sort du Pi : aucun port à ouvrir, même sur une autre connexion." ;;
   esac
-  if command -v timedatectl >/dev/null; then
+  if in_container; then
+    line "Horloge" "celle de l'hôte (conteneur)"
+  elif command -v timedatectl >/dev/null; then
     if [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" == yes ]]; then
       line "Horloge" "synchronisée"
     else

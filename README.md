@@ -15,15 +15,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.0.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.0.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.1.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.1.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.0.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.1.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -93,22 +93,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.0.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.1.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.0.0.tar.gz
-   cd tm-activation-1.0.0
+   tar xzf tm-activation-1.1.0.tar.gz
+   cd tm-activation-1.1.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.0.0.zip
-   cd tm-activation-1.0.0
+   unzip tm-activation-1.1.0.zip
+   cd tm-activation-1.1.0
    sudo bash install.sh --lan
    ```
 
@@ -146,6 +146,42 @@ fournies par l'application elle-même. Seuls manquent :
 - les **recherches QRZ** : elles se font automatiquement au retour d'Internet,
   pour tous les indicatifs déjà loggés.
 
+## Installation sur Proxmox VE (conteneur LXC)
+
+Sur un serveur **Proxmox VE**, une seule commande crée un conteneur Debian
+dédié, télécharge la dernière version depuis GitHub (empreinte SHA-256
+vérifiée) et l'installe. Dans le **Shell du nœud** Proxmox, en root :
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/f4ioz/tm-activation/main/proxmox/tm-activation-lxc.sh)"
+```
+
+Le script demande les caractéristiques du conteneur (ID, nom, disque 4 Go,
+1 vCPU, 512 Mo de RAM, stockage, réseau DHCP ou IP fixe, mot de passe root,
+clé SSH facultative), puis propose :
+
+1. **Installation guidée** : les questions habituelles de TM Activation
+   (réseau local, Internet par la box avec HTTPS, ou Cloudflare Tunnel ;
+   indicatif, club, mots de passe). En mode Internet par la box, les ports 80
+   et 443 sont à rediriger vers l'IP du conteneur.
+2. **Test rapide** : réseau local, sans question, indicatif `TM0TEST`, mot de
+   passe administrateur généré et affiché à la fin. Idéal pour essayer, puis
+   jeter le conteneur (`pct stop <ID> && pct destroy <ID>`).
+
+Le conteneur est **non privilégié** (option `nesting=1`, nécessaire au service
+durci), démarre avec le nœud et prend l'heure de l'hôte. Ensuite, depuis le
+nœud :
+
+| Action | Commande |
+|---|---|
+| Mettre à jour | `pct exec <ID> -- tm-activation-update` |
+| Diagnostic | `pct exec <ID> -- /opt/tm-activation/install.sh --check` |
+| Journal | `pct exec <ID> -- journalctl -u tm-activation -n 50` |
+| Console | `pct enter <ID>` |
+
+Variables facultatives (avant `bash -c …`) : `TM_REPO` (autre dépôt GitHub,
+ex. un fork), `TM_BRANCH`, `TM_VERSION` (version précise).
+
 ## Installation sur un serveur Internet
 
 Au préalable : le nom de domaine (ex. `tm.mon-club.fr`) doit pointer vers le
@@ -153,8 +189,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.0.0.tar.gz
-cd tm-activation-1.0.0
+tar xzf tm-activation-1.1.0.tar.gz
+cd tm-activation-1.1.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -266,6 +302,18 @@ sudo systemctl restart tm-activation
 
 Les nouvelles versions sont publiées sur
 <https://github.com/f4ioz/tm-activation> (dossier `releases/`).
+
+Le plus simple, si la machine a accès à Internet : télécharger et installer la
+dernière version en une commande (empreinte vérifiée ; rien n'est fait si la
+version installée est déjà la dernière) :
+
+```bash
+sudo bash /opt/tm-activation/deploy/update-from-github.sh
+```
+
+(sur un conteneur Proxmox : `pct exec <ID> -- tm-activation-update`).
+
+Ou à la main, depuis l'archive de la nouvelle version :
 
 ```bash
 tar xzf tm-activation-X.Y.Z.tar.gz
