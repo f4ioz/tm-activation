@@ -78,6 +78,7 @@ class QrzXmlClient:
         self.agent = agent
         self._key: str | None = None
         self._key_expires: float = 0.0
+        self.sub_exp: str = ""       # fin d'abonnement XML annoncée par QRZ au login
         self._lock = threading.Lock()
         self._cache: dict[str, _CacheEntry] = {}
         self._lookup_ttl = lookup_ttl_seconds
@@ -105,8 +106,25 @@ class QrzXmlClient:
         self._key = key
         self._key_expires = time.time() + SESSION_TTL
         sub_exp = d.get("SubExp", "")
+        self.sub_exp = sub_exp
         logger.info("QRZ XML login OK (sub expires %s)", sub_exp or "?")
         return key
+
+    def check_login(self) -> tuple[str, str]:
+        """Connexion immédiate, pour valider un compte saisi.
+
+        ``("ok", fin d'abonnement)`` ; ``("refused", message de QRZ)`` si le
+        compte est refusé ; ``("error", raison)`` si QRZ est injoignable.
+        """
+        with self._lock, httpx.Client(timeout=REQ_TIMEOUT) as client:
+            self._key = None
+            try:
+                self._login(client)
+            except RuntimeError as exc:
+                return "refused", str(exc).removeprefix("QRZ XML login: ")
+            except (httpx.HTTPError, ET.ParseError) as exc:
+                return "error", str(exc)
+        return "ok", self.sub_exp
 
     def _ensure_key(self, client: httpx.Client) -> str:
         if self._key and time.time() < self._key_expires:

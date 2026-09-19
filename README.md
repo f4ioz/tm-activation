@@ -15,15 +15,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.1.1.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.1.1.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.1.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -80,7 +80,8 @@ explique la cause en cas d'échec.
   est précompilé pour les processeurs du Raspberry Pi, rien n'est compilé sur
   place.
 - Facultatif : un compte QRZ.com avec **abonnement XML** pour les noms,
-  locators et pays des stations contactées.
+  locators et pays des stations contactées (à saisir à l'installation ou,
+  plus tard, dans **Réglages → Callbook QRZ**).
 
 L'application occupe environ 80 Mo de mémoire.
 
@@ -93,22 +94,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.1.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.2.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.1.1.tar.gz
-   cd tm-activation-1.1.1
+   tar xzf tm-activation-1.2.0.tar.gz
+   cd tm-activation-1.2.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.1.1.zip
-   cd tm-activation-1.1.1
+   unzip tm-activation-1.2.0.zip
+   cd tm-activation-1.2.0
    sudo bash install.sh --lan
    ```
 
@@ -189,8 +190,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.1.1.tar.gz
-cd tm-activation-1.1.1
+tar xzf tm-activation-1.2.0.tar.gz
+cd tm-activation-1.2.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -268,7 +269,8 @@ le certificat HTTPS, nginx et l'horloge, sans rien modifier.
 1. **Administrateur** : ouvrir `/login` (mot de passe administrateur choisi ou
    affiché à l'installation), qui mène aux **Réglages** (`/activation/settings`).
 2. Dans les Réglages, **Mot de passe opérateurs** : le définir s'il ne l'a pas
-   été à l'installation.
+   été à l'installation. **Callbook QRZ** : saisir le compte QRZ.com du club
+   (abonnement XML) ; la connexion est testée avant l'enregistrement.
 3. **Indicatifs spéciaux** → ✎ : compléter la fiche (libellé, locator, dates,
    badge, sous-titre, drapeaux) et cocher **Page publique en ligne** quand vous
    êtes prêts.
@@ -294,7 +296,7 @@ sudo systemctl restart tm-activation
 |---|---|
 | `auth.password` | mot de passe administrateur |
 | `club` | nom, indicatif, ville et site web du club (bandeau, pied de page, `/activations`) |
-| `qrz` | compte QRZ.com XML (facultatif) |
+| `qrz` | compte QRZ.com XML par défaut (facultatif) ; un compte saisi dans **Réglages → Callbook QRZ** est prioritaire |
 | `activation` | premier indicatif spécial, lu **au premier démarrage uniquement** ; ensuite tout se règle dans l'interface |
 | `server.trusted_proxies` | adresses du reverse proxy autorisées à transmettre l'IP des visiteurs |
 
@@ -337,6 +339,7 @@ Toutes les données sont dans `/opt/tm-activation/var/` :
 | `activation.sqlite` | indicatifs, opérateurs, créneaux, QSO, fiches QRZ |
 | `activation_password` | mot de passe opérateurs (s'il a été changé dans les Réglages) |
 | `activation_settings.json` | réglages : indicatif en cours, affichage public, règle de points |
+| `activation_qrz.json` | compte QRZ.com saisi dans les Réglages (lisible par le seul service, hors sauvegardes) |
 | `auth_secret` | clé de signature des sessions |
 | `backups/` | snapshots automatiques (les 40 derniers) |
 

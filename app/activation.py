@@ -37,8 +37,8 @@ from typing import Any, Iterator
 from zoneinfo import ZoneInfo
 
 from app import auth as _auth
-from app.config import activation_config
-from app.qrz_xml import get_shared_client
+from app.config import activation_config, qrz_config
+from app.qrz_xml import QrzXmlClient, get_shared_client
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "var" / "activation.sqlite"
@@ -993,9 +993,81 @@ CALLBOOK_RETRY_ERROR = 15 * 60       # erreur réseau / session : on retente plu
 logger = logging.getLogger(__name__)
 
 
+# Compte QRZ : par défaut celui de config.yml (section ``qrz``) ; l'admin peut
+# en saisir un autre dans les Réglages (ex. celui du radio-club). Il est gardé
+# à part, lisible par le seul service (0600), jamais affiché ni copié dans les
+# sauvegardes téléchargeables.
+QRZ_ACCOUNT_FILE = ROOT / "var" / "activation_qrz.json"
+_RE_QRZ_USER = re.compile(r"^[A-Za-z0-9_.@/-]{3,40}$")
+_qrz_own: QrzXmlClient | None = None
+_qrz_own_lock = threading.Lock()
+
+
+def _own_qrz_account() -> dict[str, str]:
+    """Compte saisi dans les Réglages ({} si aucun)."""
+    try:
+        data = json.loads(QRZ_ACCOUNT_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    user, pwd = data.get("username"), data.get("password")
+    if isinstance(user, str) and isinstance(pwd, str) and user and pwd:
+        return {"username": user, "password": pwd}
+    return {}
+
+
+def qrz_account() -> dict[str, str]:
+    """Compte QRZ en service : identifiant et source (``settings``, ``config`` ou "")."""
+    own = _own_qrz_account()
+    if own:
+        return {"username": own["username"], "source": "settings"}
+    cfg = qrz_config()
+    user = cfg.get("username") or cfg.get("xml_username")
+    if user and (cfg.get("password") or cfg.get("xml_password")):
+        return {"username": str(user), "source": "config"}
+    return {"username": "", "source": ""}
+
+
+def valid_qrz_username(username: str) -> bool:
+    return bool(_RE_QRZ_USER.match(username or ""))
+
+
+def check_qrz_account(username: str, password: str) -> tuple[str, str]:
+    """Essaie de se connecter à QRZ : voir ``QrzXmlClient.check_login``."""
+    return QrzXmlClient(username, password).check_login()
+
+
+def set_qrz_account(username: str, password: str) -> None:
+    username = username.strip()
+    if not valid_qrz_username(username) or not password:
+        raise ValueError("compte QRZ incomplet")
+    QRZ_ACCOUNT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = QRZ_ACCOUNT_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"username": username, "password": password}), encoding="utf-8")
+    tmp.chmod(0o600)
+    tmp.replace(QRZ_ACCOUNT_FILE)
+
+
+def clear_qrz_account() -> None:
+    """Retire le compte des Réglages : retour au compte de config.yml (s'il existe)."""
+    QRZ_ACCOUNT_FILE.unlink(missing_ok=True)
+
+
+def own_qrz_password(username: str) -> str:
+    """Mot de passe déjà enregistré pour cet identifiant (champ laissé vide = inchangé)."""
+    own = _own_qrz_account()
+    return own["password"] if own and own["username"].lower() == username.strip().lower() else ""
+
+
 def qrz_client() -> Any:
-    """Client QRZ XML partagé du site (None si le compte n'est pas configuré)."""
-    return get_shared_client()
+    """Client QRZ XML : compte des Réglages, sinon celui du site (None si aucun)."""
+    global _qrz_own
+    own = _own_qrz_account()
+    if not own:
+        return get_shared_client()
+    with _qrz_own_lock:
+        if _qrz_own is None or (_qrz_own.username, _qrz_own.password) != (own["username"], own["password"]):
+            _qrz_own = QrzXmlClient(own["username"], own["password"])
+        return _qrz_own
 
 
 def locator_center(grid: str) -> tuple[float, float] | None:

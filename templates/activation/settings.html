@@ -142,8 +142,14 @@
       <form method="post" action="/logout" class="act-form"><button type="submit" class="act-cancel-btn">Se déconnecter (admin)</button></form>
     </div>
 
-    <div class="act-card">
+    <div class="act-card" id="qrz">
       <h2>Callbook QRZ</h2>
+      {% if qz_flash == 'ok' %}<p class="act-alert act-alert-ok">Compte QRZ enregistré : connexion réussie.</p>
+      {% elif qz_flash == 'nosub' %}<p class="act-alert act-alert-err">Compte QRZ enregistré, mais sans abonnement XML : QRZ ne renverra pas les fiches complètes.</p>
+      {% elif qz_flash == 'offline' %}<p class="act-alert act-alert-err">Compte enregistré sans vérification : QRZ.com est injoignable pour l'instant.</p>
+      {% elif qz_flash == 'refused' %}<p class="act-alert act-alert-err">QRZ.com a refusé la connexion (identifiant ou mot de passe incorrect) : compte non enregistré.</p>
+      {% elif qz_flash == 'incomplete' %}<p class="act-alert act-alert-err">Identifiant et mot de passe QRZ requis.</p>
+      {% elif qz_flash == 'cleared' %}<p class="act-alert act-alert-ok">Compte QRZ retiré des Réglages.</p>{% endif %}
       <p class="act-muted">
         Fiches QRZ (nom, locator, DXCC) des stations contactées : récupérées à la saisie
         dans le log, et doucement en tâche de fond (1 indicatif toutes les ~10 s).
@@ -151,6 +157,24 @@
         {% if callbook.notfound %} · {{ callbook.notfound }} inconnue(s) de QRZ{% endif %}
         {% if callbook.pending %} · <span class="act-warn">{{ callbook.pending }} en attente</span>{% endif %}
       </p>
+      <p class="act-muted"><b>Compte utilisé :</b>
+        {% if qrz_account.source == 'settings' %}{{ qrz_account.username }} (saisi ici)
+        {% elif qrz_account.source == 'config' %}{{ qrz_account.username }} (compte par défaut, config.yml)
+        {% else %}<span class="act-warn">aucun : pas de recherche QRZ</span>{% endif %}
+      </p>
+      <form method="post" action="/activation/settings/qrz" class="act-form">
+        <label>Identifiant QRZ.com <input type="text" name="username" maxlength="40" autocomplete="off" required
+          value="{{ qrz_account.username if qrz_account.source == 'settings' else '' }}"></label>
+        <label>Mot de passe QRZ.com <input type="password" name="password" autocomplete="new-password"
+          {% if qrz_account.source == 'settings' %}placeholder="inchangé si vide"{% endif %}></label>
+        <button type="submit" name="action" value="save">Enregistrer et tester</button>
+      </form>
+      {% if qrz_account.source == 'settings' %}
+      <form method="post" action="/activation/settings/qrz" class="act-form">
+        <button type="submit" name="action" value="clear" class="act-cancel-btn">Retirer ce compte (retour au compte par défaut)</button>
+      </form>
+      {% endif %}
+      <p class="act-muted act-map-note">Abonnement QRZ XML nécessaire. Le mot de passe reste sur le serveur : jamais réaffiché, ni inclus dans les sauvegardes.</p>
     </div>
 
     <div class="act-card act-card-wide" id="points">

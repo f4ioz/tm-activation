@@ -285,6 +285,8 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             show_contacts=activation.show_contacts(),
             show_map_stats=activation.show_map_stats(),
             callbook=activation.callbook_progress(),
+            qrz_account=activation.qrz_account(),
+            qz_flash=request.query_params.get("qz"),
             scoring=activation.get_scoring(),
             scoring_summary=activation.scoring_summary(),
             sc_flash=request.query_params.get("sc"),
@@ -326,6 +328,36 @@ async def change_flags(
     activation.set_flag("show_contacts", bool(show_contacts))
     activation.set_flag("show_map_stats", bool(show_map_stats))
     return RedirectResponse("/activation/settings?fl=ok", status_code=303)
+
+
+@router.post("/settings/qrz")
+async def change_qrz_account(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    action: str = Form("save"),
+) -> Response:
+    """Compte QRZ.com du callbook (admin) : testé auprès de QRZ avant d'être gardé."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    if action == "clear":
+        activation.clear_qrz_account()
+        return RedirectResponse("/activation/settings?qz=cleared#qrz", status_code=303)
+    username = username.strip()
+    password = password or activation.own_qrz_password(username)
+    if not activation.valid_qrz_username(username) or not password:
+        return RedirectResponse("/activation/settings?qz=incomplete#qrz", status_code=303)
+    status, detail = await run_in_threadpool(activation.check_qrz_account, username, password)
+    if status == "refused":
+        return RedirectResponse("/activation/settings?qz=refused#qrz", status_code=303)
+    activation.set_qrz_account(username, password)
+    if status == "error":
+        flash = "offline"                    # QRZ injoignable : gardé, vérifié plus tard
+    elif "non-subscriber" in detail.lower():
+        flash = "nosub"                      # compte valide mais sans abonnement XML
+    else:
+        flash = "ok"
+    return RedirectResponse(f"/activation/settings?qz={flash}#qrz", status_code=303)
 
 
 @router.post("/settings/scoring")

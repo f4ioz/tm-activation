@@ -12,8 +12,12 @@ from fastapi.testclient import TestClient
 from app import activation
 from app import auth as auth_mod
 from app.main import app
-from app.qrz_xml import XmlLookup
+from app import qrz_xml
+from app.qrz_xml import QrzXmlClient, XmlLookup
 from app.wavelog_client import parse_adif
+
+
+_REAL_QRZ_CLIENT = activation.qrz_client   # avant sa neutralisation par _isolate
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +41,8 @@ def _isolate(tmp_path, monkeypatch):
         },
     )
     monkeypatch.setattr(activation, "qrz_client", lambda: None)  # jamais de vrai QRZ en test
+    monkeypatch.setattr(activation, "QRZ_ACCOUNT_FILE", tmp_path / "activation_qrz.json")
+    monkeypatch.setattr(activation, "_qrz_own", None)
     monkeypatch.setattr(activation, "IMPORT_TMP_DIR", tmp_path / "import")
     activation.init_db()
     yield
@@ -1162,3 +1168,110 @@ def test_note_is_sat() -> None:
         assert activation.note_is_sat(note), note
     for note in ("", None, "Samedi matin", "Saturne", "Depuis le local du club", "SATCOM"):
         assert not activation.note_is_sat(note), note
+
+
+# ── Compte QRZ.com (Réglages) ──────────────────────────────────────────────
+
+
+def test_qrz_account_from_settings_overrides_config(monkeypatch) -> None:
+    site_client = object()
+    monkeypatch.setattr(activation, "get_shared_client", lambda: site_client)
+    monkeypatch.setattr(activation, "qrz_config", lambda: {"username": "F4XYZ", "password": "site"})
+    assert activation.qrz_account() == {"username": "F4XYZ", "source": "config"}
+    assert _REAL_QRZ_CLIENT() is site_client
+
+    activation.set_qrz_account("F6ABC", "clubpw")
+    assert activation.qrz_account() == {"username": "F6ABC", "source": "settings"}
+    assert activation.QRZ_ACCOUNT_FILE.stat().st_mode & 0o777 == 0o600
+    client = _REAL_QRZ_CLIENT()
+    assert isinstance(client, QrzXmlClient) and (client.username, client.password) == ("F6ABC", "clubpw")
+    assert _REAL_QRZ_CLIENT() is client                  # une seule session QRZ
+    activation.set_qrz_account("F6ABC", "newpw")
+    assert _REAL_QRZ_CLIENT().password == "newpw"        # nouveau mot de passe → nouveau client
+
+    activation.clear_qrz_account()
+    assert activation.qrz_account()["source"] == "config" and _REAL_QRZ_CLIENT() is site_client
+    monkeypatch.setattr(activation, "qrz_config", lambda: {})
+    assert activation.qrz_account() == {"username": "", "source": ""}
+
+
+def test_qrz_account_never_in_backups(monkeypatch) -> None:
+    activation.set_qrz_account("F6ABC", "clubpw")
+    activation.backup_now()
+    for f in activation.BACKUP_DIR.iterdir():
+        assert b"clubpw" not in f.read_bytes(), f.name
+
+
+def test_qrz_settings_route(monkeypatch) -> None:
+    checked: list[tuple[str, str]] = []
+    answer = {"value": ("ok", "Wed Jan 6 2027")}
+
+    def fake_check(user: str, pwd: str) -> tuple[str, str]:
+        checked.append((user, pwd))
+        return answer["value"]
+
+    monkeypatch.setattr(activation, "check_qrz_account", fake_check)
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    admin = _private_client()
+
+    r = admin.post("/activation/settings/qrz", data={"username": "F6ABC", "password": "clubpw"})
+    assert r.headers["location"].endswith("qz=ok#qrz")
+    assert activation.qrz_account() == {"username": "F6ABC", "source": "settings"}
+    page = admin.get("/activation/settings").text
+    assert "F6ABC (saisi ici)" in page and "clubpw" not in page
+
+    # Mot de passe laissé vide, même identifiant : l'ancien est repris.
+    admin.post("/activation/settings/qrz", data={"username": "f6abc", "password": ""})
+    assert checked[-1] == ("f6abc", "clubpw")
+    # Autre identifiant sans mot de passe : refusé.
+    r = admin.post("/activation/settings/qrz", data={"username": "F5NEW", "password": ""})
+    assert r.headers["location"].endswith("qz=incomplete#qrz")
+
+    answer["value"] = ("refused", "Username/password incorrect")
+    r = admin.post("/activation/settings/qrz", data={"username": "F5BAD", "password": "x"})
+    assert r.headers["location"].endswith("qz=refused#qrz")
+    assert activation.qrz_account()["username"] == "f6abc"           # compte précédent gardé
+
+    answer["value"] = ("ok", "non-subscriber")
+    r = admin.post("/activation/settings/qrz", data={"username": "F5FREE", "password": "y"})
+    assert r.headers["location"].endswith("qz=nosub#qrz")
+    answer["value"] = ("error", "timeout")
+    r = admin.post("/activation/settings/qrz", data={"username": "F5OFF", "password": "z"})
+    assert r.headers["location"].endswith("qz=offline#qrz") and activation.qrz_account()["username"] == "F5OFF"
+
+    r = admin.post("/activation/settings/qrz", data={"action": "clear"})
+    assert r.headers["location"].endswith("qz=cleared#qrz") and not activation.QRZ_ACCOUNT_FILE.exists()
+
+    # Opérateur non admin → /login, rien n'est changé.
+    activation.set_operator_password("oppass")
+    op = TestClient(app, follow_redirects=False)
+    op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
+    r = op.post("/activation/settings/qrz", data={"username": "F5HACK", "password": "x"})
+    assert r.headers["location"].startswith("/login") and not activation.QRZ_ACCOUNT_FILE.exists()
+
+
+_REAL_HTTPX_CLIENT = qrz_xml.httpx.Client
+
+
+def _qrz_transport(monkeypatch, handler) -> None:
+    """Réponses QRZ simulées : httpx.Client de qrz_xml branché sur un MockTransport."""
+    mock = qrz_xml.httpx.MockTransport(handler)
+    monkeypatch.setattr(qrz_xml.httpx, "Client", lambda **kw: _REAL_HTTPX_CLIENT(transport=mock, **kw))
+
+
+def test_qrz_check_login(monkeypatch) -> None:
+    import httpx
+
+    ns = 'xmlns="http://xmldata.qrz.com"'
+    _qrz_transport(monkeypatch, lambda req: httpx.Response(
+        200, text=f"<QRZDatabase {ns}><Session><Key>k1</Key><SubExp>Wed Jan 6 2027</SubExp></Session></QRZDatabase>"))
+    assert QrzXmlClient("F6ABC", "pw").check_login() == ("ok", "Wed Jan 6 2027")
+    _qrz_transport(monkeypatch, lambda req: httpx.Response(
+        200, text=f"<QRZDatabase {ns}><Session><Error>Username/password incorrect</Error></Session></QRZDatabase>"))
+    assert QrzXmlClient("F6ABC", "bad").check_login() == ("refused", "Username/password incorrect")
+
+    def down(req):
+        raise httpx.ConnectError("injoignable")
+
+    _qrz_transport(monkeypatch, down)
+    assert QrzXmlClient("F6ABC", "pw").check_login()[0] == "error"

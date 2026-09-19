@@ -32,6 +32,7 @@ club:
 qrz:
   # Facultatif — compte QRZ.com avec abonnement XML : nom, locator et pays des
   # stations contactées (saisie du log, carte, tableau DXCC, points de distance).
+  # Plus simple : Réglages → Callbook QRZ (prioritaire, sans redémarrage).
   username: ""
   password: ""
   ttl_seconds: 21600        # cache mémoire des recherches (6 h)
