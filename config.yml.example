@@ -1,0 +1,52 @@
+# TM Activation — configuration.
+#
+# install.sh génère config.yml à partir de ce fichier (hors dépôt : il contient
+# des mots de passe, droits 640). Après modification :
+#   sudo systemctl restart tm-activation
+
+site:
+  base_url: ""              # URL publique, ex. https://tm.mon-club.fr
+
+server:
+  # Reverse proxy (nginx) autorisé à transmettre l'IP réelle du visiteur
+  # (X-Forwarded-For) et le https (X-Forwarded-Proto) : IP ou réseau CIDR.
+  # Les en-têtes venant de toute autre adresse sont ignorés : un client ne
+  # peut pas se faire passer pour le réseau local ni contourner le blocage
+  # des essais de mots de passe. Nginx sur une autre machine : mettre son IP.
+  trusted_proxies: ["127.0.0.1", "::1"]
+
+auth:
+  # Mot de passe ADMINISTRATEUR : Réglages (indicatifs spéciaux, mot de passe
+  # opérateurs, règle de points, sauvegardes). Connexion sur /login.
+  # Vide = administration désactivée.
+  password: ""
+
+club:
+  # Radio-club qui active les indicatifs : affiché dans le bandeau, le pied de
+  # page et la liste publique /activations. Tout est facultatif.
+  callsign: ""              # ex. F6ABC
+  name: ""                  # ex. Radio-club de Villeneuve
+  city: ""                  # ex. Villeneuve
+  website: ""               # ex. https://www.mon-club.fr
+
+qrz:
+  # Facultatif — compte QRZ.com avec abonnement XML : nom, locator et pays des
+  # stations contactées (saisie du log, carte, tableau DXCC, points de distance).
+  username: ""
+  password: ""
+  ttl_seconds: 21600        # cache mémoire des recherches (6 h)
+
+activation:
+  # Premier indicatif spécial, créé au PREMIER démarrage uniquement. Ensuite
+  # tout se règle dans l'interface (Réglages → Indicatifs spéciaux), y compris
+  # la création des indicatifs suivants.
+  callsign: "TM0ABC"
+  label: ""                 # ex. 50 ans du radio-club
+  my_gridsquare: ""         # locator de la station (4, 6 ou 8 car.) : ADIF + distances
+  public: false             # page publique /<indicatif> en ligne dès le départ
+  # Mot de passe commun des opérateurs (connexion sur /activation/login avec
+  # leur indicatif). Modifiable ensuite dans les Réglages, qui priment.
+  password: ""
+  operators: []             # roster initial, ex. ["F1ABC", "F4XYZ"]
+  qrz_enrich: true          # compléter les fiches QRZ en tâche de fond
+  qrz_interval_seconds: 10  # 1 indicatif toutes les N secondes

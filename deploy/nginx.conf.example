@@ -1,0 +1,61 @@
+# Reverse proxy nginx pour TM Activation.
+#
+# `sudo ./install.sh --domain …` génère ce fichier tout seul (domaine et nom
+# .local remplacés) : rien à faire à la main dans ce cas.
+#
+# Usage manuel (mode --manual) :
+#   sudo cp nginx.conf.example /etc/nginx/sites-available/tm-activation
+#   (adapter les deux server_name et proxy_pass)
+#   sudo ln -s /etc/nginx/sites-available/tm-activation /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d tm.mon-club.fr     # HTTPS Let's Encrypt + redirection 80 → 443
+#
+# Nginx sur une AUTRE machine que l'application : installer avec
+#   --host 0.0.0.0   et mettre l'IP de nginx dans server.trusted_proxies (config.yml).
+
+# Accès public : https://tm.mon-club.fr (certbot ajoute le bloc HTTPS).
+server {
+    listen 80;
+    listen [::]:80;
+    server_name tm.mon-club.fr;
+
+    client_max_body_size 10m;          # import de fichiers ADIF
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # $remote_addr (et non $proxy_add_x_forwarded_for) : l'IP transmise
+        # est celle vue par nginx, jamais une valeur fournie par le client.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Accès depuis le réseau local : http://nom-machine.local. Indispensable quand
+# la box ne renvoie pas l'adresse publique vers l'intérieur (« NAT loopback »
+# absent) : les opérateurs sur place passent par ici. Refusé depuis Internet.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name nom-machine.local;
+
+    allow 127.0.0.0/8;
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    allow 192.168.0.0/16;
+    allow ::1;
+    allow fc00::/7;
+    allow fe80::/10;
+    deny all;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

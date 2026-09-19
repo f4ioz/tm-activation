@@ -1,0 +1,29 @@
+{% extends "activation/_base.html" %}
+{% block title %}Indicatifs spéciaux{% if club.name %} — {{ club.name }}{% endif %}{% endblock %}
+{% block robots %}index, follow{% endblock %}
+{% block meta_description %}Les indicatifs spéciaux activés par {{ club.name or 'le club' }} : pages d'activation, logs, cartes et classements.{% endblock %}
+{% block brand_href %}/activations{% endblock %}
+
+{% block content %}
+<header class="act-head">
+  <h1>Indicatifs spéciaux</h1>
+  <p class="act-sub">{% if club.name %}Activations — {{ club.name }}{% if club.city %} · {{ club.city }}{% endif %}{% else %}Activations du club{% endif %}</p>
+</header>
+
+<div class="act-next">
+  {% for s in stations %}
+    <a class="act-next-card act-station-card{{ {'current': ' is-current', 'archive': ' act-past-card'}.get(s.status, '') }}" href="/{{ s.slug }}">
+      <div class="act-next-when">
+        {{- {'current': 'En cours', 'upcoming': 'À venir'}.get(s.status, 'Archive') -}}
+        {%- if s.start_date %} · {{ s.start_date[8:10] }}/{{ s.start_date[5:7] }}/{{ s.start_date[:4] }}{% endif -%}
+        {%- if s.end_date %} → {{ s.end_date[8:10] }}/{{ s.end_date[5:7] }}/{{ s.end_date[:4] }}{% endif -%}
+      </div>
+      <p class="act-next-op">{{ s.callsign }}</p>
+      <p class="act-next-bm">{{ s.label }}</p>
+      <p class="act-muted">{{ s.qsos }} QSO</p>
+    </a>
+  {% else %}
+    <p class="act-muted">Aucune activation publiée pour l'instant.</p>
+  {% endfor %}
+</div>
+{% endblock %}

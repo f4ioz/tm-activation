@@ -1,0 +1,10 @@
+{# Drapeaux du bandeau (fiche de l'indicatif : « fr,be ») avec leur préfixe radio ;
+   le dernier est en miroir (préfixe puis drapeau) : F 🤝 ON. #}
+<span class="act-flags">
+  {%- for f in station.flags.split(',') if f %}
+    {%- set p = flag_prefixes.get(f, f|upper) %}
+    {%- if not loop.first %} 🤝 {% endif %}
+    {%- if loop.last and not loop.first %}<span class="act-prefix">{{ p }}</span> <span class="flag flag-{{ f }}" title="{{ p }}"></span>
+    {%- else %}<span class="flag flag-{{ f }}" title="{{ p }}"></span> <span class="act-prefix">{{ p }}</span>{% endif %}
+  {%- endfor %}
+</span>

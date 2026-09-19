@@ -1,0 +1,38 @@
+{% extends "activation/_base.html" %}
+{% block title %}{{ callsign }} — Modifier un créneau{% endblock %}
+
+{% block content %}
+<header class="act-head">
+  <h1>Modifier un créneau</h1>
+  <nav class="act-tabs">
+    <a href="/activation">Tableau de bord</a>
+    <a href="/activation/planning" class="active">Planning</a>
+    <a href="/activation/log">Log QSO</a>
+    <a href="/activation/adif">ADIF</a>
+    {% if is_admin %}<a href="/activation/settings">Réglages</a>{% endif %}
+  </nav>
+</header>
+
+<div class="act-card">
+  {% set ps = to_disp(slot.start_utc) %}{% set pe = to_disp(slot.end_utc) %}
+  <form method="post" action="/activation/slots/{{ slot.id }}" class="act-form">
+    <label>Opérateur
+      <select name="operator" required>
+        {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == slot.operator_call %} selected{% endif %}>{{ op.callsign }}</option>{% endfor %}
+        {% if slot.operator_call not in (operators | map(attribute='callsign') | list) %}<option value="{{ slot.operator_call }}" selected>{{ slot.operator_call }}</option>{% endif %}
+      </select>
+    </label>
+    <label>Début (heure {{ tz_label }}) <input type="datetime-local" name="start" value="{{ ps.strftime('%Y-%m-%dT%H:%M') if ps }}" required></label>
+    <label>Fin (heure {{ tz_label }}) <input type="datetime-local" name="end" value="{{ pe.strftime('%Y-%m-%dT%H:%M') if pe }}" required></label>
+    <div class="act-row">
+      <label>Bande <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == slot.band %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+      <label>Mode <select name="mode" required>{% for m in modes %}<option value="{{ m }}"{% if m == slot.mode %} selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+    </div>
+    <label>Note <input type="text" name="note" value="{{ slot.note or '' }}" maxlength="120"></label>
+    <div class="act-inline">
+      <button type="submit">Enregistrer</button>
+      <a href="/activation/planning" class="act-cancel">Annuler</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

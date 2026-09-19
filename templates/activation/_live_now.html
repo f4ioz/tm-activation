@@ -1,0 +1,10 @@
+{% for s in live %}
+{% set pe = to_disp(s.end_utc) %}
+<div class="act-live-now">
+  <span class="act-live-tag">🔴 EN DIRECT</span>
+  <span class="act-live-op">{{ callsign }}<span class="act-op-sub">Op&nbsp;: {{ s.operator_call }}</span></span>
+  <span class="act-live-bm">{{ s.band }} · {{ s.mode }}</span>
+  <span class="act-live-until">jusqu'à {{ pe.strftime('%d/%m %H:%M') if pe }} ({{ tz_label }}){% if s.note %} — {% if note_is_sat(s.note) %}<span class="act-sat-icon" title="Satellite">🛰️</span> {% endif %}{{ s.note }}{% endif %}</span>
+  <span class="act-countdown" data-start="{{ s.start_utc }}" data-end="{{ s.end_utc }}"></span>
+</div>
+{% endfor %}

@@ -1,0 +1,82 @@
+{% extends "activation/_base.html" %}
+{% block title %}{{ callsign }} — Planning{% endblock %}
+{% block topnav %}
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+{% endblock %}
+
+{% block content %}
+<header class="act-head">
+  <h1>Planning des créneaux</h1>
+  <nav class="act-tabs">
+    <a href="/activation">Tableau de bord</a>
+    <a href="/activation/planning" class="active">Planning</a>
+    <a href="/activation/log">Log QSO</a>
+    <a href="/activation/adif">ADIF</a>
+    {% if is_admin %}<a href="/activation/settings">Réglages</a>{% endif %}
+  </nav>
+</header>
+
+{% include "activation/_tz_toggle.html" %}
+
+{% if conflict_warn %}
+<p class="act-alert act-alert-dupe">⚠ Chevauchement détecté : un autre créneau occupe déjà cette bande sur ce créneau horaire. Le créneau est enregistré mais vérifie la coordination.</p>
+{% endif %}
+
+<div class="act-grid act-grid-2">
+  <div class="act-card">
+    <h2>Réserver un créneau</h2>
+    <form method="post" action="/activation/slots" class="act-form">
+      <label>Opérateur
+        <select name="operator" required>
+          <option value="">—</option>
+          {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == current_op %} selected{% endif %}>{{ op.callsign }}{% if op.name %} — {{ op.name }}{% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Début (heure {{ tz_label }}) <input type="datetime-local" name="start" value="{{ now_input }}" required></label>
+      <label>Fin (heure {{ tz_label }}) <input type="datetime-local" name="end" required></label>
+      <div class="act-row">
+        <label>Bande <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+        <label>Mode <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
+      </div>
+      <label>Note <input type="text" name="note" maxlength="120" placeholder="ex. QRV depuis le local du club"></label>
+      <button type="submit">Réserver</button>
+    </form>
+  </div>
+
+  <div class="act-card">
+    <h2>Ajouter un opérateur</h2>
+    <form method="post" action="/activation/operators" class="act-form">
+      <label>Indicatif <input type="text" name="callsign" required autocapitalize="characters" placeholder="F4XXX"></label>
+      <label>Nom <input type="text" name="name" maxlength="60" placeholder="Prénom (optionnel)"></label>
+      <button type="submit">Ajouter au roster</button>
+    </form>
+    <p class="act-muted">{{ operators | length }} opérateur(s) au roster.</p>
+    <p class="act-muted">Import d'un log ADIF : onglet <a href="/activation/adif">ADIF</a>.</p>
+  </div>
+</div>
+
+<div class="act-card">
+  <h2>Créneaux {% if conflicts %}<span class="act-conflict-count">{{ conflicts|length }} en conflit</span>{% endif %}</h2>
+  <table class="act-table">
+    <thead><tr><th>Opérateur</th><th>Début ({{ tz_label }})</th><th>Fin</th><th>Bande</th><th>Mode</th><th>Note</th><th></th></tr></thead>
+    <tbody>
+      {% for s in slots %}
+        {% set ps = to_disp(s.start_utc) %}{% set pe = to_disp(s.end_utc) %}
+        <tr{% if s.id in conflicts %} class="act-row-conflict"{% endif %}>
+          <td class="act-call">{{ s.operator_call }}</td>
+          <td>{{ ps.strftime('%d/%m %H:%M') if ps }}{% if s.id in conflicts %} <span class="act-conflict-flag" title="Chevauchement même bande">⚠</span>{% endif %}</td>
+          <td>{{ pe.strftime('%d/%m %H:%M') if pe }}</td>
+          <td>{{ s.band }}</td><td>{{ s.mode }}</td>
+          <td>{{ s.note }}</td>
+          <td class="act-actions">
+            <a class="act-edit" href="/activation/slots/{{ s.id }}/edit" title="Modifier">✎</a>
+            <form method="post" action="/activation/slots/{{ s.id }}/delete" onsubmit="return confirm('Supprimer ce créneau ?')"><button type="submit" class="act-del">✕</button></form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="act-muted">Aucun créneau réservé.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

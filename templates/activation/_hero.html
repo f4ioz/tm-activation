@@ -1,0 +1,17 @@
+{# Bandeau d'un indicatif spécial, d'après sa fiche (station). Variable
+   optionnelle hero_sub : remplace le libellé (ex. « Espace opérateurs »). #}
+<header class="act-hero">
+  {% if station.flags %}<div class="act-hero-flags">{% include "activation/_flags.html" %}</div>{% endif %}
+  {% if station.badge %}<span class="act-badge60">{{ station.badge }}</span>{% endif %}
+  <h1>{{ station.callsign }}</h1>
+  <p class="act-sub">{{ hero_sub if hero_sub is defined else (station.label or '') }}</p>
+  {% if station.subtitle %}<p class="act-hero-cities">{{ station.subtitle }}</p>{% endif %}
+  {% set sd, ed = station.start_date, station.end_date %}
+  {% if sd or ed %}
+    <p class="act-hero-cities">
+      {%- if sd and ed %}Du {{ sd[8:10] }}/{{ sd[5:7] }}/{{ sd[:4] }} au {{ ed[8:10] }}/{{ ed[5:7] }}/{{ ed[:4] }}
+      {%- elif sd %}À partir du {{ sd[8:10] }}/{{ sd[5:7] }}/{{ sd[:4] }}
+      {%- else %}Jusqu'au {{ ed[8:10] }}/{{ ed[5:7] }}/{{ ed[:4] }}{% endif -%}
+    </p>
+  {% endif %}
+</header>

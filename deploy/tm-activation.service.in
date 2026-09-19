@@ -1,0 +1,35 @@
+[Unit]
+Description=TM Activation (@SERVICE@) - indicatifs speciaux radioamateur
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+WorkingDirectory=@DIR@
+Environment=TM_CONFIG=@DIR@/config.yml
+Environment=PYTHONDONTWRITEBYTECODE=1
+# Un seul worker (blocages en memoire + tache de fond QRZ). Les en-tetes du
+# proxy sont traites par l'application selon server.trusted_proxies.
+ExecStart=@DIR@/.venv/bin/uvicorn app.main:app --host @HOST@ --port @PORT@ --workers 1 --no-proxy-headers
+Restart=on-failure
+RestartSec=3
+
+# Durcissement : seul var/ (base, sauvegardes, secret) est inscriptible.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=@PROTECT_HOME@
+ReadWritePaths=@DIR@/var
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Port < 1024 (80 en réseau local) : seule capacité accordée ; sinon aucune.
+AmbientCapabilities=@CAPS@
+CapabilityBoundingSet=@CAPS@
+
+[Install]
+WantedBy=multi-user.target

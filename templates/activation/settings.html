@@ -1,0 +1,204 @@
+{% extends "activation/_base.html" %}
+{% block title %}{{ callsign }} — Réglages{% endblock %}
+{% block topnav %}
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+{% endblock %}
+
+{% block content %}
+<section class="act">
+  <header class="act-head">
+    <h1>Réglages</h1>
+    <nav class="act-tabs">
+      <a href="/activation">Tableau de bord</a>
+      <a href="/activation/planning">Planning</a>
+      <a href="/activation/log">Log QSO</a>
+      <a href="/activation/adif">ADIF</a>
+      <a href="/activation/settings" class="active">Réglages</a>
+    </nav>
+  </header>
+
+  {% if pw_flash == 'ok' %}
+    <p class="act-alert act-alert-ok">Mot de passe opérateurs mis à jour. Actif immédiatement (les sessions déjà ouvertes restent valides).</p>
+  {% elif pw_flash == 'mismatch' %}
+    <p class="act-alert act-alert-err">Les deux saisies ne correspondent pas (ou champ vide).</p>
+  {% elif pw_flash == 'empty' %}
+    <p class="act-alert act-alert-err">Le mot de passe ne peut pas être vide.</p>
+  {% endif %}
+  {% if bk_flash == 'ok' %}
+    <p class="act-alert act-alert-ok">Sauvegarde effectuée.</p>
+  {% elif bk_flash == 'err' %}
+    <p class="act-alert act-alert-err">La sauvegarde a échoué (voir les logs).</p>
+  {% endif %}
+  {% if flags_flash == 'ok' %}
+    <p class="act-alert act-alert-ok">Réglage d'affichage mis à jour.</p>
+  {% endif %}
+  {% if st_flash == 'created' %}
+    <p class="act-alert act-alert-ok">Indicatif spécial créé (pas encore en cours).</p>
+  {% elif st_flash == 'updated' %}
+    <p class="act-alert act-alert-ok">Fiche d'indicatif mise à jour.</p>
+  {% elif st_flash == 'deleted' %}
+    <p class="act-alert act-alert-ok">Fiche supprimée (sauvegarde faite juste avant).</p>
+  {% elif st_flash == 'current' %}
+    <p class="act-alert act-alert-ok">Indicatif en cours : <b>{{ callsign }}</b>. Log, planning, ADIF et points portent désormais sur lui.</p>
+  {% endif %}
+
+  <div class="act-grid act-grid-2">
+    <div class="act-card act-card-wide" id="stations">
+      <h2>Indicatifs spéciaux</h2>
+      {% if st_error %}<p class="act-alert act-alert-err">⚠ {{ st_error }}</p>{% endif %}
+      <div class="act-scroll">
+        <table class="act-table">
+          <thead><tr><th>Indicatif</th><th>Libellé</th><th>Locator</th><th>Dates</th><th>QSO</th><th>Page publique</th><th></th></tr></thead>
+          <tbody>
+            {% for s in stations %}
+              {% set is_cur = s.callsign == callsign %}
+              <tr{% if is_cur %} class="is-current"{% endif %}>
+                <td class="act-call">{{ s.callsign }}{% if is_cur %} <span class="act-live-tag">EN COURS</span>{% endif %}</td>
+                <td>{{ s.label }}</td>
+                <td>{{ s.gridsquare }}</td>
+                <td>{{ s.start_date }}{% if s.end_date %} → {{ s.end_date }}{% endif %}</td>
+                <td>{{ s.qsos }}</td>
+                <td>{% if s.public %}<a href="/{{ s.slug }}">/{{ s.slug }}</a>{% else %}<span class="act-muted">masquée</span>{% endif %}</td>
+                <td class="act-actions">
+                  <a class="act-edit" href="/activation/stations/{{ s.slug }}/edit" title="Modifier la fiche">✎</a>
+                  {% if not is_cur %}<form method="post" action="/activation/stations/{{ s.slug }}/current" onsubmit="return confirm('Mettre {{ s.callsign }} en cours ? Log, planning, ADIF et points des opérateurs basculeront sur cet indicatif.')"><button type="submit" class="act-cancel-btn">Mettre en cours</button></form>{% endif %}
+                  {% if not is_cur and not s.qsos %}<form method="post" action="/activation/stations/{{ s.slug }}/delete" onsubmit="return confirm('Supprimer la fiche {{ s.callsign }} ?{% if s.slots %} Ses {{ s.slots }} créneau(x) planifié(s) seront supprimés aussi.{% endif %} Une sauvegarde est faite juste avant.')"><button type="submit" class="act-del" title="Supprimer la fiche (aucun QSO)">✕</button></form>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <details class="act-new-station"{% if st_error %} open{% endif %}>
+        <summary>+ Nouvel indicatif spécial</summary>
+        <form method="post" action="/activation/stations" class="act-form">
+          <label>Indicatif <input type="text" name="callsign" required maxlength="14" autocapitalize="characters" autocomplete="off" placeholder="TM61XYZ" value="{{ st_form.callsign or '' }}"></label>
+          {% with f = st_form %}{% include "activation/_station_fields.html" %}{% endwith %}
+          <button type="submit">Créer l'indicatif</button>
+        </form>
+      </details>
+      <p class="act-muted act-map-note">Un seul indicatif est « en cours » : c'est lui que les opérateurs loguent et planifient. Les autres restent consultables sur leur page publique et dans <a href="/activations">/activations</a>. Roster et mot de passe opérateurs sont communs à tous. Une fiche sans QSO peut être supprimée (✕) ; dès qu'elle a des QSO, elle est conservée.</p>
+    </div>
+
+    <div class="act-card">
+      <h2>Mot de passe opérateurs</h2>
+      <p class="act-muted">
+        Mot de passe commun aux opérateurs autorisés à activer {{ callsign }}. Il protège
+        l'espace opérateurs (planning, log, ADIF) de tous les indicatifs spéciaux du club,
+        indépendamment du mot de passe admin du site.
+        {% if op_configured %}<br><b>État :</b> configuré.{% else %}<br><b>État :</b> <span class="act-warn">non configuré</span> — à définir ci-dessous.{% endif %}
+      </p>
+      <form method="post" action="/activation/settings/password" class="act-form">
+        <label>Nouveau mot de passe <input type="password" name="new_password" required autocomplete="new-password"></label>
+        <label>Confirmer <input type="password" name="confirm" required autocomplete="new-password"></label>
+        <button type="submit">Mettre à jour</button>
+      </form>
+      <form method="post" action="/activation/logout" class="act-form" style="margin-top:0.8rem;">
+        <button type="submit" class="act-cancel-btn">Se déconnecter de l'espace opérateurs</button>
+      </form>
+    </div>
+
+    <div class="act-card">
+      <h2>Affichage public</h2>
+      <p class="act-muted">Contrôle ce qui est visible sur les pages publiques (ex. <a href="/{{ station.slug }}">/{{ station.slug }}</a>).</p>
+      <form method="post" action="/activation/settings/flags" class="act-form">
+        <label class="act-check"><input type="checkbox" name="show_contacts" value="1"{% if show_contacts %} checked{% endif %}> Afficher la liste des contacts (« Derniers contacts »)</label>
+        <label class="act-check"><input type="checkbox" name="show_map_stats" value="1"{% if show_map_stats %} checked{% endif %}> Afficher la carte, le tableau DXCC et le classement des chasseurs</label>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <p class="act-muted">Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.</p>
+    </div>
+
+    <div class="act-card">
+      <h2>Board public</h2>
+      <p class="act-muted">
+        {% if station.public %}
+          En ligne : la page de {{ callsign }} est sur <a href="/{{ station.slug }}">/{{ station.slug }}</a>.
+        {% else %}
+          Masquée : coche « Page publique en ligne » dans la fiche de {{ callsign }} (Indicatifs spéciaux).
+        {% endif %}
+      </p>
+      <p class="act-muted">Toutes les activations publiées : <a href="/activations">/activations</a>.</p>
+      {% if is_admin %}<p class="act-muted">Tu es connecté en <b>admin site</b> (accès garanti même sans mot de passe opérateur).</p>{% endif %}
+    </div>
+
+    <div class="act-card">
+      <h2>Connexions</h2>
+      <p class="act-muted">
+        <b>7 jours :</b> {{ visits_summary.logins_7d }} connexion(s) réussie(s)
+        {%- if visits_summary.failed_logins_7d %}<br><span class="act-warn">{{ visits_summary.failed_logins_7d }} connexion(s) ratée(s)</span>{% else %} · aucune ratée{% endif %}
+      </p>
+      {% if visits_summary.recent_failures %}
+      <div class="act-scroll">
+        <table class="act-table">
+          <thead><tr><th>Date (UTC)</th><th>IP</th><th>Accès</th><th>Indicatif</th></tr></thead>
+          <tbody>
+            {% for f in visits_summary.recent_failures %}<tr><td>{{ f.when }}</td><td>{{ f.ip }}</td><td>{{ f.kind }}</td><td>{{ f.callsign }}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      <p class="act-muted act-map-note">Une IP publique est bloquée 15 min après 5 échecs de connexion ; le réseau local ne l'est jamais. Journal conservé 90 jours.</p>
+      <form method="post" action="/logout" class="act-form"><button type="submit" class="act-cancel-btn">Se déconnecter (admin)</button></form>
+    </div>
+
+    <div class="act-card">
+      <h2>Callbook QRZ</h2>
+      <p class="act-muted">
+        Fiches QRZ (nom, locator, DXCC) des stations contactées : récupérées à la saisie
+        dans le log, et doucement en tâche de fond (1 indicatif toutes les ~10 s).
+        <br><b>Identifiées :</b> {{ callbook.ok }} / {{ callbook.stations }}
+        {% if callbook.notfound %} · {{ callbook.notfound }} inconnue(s) de QRZ{% endif %}
+        {% if callbook.pending %} · <span class="act-warn">{{ callbook.pending }} en attente</span>{% endif %}
+      </p>
+    </div>
+
+    <div class="act-card act-card-wide" id="points">
+      <h2>Classement aux points — {{ callsign }}</h2>
+      {% if sc_flash == 'ok' %}<p class="act-alert act-alert-ok">Règle de points enregistrée.</p>{% endif %}
+      <form method="post" action="/activation/settings/scoring" class="act-form">
+        <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if scoring.enabled %} checked{% endif %}> Classer les chasseurs aux points sur <a href="/{{ station.slug }}">/{{ station.slug }}</a> (sinon : couples bande×mode)</label>
+        <label class="act-check"><input type="checkbox" name="unique_band_mode" value="1"{% if scoring.unique_band_mode %} checked{% endif %}> Un seul QSO compté par bande × mode (les doublons rapportent 0)</label>
+        <fieldset class="act-fieldset">
+          <legend><label class="act-check"><input type="checkbox" name="per_qso_on" value="1"{% if scoring.per_qso_on %} checked{% endif %}> Nombre de contacts</label></legend>
+          <label>Points par QSO <input type="number" name="per_qso" min="0" max="1000" value="{{ scoring.per_qso }}"></label>
+        </fieldset>
+        <fieldset class="act-fieldset">
+          <legend><label class="act-check"><input type="checkbox" name="mode_on" value="1"{% if scoring.mode_on %} checked{% endif %}> Mode</label></legend>
+          <div class="act-mode-grid">
+            {% for m in modes %}<label>{{ m }} <input type="number" name="mode_{{ m }}" min="0" max="1000" value="{{ scoring.mode_points.get(m, scoring.mode_default) }}"></label>{% endfor %}
+            <label>Autres <input type="number" name="mode_default" min="0" max="1000" value="{{ scoring.mode_default }}"></label>
+          </div>
+        </fieldset>
+        <fieldset class="act-fieldset">
+          <legend><label class="act-check"><input type="checkbox" name="distance_on" value="1"{% if scoring.distance_on %} checked{% endif %}> Distance depuis {{ my_grid or 'la station' }}</label></legend>
+          <div class="act-row">
+            <label>1 point tous les (km) <input type="number" name="km_per_point" min="1" max="20000" value="{{ scoring.km_per_point }}"></label>
+            <label>Plafond (0 = aucun) <input type="number" name="distance_max" min="0" max="1000" value="{{ scoring.distance_max }}"></label>
+          </div>
+        </fieldset>
+        <button type="submit">Enregistrer la règle</button>
+      </form>
+      <p class="act-muted act-map-note">Règle actuelle : {{ scoring_summary }}. Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).</p>
+    </div>
+
+    <div class="act-card">
+      <h2>Sauvegardes</h2>
+      <p class="act-muted">
+        Snapshots automatiques (base + mot de passe) dans <code>var/backups/</code> :
+        au démarrage et après chaque modification. Rotation sur les 40 derniers.
+        {% if last_backup_str %}
+          <br><b>Dernière :</b> {{ last_backup_str }} · {{ backup_count }} snapshot(s).
+        {% else %}
+          <br><span class="act-warn">Aucune sauvegarde encore.</span>
+        {% endif %}
+      </p>
+      <div class="act-inline">
+        <form method="post" action="/activation/settings/backup"><button type="submit">Sauvegarder maintenant</button></form>
+        <a class="act-cancel-btn" href="/activation/settings/backup.sqlite">Télécharger (.sqlite)</a>
+      </div>
+      <p class="act-muted">Le téléchargement récupère une copie de la base à conserver hors serveur.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

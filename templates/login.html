@@ -1,0 +1,26 @@
+{% extends "activation/_base.html" %}
+{% block title %}{{ callsign }} — Administration{% endblock %}
+
+{% block content %}
+<section class="act">
+  {% with hero_sub = 'Administration' %}{% include "activation/_hero.html" %}{% endwith %}
+
+  <div class="act-grid act-grid-2">
+    <div class="act-card">
+      <h2>Connexion administrateur</h2>
+      {% if error %}<p class="act-alert act-alert-err">{{ error }}</p>{% endif %}
+      {% if not configured %}
+        <p class="act-muted">Aucun mot de passe administrateur : renseigner <code>auth.password</code> dans <code>config.yml</code>, puis redémarrer le service.</p>
+      {% endif %}
+      <form method="post" action="/login" class="act-form">
+        <label>Mot de passe administrateur
+          <input type="password" name="password" required autofocus autocomplete="current-password">
+        </label>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit">Entrer</button>
+      </form>
+      <p class="act-muted">Opérateur ? <a href="/activation/login">Connexion opérateurs</a> (indicatif + mot de passe commun).</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

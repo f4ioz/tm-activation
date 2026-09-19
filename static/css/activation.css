@@ -1,0 +1,403 @@
+/* Module d'activation indicatif temporaire (TM…) — mobile-first.
+ * Site "spécial" autonome : layout propre (barre + wrap + footer), sans le
+ * chrome du site d'origine. */
+
+/* ── Layout autonome ──────────────────────────────────────────────────── */
+body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
+.act-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 0.55rem clamp(0.8rem, 3vw, 2rem);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.act-bar-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+.act-bar-flags { display: inline-flex; align-items: center; gap: 0.25rem; }
+.act-bar-flags .flag { width: 18px; height: 12px; }
+.act-bar-call {
+  font-family: var(--font-display, 'Orbitron', sans-serif); font-weight: 900;
+  letter-spacing: 0.12em; color: var(--accent); font-size: 1.05rem;
+}
+.act-bar-right { display: flex; align-items: center; gap: 0.6rem; }
+.act-bar-logout button {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: 3px; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.95rem; line-height: 1;
+}
+.act-bar-logout button:hover { color: var(--red, #c0392b); border-color: var(--red, #c0392b); }
+.act-wrap {
+  flex: 1; width: 100%; max-width: 1100px; margin: 0 auto;
+  padding: clamp(1rem, 3vw, 2rem) clamp(0.8rem, 3vw, 2rem);
+  display: flex; flex-direction: column; gap: 1.1rem;
+}
+.act-site-foot {
+  text-align: center; color: var(--text-muted); font-size: 0.8rem;
+  padding: 1.2rem; border-top: 1px solid var(--border);
+  display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;
+}
+.act-site-foot a { color: var(--cyan); }
+
+/* ── KPI (dashboard pro / score) ──────────────────────────────────────── */
+.act-kpis, .act-score {
+  display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.act-score { margin: 0.9rem 0; }
+.act-kpi {
+  border: 1px solid var(--border); border-radius: var(--radius, 4px);
+  background: var(--panel); padding: 0.9rem 1rem; text-align: center;
+}
+.act-kpi-n {
+  display: block; font-family: var(--font-display, 'Orbitron', sans-serif);
+  font-size: 2rem; font-weight: 900; color: var(--accent); line-height: 1;
+}
+.act-kpi-l { display: block; margin-top: 0.25rem; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* ── Comptes à rebours ────────────────────────────────────────────────── */
+.act-countdown { margin: 0.5rem 0 0; font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--text-muted); }
+.act-countdown.is-soon { color: var(--cyan); }
+.act-countdown.is-onair { color: var(--green, #2ecc71); font-weight: 600; }
+.act-countdown.is-done { color: var(--text-dim, var(--text-muted)); }
+
+/* ── Conflits de créneaux ─────────────────────────────────────────────── */
+.act-row-conflict td { background: color-mix(in srgb, var(--warn, #e0a800) 12%, transparent); }
+.act-conflict-flag { color: var(--warn, #e0a800); }
+.act-conflict-count { color: var(--warn, #e0a800); font-size: 0.75rem; font-weight: 700; margin-left: 0.4rem; }
+
+/* ── Résultats de recherche mis en avant (haut de page) ───────────────── */
+.act-results-top { border-left: 4px solid var(--accent); }
+.act-results-top h2 { text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--text); }
+
+/* ── Recherche publique (compacte) ────────────────────────────────────── */
+.act-search-slim { padding: 0.6rem 0.9rem; }
+.act-search-slim h2 { margin: 0 0 0.4rem; font-size: 0.78rem; }
+.act-search-slim .act-inline { margin: 0; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap; }
+.act-search-slim .act-inline label { font-size: 0.8rem; }
+.act-search-slim .act-inline input { max-width: 180px; }
+.act-search-results { margin-top: 0.7rem; }
+
+/* ── Coche satellite ──────────────────────────────────────────────────── */
+.act-satrow { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+
+/* ── Sélecteur de fuseau d'affichage (Local / UTC) ────────────────────── */
+.act-tzswitch { display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono, monospace); font-size: 0.8rem; flex-wrap: wrap; }
+.act-tz-lbl { color: var(--text-muted); }
+.act-tzswitch a {
+  text-decoration: none; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.55rem;
+}
+.act-tzswitch a:hover { color: var(--accent); border-color: var(--accent); }
+.act-tzswitch a.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+
+.act { display: flex; flex-direction: column; gap: 1.1rem; }
+
+.act-head h1 {
+  font-family: var(--font-display, 'Orbitron', sans-serif);
+  letter-spacing: 0.08em; margin: 0;
+}
+.act-sub { color: var(--text-muted); margin: 0.2rem 0 0; }
+
+/* ── Hero (bandeau de l'indicatif) — compact ──────────────────────────────── */
+.act-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius, 4px);
+  padding: 0.7rem 1.1rem 0.85rem; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(0,86,179,0.20), transparent 55%),
+    radial-gradient(120% 140% at 100% 0%, rgba(214,40,40,0.18), transparent 55%),
+    var(--panel);
+}
+.act-hero::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, #0055A4 0 33%, #fff 33% 50%, #FDDA24 50% 66%, #EF3340 66% 100%);
+  opacity: 0.85;
+}
+.act-hero h1 {
+  font-family: var(--font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.5rem, 5vw, 2.3rem); letter-spacing: 0.09em;
+  margin: 0;
+  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.act-hero .act-badge60 {
+  display: inline-block; font-family: var(--font-display, 'Orbitron', sans-serif);
+  font-weight: 900; font-size: 0.72rem; letter-spacing: 0.15em;
+  border: 1px solid var(--accent); color: var(--accent);
+  border-radius: 999px; padding: 0.1rem 0.6rem;
+}
+.act-hero .act-sub { color: var(--text); font-size: 0.92rem; margin: 0; }
+.act-hero-cities { color: var(--text-muted); margin: 0; font-size: 0.8rem; letter-spacing: 0.03em; }
+
+/* ── Drapeaux CSS (rendu garanti) + préfixes radio F / ON ─────────────── */
+.act-flags { display: inline-flex; align-items: center; gap: 0.4rem; }
+.flag {
+  display: inline-block; width: 22px; height: 15px; border-radius: 2px;
+  border: 1px solid rgba(0,0,0,0.3); vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+}
+.flag-fr { background: linear-gradient(90deg, #0055A4 0 33.33%, #fff 33.33% 66.66%, #EF3340 66.66% 100%); }
+.flag-be { background: linear-gradient(90deg, #000 0 33.33%, #FAE042 33.33% 66.66%, #ED2939 66.66% 100%); }
+.flag-de { background: linear-gradient(180deg, #000 0 33.33%, #DD0000 33.33% 66.66%, #FFCE00 66.66% 100%); }
+.flag-it { background: linear-gradient(90deg, #009246 0 33.33%, #fff 33.33% 66.66%, #CE2B37 66.66% 100%); }
+.flag-nl { background: linear-gradient(180deg, #AE1C28 0 33.33%, #fff 33.33% 66.66%, #21468B 66.66% 100%); }
+.flag-lu { background: linear-gradient(180deg, #EA141D 0 33.33%, #fff 33.33% 66.66%, #51ADDA 66.66% 100%); }
+.flag-es { background: linear-gradient(180deg, #AA151B 0 25%, #F1BF00 25% 75%, #AA151B 75% 100%); }
+.act-prefix {
+  font-family: var(--font-display, 'Orbitron', sans-serif); font-weight: 700;
+  letter-spacing: 0.06em; color: var(--text); font-size: 0.85rem;
+}
+
+/* ── Prochaines activations (mises en avant) ──────────────────────────── */
+.act-next-title {
+  font-family: var(--font-display, 'Orbitron', sans-serif); letter-spacing: 0.08em;
+  margin: 0.4rem 0 0.2rem; font-size: 1.1rem;
+}
+.act-next {
+  display: grid; gap: 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.act-next-card {
+  border: 1px solid var(--border); border-left: 4px solid var(--cyan);
+  border-radius: var(--radius, 4px); padding: 1rem 1.1rem; background: var(--panel);
+}
+.act-next-card.is-live {
+  border: 2px solid var(--green, #2ecc71); border-left-width: 4px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green, #2ecc71) 25%, transparent),
+              0 0 16px color-mix(in srgb, var(--green, #2ecc71) 35%, transparent);
+}
+.act-next-when { font-family: var(--font-mono, monospace); color: var(--cyan); font-size: 1.15rem; font-weight: 600; }
+.act-next-op { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: 1.6rem; color: var(--accent); margin: 0.25rem 0; }
+/* Indicatif opérateur sous l'indicatif spécial (dans les cartes) : nouvelle ligne, même
+   police qu'au-dessus, plus gros et plus voyant. */
+.act-op-sub {
+  display: block; margin-top: 0.1em; margin-left: 0;
+  font-family: var(--font-display, 'Orbitron', sans-serif); font-weight: 700;
+  font-size: 0.72em; letter-spacing: 0.04em; white-space: normal;
+  /* Cyan rehaussé vers la couleur de texte → un peu plus visible dans les
+     deux thèmes (plus lumineux en sombre, plus contrasté en clair). */
+  color: color-mix(in srgb, var(--cyan) 70%, var(--text) 30%);
+}
+/* Bandeau « EN DIRECT » : on garde l'opérateur sur la même ligne. */
+.act-live-op .act-op-sub {
+  display: inline; margin-top: 0; margin-left: 0.5em; font-size: 0.6em;
+}
+.act-next-bm { color: var(--text-muted); font-family: var(--font-mono, monospace); }
+/* Note du créneau (ex. « QRV Sat FO-29 ») : sur sa propre ligne, lisible. */
+.act-next-note {
+  margin: 0.35rem 0 0; padding-left: 0.5rem; border-left: 2px solid var(--cyan);
+  color: var(--text); font-size: 0.9rem; overflow-wrap: anywhere;
+}
+.act-past-card .act-next-note { color: var(--text-muted); border-left-color: var(--text-muted); }
+.act-sat-icon { font-style: normal; }  /* 🛰️ devant une note « SAT … » */
+.act-live-tag {
+  display: inline-block; font-size: 0.7rem; letter-spacing: 0.12em; font-weight: 700;
+  background: var(--green, #2ecc71); color: var(--bg); border-radius: 3px; padding: 0.1rem 0.45rem; margin-left: 0.4rem;
+}
+.act-sat-tag { color: var(--cyan); font-weight: 600; }
+
+/* Cartes « activations passées » : même format que les futures, couleur mutée. */
+.act-past-title { color: var(--text-muted); }
+.act-past-card { border-left-color: var(--text-muted); opacity: 0.8; }
+.act-past-card .act-next-when { color: var(--text-muted); }
+.act-past-card .act-next-op { color: var(--text-muted); }
+
+/* ── Bandeau « EN DIRECT » (activation en cours) ──────────────────────── */
+.act-live-now {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem;
+  padding: 0.75rem 1.1rem; border-radius: var(--radius, 4px);
+  border: 2px solid var(--green, #2ecc71); border-left-width: 5px;
+  background: color-mix(in srgb, var(--green, #2ecc71) 8%, var(--panel));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green, #2ecc71) 20%, transparent),
+              0 0 16px color-mix(in srgb, var(--green, #2ecc71) 28%, transparent);
+}
+.act-live-now .act-live-tag { margin-left: 0; animation: act-live-pulse 1.6s ease-in-out infinite; }
+.act-live-op { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+.act-live-bm { font-family: var(--font-mono, monospace); color: var(--text); }
+.act-live-until { color: var(--text-muted); font-size: 0.85rem; }
+.act-live-now .act-countdown { margin: 0; margin-left: auto; }
+@keyframes act-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.act-tabs {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+.act-tabs a {
+  padding: 0.45rem 0.9rem; text-decoration: none; color: var(--text-muted);
+  border: 1px solid transparent; border-bottom: none; border-radius: 3px 3px 0 0;
+  font-family: var(--font-mono, monospace); font-size: 0.9rem;
+}
+.act-tabs a.active {
+  color: var(--accent); border-color: var(--border);
+  background: var(--panel); position: relative; top: 1px;
+}
+.act-tabs a:hover { color: var(--accent); }
+
+.act-grid {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.act-grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+.act-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius, 3px); padding: 1rem 1.1rem;
+}
+.act-card h2 {
+  font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted); margin: 0 0 0.6rem;
+}
+
+.act-op { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin: 0.1rem 0; }
+.act-big { font-size: 2.6rem; font-weight: 700; color: var(--accent); margin: 0; line-height: 1; }
+.act-time { color: var(--cyan); font-family: var(--font-mono, monospace); }
+.act-muted { color: var(--text-muted); }
+
+.act-bars { list-style: none; margin: 0; padding: 0; }
+.act-bars li {
+  display: flex; justify-content: space-between; padding: 0.25rem 0;
+  border-bottom: 1px dotted var(--border); font-family: var(--font-mono, monospace);
+}
+.act-bars li b { color: var(--accent); }
+
+/* Formulaires */
+.act-form { display: flex; flex-direction: column; gap: 0.7rem; }
+.act-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-muted); }
+.act-row { display: grid; gap: 0.7rem; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.act-form input, .act-form select {
+  background: var(--bg-2, var(--bg)); color: var(--text);
+  border: 1px solid var(--border); border-radius: 3px; padding: 0.5rem 0.6rem;
+  font-family: var(--font-mono, monospace); font-size: 0.95rem;
+}
+.act-call, .act-form input[name="call"] { text-transform: uppercase; }
+.act-form button, .act-op-select button {
+  align-self: flex-start; cursor: pointer;
+  background: var(--accent); color: var(--bg);
+  border: none; border-radius: 3px; padding: 0.55rem 1.1rem;
+  font-family: var(--font-mono, monospace); font-weight: 600;
+}
+.act-form button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.act-inline { display: flex; align-items: flex-end; gap: 0.6rem; flex-wrap: wrap; }
+.act-op-select { display: flex; flex-direction: column; gap: 0.4rem; }
+.act-utc-hint { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
+
+/* Tables */
+.act-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono, monospace); font-size: 0.86rem; }
+.act-table th, .act-table td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--td-border, var(--border)); }
+.act-table th { color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
+.act-table tr:hover td { background: var(--row-hover, transparent); }
+.act-table .act-call { color: var(--accent); font-weight: 600; }
+
+.act-del {
+  background: transparent; border: 1px solid var(--border); color: var(--red, #c0392b);
+  border-radius: 3px; cursor: pointer; padding: 0.15rem 0.45rem; line-height: 1;
+}
+.act-del:hover { border-color: var(--red, #c0392b); }
+.act-actions { display: flex; gap: 0.35rem; align-items: center; }
+.act-edit {
+  border: 1px solid var(--border); color: var(--accent); text-decoration: none;
+  border-radius: 3px; padding: 0.15rem 0.45rem; line-height: 1;
+}
+.act-edit:hover { border-color: var(--accent); }
+.act-cancel { color: var(--text-muted); text-decoration: none; align-self: center; }
+.act-cancel:hover { color: var(--text); }
+.act-cancel-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: 3px; padding: 0.4rem 0.9rem; cursor: pointer;
+  font-family: var(--font-mono, monospace); font-size: 0.85rem;
+}
+.act-cancel-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
+.act-log-head { display: flex; justify-content: space-between; align-items: baseline; }
+.act-count { color: var(--accent); }
+.act-exports { font-family: var(--font-mono, monospace); font-size: 0.85rem; }
+
+.act-alert { padding: 0.6rem 0.8rem; border-radius: 3px; margin: 0 0 0.8rem; font-family: var(--font-mono, monospace); font-size: 0.9rem; }
+.act-alert-err { border: 1px solid var(--red, #c0392b); color: var(--red, #c0392b); }
+.act-alert-dupe { border: 1px solid var(--warn, #e0a800); color: var(--warn, #e0a800); }
+.act-alert-ok { border: 1px solid var(--green, #2ecc71); color: var(--green, #2ecc71); }
+.act-warn { color: var(--warn, #e0a800); font-size: 0.85rem; margin: 0; }
+
+.act-check { flex-direction: row !important; align-items: center; gap: 0.4rem !important; }
+.act-check input { width: auto; }
+.act-qrz-hint { min-height: 1.1em; margin: 0; font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--cyan); }
+.act-qrz-hint.is-miss { color: var(--text-muted); }
+.act-lotw-note { font-size: 0.82rem; margin: 0.8rem 0 0; }
+
+/* ── Log : coches « Maintenant » / QRZ ────────────────────────────────── */
+.act-toggles { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+.act-when { display: flex; flex-direction: column; gap: 0.35rem; }
+.act-when input[type="datetime-local"]:disabled { opacity: 0.55; cursor: not-allowed; }
+@media (min-width: 700px) { .act-when { grid-column: span 2; } }  /* date + heure lisibles */
+
+/* ── Board public : carte, DXCC, classement ───────────────────────────── */
+.act-map {
+  height: clamp(320px, 55vh, 520px); margin: 0.2rem 0 0.4rem;
+  border: 1px solid var(--border); border-radius: var(--radius, 3px);
+}
+.act-map.leaflet-container { background: var(--bg-2, var(--bg)); font-family: var(--font-mono, monospace); }
+.act-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--text-muted); }
+.act-map .leaflet-control-attribution a { color: var(--cyan); }
+/* Contour foncé : points lisibles sur le fond clair d'OpenStreetMap. */
+.act-map-pt { stroke: color-mix(in srgb, var(--cyan) 50%, #000); fill: var(--cyan); }
+.act-map-home { stroke: color-mix(in srgb, var(--accent) 50%, #000); fill: var(--accent); }
+.leaflet-tooltip.act-map-label {
+  background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--border);
+  color: var(--text); box-shadow: none; padding: 1px 5px; font-size: 11px; font-weight: 600;
+}
+.leaflet-tooltip.act-map-label::before { display: none; }
+.leaflet-tooltip.act-map-label.is-home { color: var(--accent); border-color: var(--accent); }
+/* Étiquettes d'indicatifs masquées à petite échelle (illisibles), sauf la station. */
+.act-map .act-map-label:not(.is-home) { display: none; }
+.act-map.act-map-labels .act-map-label { display: block; }
+.act-map-note { font-size: 0.8rem; margin: 0.4rem 0 0; }
+.act-scroll { max-height: 440px; overflow: auto; }
+.act-rank td:first-child { color: var(--text-muted); }
+.act-rank tr.is-me td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.act-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+
+/* ── ADIF : sélection à la souris, aperçu d'import ────────────────────── */
+.act-sel-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 0.8rem; margin: 0 0 0.6rem; }
+.act-sel-bar label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; color: var(--text-muted); }
+.act-sel-bar select {
+  background: var(--bg-2, var(--bg)); color: var(--text); border: 1px solid var(--border);
+  border-radius: 3px; padding: 0.35rem 0.5rem; font-family: var(--font-mono, monospace);
+}
+.act-sel-count { font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--text-muted); }
+.act-sel-go {
+  cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 3px;
+  padding: 0.45rem 1rem; font-family: var(--font-mono, monospace); font-weight: 600;
+}
+.act-sel-go:disabled { opacity: 0.45; cursor: not-allowed; }
+.act-sel-table tr[data-sel-row] { cursor: pointer; user-select: none; }
+.act-sel-table tr.is-sel td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.act-sel-table tr.is-invalid td { opacity: 0.6; }
+.act-scroll-tall { max-height: 65vh; }
+.act-imp-tag {
+  display: inline-block; font-family: var(--font-mono, monospace); font-size: 0.72rem;
+  border: 1px solid currentColor; border-radius: 3px; padding: 0 0.35rem; white-space: nowrap;
+}
+.act-imp-new { color: var(--green, #2ecc71); }
+.act-imp-worked { color: var(--cyan); }
+.act-imp-in_log, .act-imp-file_dupe { color: var(--warn, #e0a800); }
+.act-imp-invalid { color: var(--red, #c0392b); }
+
+/* ── Réglages : règle de points ───────────────────────────────────────── */
+.act-card-wide { grid-column: 1 / -1; }
+.act-fieldset {
+  border: 1px solid var(--border); border-radius: 3px; margin: 0;
+  padding: 0.5rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem;
+}
+.act-fieldset legend { padding: 0 0.3rem; }
+.act-mode-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+.act-form input[type="number"] { max-width: 9rem; }
+
+/* ── Indicatifs spéciaux ──────────────────────────────────────────────── */
+a.act-station-card { display: block; text-decoration: none; color: inherit; }
+a.act-station-card:hover { border-color: var(--accent); }
+.act-station-card.is-current { border-left-color: var(--green, #2ecc71); }
+.act-table tr.is-current td { background: color-mix(in srgb, var(--green, #2ecc71) 8%, transparent); }
+.act-new-station summary { cursor: pointer; color: var(--accent); margin: 0.9rem 0 0.6rem; font-family: var(--font-mono, monospace); }
+.act-actions form { display: inline; }
+.act-archive-note { border-left: 4px solid var(--text-muted); }
+.act code { font-family: var(--font-mono, monospace); background: var(--bg-2, var(--bg)); padding: 0 0.25em; border-radius: 2px; }

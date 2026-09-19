@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ callsign }}{% endblock %}</title>
+  <meta name="robots" content="{% block robots %}noindex, nofollow{% endblock %}">
+  <meta name="description" content="{% block meta_description %}Activation spéciale {{ callsign }} — {{ label }}.{% endblock %}">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('theme'); } catch (e) {}
+      document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ asset('/static/vendor/fonts/fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+  <link rel="stylesheet" href="{{ asset('/static/css/activation.css') }}">
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="scanlines act-site">
+  <header class="act-bar">
+    <a class="act-bar-brand" href="{% block brand_href %}/activation{% endblock %}">
+      <span class="act-bar-flags">
+        {%- if station is defined and station %}{% for f in station.flags.split(',') if f %}<span class="flag flag-{{ f }}"></span>{% endfor %}{% endif -%}
+      </span>
+      <span class="act-bar-call">{{ callsign }}</span>
+    </a>
+    <div class="act-bar-right">
+      {% block topnav %}{% endblock %}
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Basculer thème clair/sombre" title="Thème clair/sombre">
+        <span class="theme-icon" aria-hidden="true">☀</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="act-wrap">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="act-site-foot">
+    <span>{{ label }}</span>
+    <span class="act-foot-sep">· station événementielle{% if club.name %} · {% if club.website %}<a href="{{ club.website }}">{{ club.name }}</a>{% else %}{{ club.name }}{% endif %}{% endif %}</span>
+  </footer>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var btn = document.getElementById('theme-toggle');
+      if (!btn) return;
+      var icon = btn.querySelector('.theme-icon');
+      function render() { if (icon) icon.textContent = root.getAttribute('data-theme') === 'light' ? '☾' : '☀'; }
+      btn.addEventListener('click', function () {
+        var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('theme', next); } catch (e) {}
+        render();
+      });
+      render();
+    })();
+  </script>
+</body>
+</html>
