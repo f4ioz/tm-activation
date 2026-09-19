@@ -15,15 +15,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.1.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.1.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.2.1.tar.gz
 ```
 
 ## Fonctionnalités
@@ -94,22 +94,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.2.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.2.1.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.2.0.tar.gz
-   cd tm-activation-1.2.0
+   tar xzf tm-activation-1.2.1.tar.gz
+   cd tm-activation-1.2.1
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.2.0.zip
-   cd tm-activation-1.2.0
+   unzip tm-activation-1.2.1.zip
+   cd tm-activation-1.2.1
    sudo bash install.sh --lan
    ```
 
@@ -175,7 +175,7 @@ nœud :
 
 | Action | Commande |
 |---|---|
-| Mettre à jour | `pct exec <ID> -- tm-activation-update` |
+| Mettre à jour | `pct exec <ID> -- /usr/local/sbin/tm-activation-update` |
 | Diagnostic | `pct exec <ID> -- /opt/tm-activation/install.sh --check` |
 | Journal | `pct exec <ID> -- journalctl -u tm-activation -n 50` |
 | Console | `pct enter <ID>` |
@@ -190,8 +190,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.2.0.tar.gz
-cd tm-activation-1.2.0
+tar xzf tm-activation-1.2.1.tar.gz
+cd tm-activation-1.2.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -313,7 +313,9 @@ version installée est déjà la dernière) :
 sudo bash /opt/tm-activation/deploy/update-from-github.sh
 ```
 
-(sur un conteneur Proxmox : `pct exec <ID> -- tm-activation-update`).
+(sur un conteneur Proxmox, depuis le nœud :
+`pct exec <ID> -- /usr/local/sbin/tm-activation-update` ; le chemin complet
+est nécessaire, `pct exec` ne cherche pas dans `/usr/local/sbin`).
 
 Ou à la main, depuis l'archive de la nouvelle version :
 

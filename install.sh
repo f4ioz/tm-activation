@@ -887,7 +887,7 @@ summary() {
   line "Données" "$DIR/var/ (sauvegardes automatiques : var/backups/)"
   line "Diagnostic" "sudo $DIR/install.sh --check"
   if [[ -x /usr/local/sbin/tm-activation-update ]]; then
-    line "Mise à jour" "sudo tm-activation-update (dernière version GitHub, réglages repris)"
+    line "Mise à jour" "/usr/local/sbin/tm-activation-update (root ; dernière version GitHub, réglages repris)"
   else
     local tm_dir=""
     if [[ $DIR != /opt/tm-activation ]]; then tm_dir="TM_DIR=$DIR "; fi

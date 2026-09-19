@@ -19,6 +19,7 @@ set -euo pipefail
 REPO="${TM_REPO:-f4ioz/tm-activation}"
 BRANCH="${TM_BRANCH:-main}"
 RAW="${TM_RAW_URL:-https://raw.githubusercontent.com/$REPO/$BRANCH}"
+# Chemin complet partout : pct exec n'a pas /usr/local/sbin dans son PATH.
 UPDATER="/usr/local/sbin/tm-activation-update"
 
 # ─── Couleurs ─────────────────────────────────────────────────────────────────
@@ -310,7 +311,7 @@ show_summary() {
   echo "  CT          : $CTID ($CT_HOST)  IP ${ip:-?}"
   echo "  Console     : pct enter $CTID"
   if [[ -n $SSH_PUBKEY ]]; then echo "  SSH         : ssh root@${ip:-$CT_HOST.local}"; fi
-  echo "  Mise à jour : pct exec $CTID -- tm-activation-update"
+  echo "  Mise à jour : pct exec $CTID -- $UPDATER"
   echo "  Diagnostic  : pct exec $CTID -- /opt/tm-activation/install.sh --check"
   echo "  Journal     : pct exec $CTID -- journalctl -u tm-activation -n 50"
   if [[ $INSTALL_MODE == quick ]]; then
@@ -324,7 +325,7 @@ show_summary() {
 
 install_failed() {
   msg_err "L'installation de TM Activation n'a pas abouti (la CT $CTID est conservée)."
-  echo "  Relancer   : pct exec $CTID -- tm-activation-update   (guidée : lxc-attach -n $CTID -- tm-activation-update)"
+  echo "  Relancer   : pct exec $CTID -- $UPDATER   (guidée : lxc-attach -n $CTID -- $UPDATER)"
   echo "  Console    : pct enter $CTID"
   echo "  Supprimer  : pct stop $CTID && pct destroy $CTID"
   exit 1

@@ -194,6 +194,9 @@ def test_lxc_quick_test_install(tmp_path, proxmox) -> None:
     assert "TM_CALLSIGN=TM1ABC" in run and "TM_PUBLIC=1" in run and run.endswith("--lan --non-interactive")
     assert "lxc-attach" not in log
     assert "http://192.168.1.50/" in r.stdout and "pct destroy 102" in r.stdout
+    # pct exec n'a pas /usr/local/sbin dans son PATH : commandes affichées avec le chemin complet.
+    assert "pct exec 102 -- /usr/local/sbin/tm-activation-update" in r.stdout
+    assert "-- tm-activation-update" not in r.stdout
 
 
 @pytest.mark.parametrize("proxmox", ["avec-pvesh", "sans-pvesh"], indirect=True)
@@ -228,6 +231,7 @@ def test_lxc_install_failure_keeps_ct_and_explains(tmp_path, proxmox) -> None:
     r = lxc(proxmox, [*CT_DEFAULTS, "", "", "pw", "pw", "2", "", ""], FAIL="1")
     assert r.returncode == 1
     assert "la CT 102 est conservée" in r.stderr and "pct enter 102" in r.stdout
+    assert "pct exec 102 -- /usr/local/sbin/tm-activation-update" in r.stdout
     assert "destroy" not in calls(tmp_path)
 
 
