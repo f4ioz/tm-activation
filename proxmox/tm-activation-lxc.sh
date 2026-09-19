@@ -66,9 +66,22 @@ D_BRIDGE="vmbr0"
 D_IP="dhcp"
 D_TEST_CALL="TM0TEST"
 
+# Les ID sont communs aux VM et aux CT, sur tout le cluster : pvesh le sait,
+# pct status ne voit que les CT du nœud.
+id_free() {
+  if command -v pvesh >/dev/null; then
+    pvesh get /cluster/nextid --vmid "$1" >/dev/null 2>&1
+  else
+    ! pct status "$1" &>/dev/null && ! qm status "$1" &>/dev/null
+  fi
+}
+
 find_next_ctid() {
-  local id=100
-  while pct status "$id" &>/dev/null; do ((id++)); done
+  local id
+  id=$(pvesh get /cluster/nextid 2>/dev/null | tr -d '"[:space:]') || true
+  if [[ $id =~ ^[0-9]+$ ]]; then echo "$id"; return; fi
+  id=100
+  while ! id_free "$id"; do ((id++)); done
   echo "$id"
 }
 
@@ -106,8 +119,8 @@ prompt_config() {
   echo -e "${BOLD}Conteneur${NC} (Entrée = valeur proposée)"
   while :; do
     ask CTID "Container ID" "$d_ctid"
-    if [[ $CTID =~ ^[0-9]+$ ]] && (( CTID >= 100 )) && ! pct status "$CTID" &>/dev/null; then break; fi
-    msg_warn "ID invalide ou déjà utilisé."
+    if [[ $CTID =~ ^[0-9]+$ ]] && (( CTID >= 100 )) && id_free "$CTID"; then break; fi
+    msg_warn "ID invalide ou déjà utilisé (VM ou CT)."
   done
   while :; do
     ask CT_HOST "Nom de la CT (adresse http://<nom>.local)" "$D_HOSTNAME"

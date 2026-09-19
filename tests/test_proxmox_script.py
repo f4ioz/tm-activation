@@ -117,6 +117,18 @@ case "$1" in
 esac
 exit 0
 """
+FAKE_QM = r"""#!/usr/bin/env bash
+[[ $1 == status && $2 == 101 ]]                        # la VM 101 existe déjà
+"""
+FAKE_PVESH = r"""#!/usr/bin/env bash
+# /cluster/nextid : prochain ID libre (VM et CT) ; --vmid N : échec si N est pris.
+if [[ "$*" == *--vmid* ]]; then
+  v="${@: -1}"
+  if [[ $v == 100 || $v == 101 ]]; then echo "VM $v already exists" >&2; exit 2; fi
+  echo "$v"; exit 0
+fi
+echo 102
+"""
 FAKE_PVEAM = r"""#!/usr/bin/env bash
 echo "pveam $*" >> "$CALLS"
 if [[ $1 == available ]]; then
@@ -139,10 +151,14 @@ echo "lxc-attach $*" >> "$CALLS"
 
 
 @pytest.fixture
-def proxmox(tmp_path):
+def proxmox(tmp_path, request):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, body in {"pct": FAKE_PCT, "pveam": FAKE_PVEAM, "pvesm": FAKE_PVESM, "lxc-attach": FAKE_ATTACH}.items():
+    fakes = {"pct": FAKE_PCT, "qm": FAKE_QM, "pvesh": FAKE_PVESH, "pveam": FAKE_PVEAM, "pvesm": FAKE_PVESM,
+             "lxc-attach": FAKE_ATTACH}
+    if getattr(request, "param", "") == "sans-pvesh":
+        del fakes["pvesh"]
+    for name, body in fakes.items():
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
     return {"PATH": f"{bin_dir}:{os.environ['PATH']}", "CALLS": str(tmp_path / "calls"), "TERM": "dumb"}
@@ -155,7 +171,8 @@ def lxc(env: dict[str, str], answers: list[str], **extra: str) -> subprocess.Com
                           text=True, timeout=60, env={**os.environ, **env, **extra})
 
 
-CT_DEFAULTS = ["100", "", "", "", "", "", "", "", ""]   # 100 déjà pris → redemandé, puis défauts
+# CT 100 et VM 101 déjà prises → redemandé, puis défauts (ID 102 proposé).
+CT_DEFAULTS = ["100", "101", "", "", "", "", "", "", "", ""]
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@pc"
 
 
@@ -166,7 +183,7 @@ def test_lxc_quick_test_install(tmp_path, proxmox) -> None:
     assert "ID invalide ou déjà utilisé" in r.stdout
     assert "pveam download local debian-13-standard_13.1-2_amd64.tar.zst" in log   # la plus récente
     create = next(line for line in log.splitlines() if line.startswith("pct create"))
-    assert create.startswith("pct create 101 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst")
+    assert create.startswith("pct create 102 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst")
     for opt in ("--hostname tm-activation", "--rootfs local-zfs:4", "--memory 512", "--features nesting=1",
                 "--unprivileged 1", "--net0 name=eth0,bridge=vmbr0,ip=dhcp", "--ssh-public-keys",
                 "--tags tm-activation"):
@@ -176,7 +193,15 @@ def test_lxc_quick_test_install(tmp_path, proxmox) -> None:
     run = next(line for line in log.splitlines() if "/usr/local/sbin/tm-activation-update --lan" in line)
     assert "TM_CALLSIGN=TM1ABC" in run and "TM_PUBLIC=1" in run and run.endswith("--lan --non-interactive")
     assert "lxc-attach" not in log
-    assert "http://192.168.1.50/" in r.stdout and "pct destroy 101" in r.stdout
+    assert "http://192.168.1.50/" in r.stdout and "pct destroy 102" in r.stdout
+
+
+@pytest.mark.parametrize("proxmox", ["avec-pvesh", "sans-pvesh"], indirect=True)
+def test_lxc_default_id_skips_existing_vm_and_ct(tmp_path, proxmox) -> None:
+    """Une VM occupe aussi un ID : 100 (CT) et 101 (VM) pris → 102 proposé."""
+    r = lxc(proxmox, ["", "", "", "", "", "", "", "", "", "", "pw", "pw", "1", "n"])
+    assert "CT 102 «" in r.stdout, r.stdout             # récapitulatif (le prompt de read -p est muet hors terminal)
+    assert r.stdout.count("ID invalide ou déjà utilisé") == 0
 
 
 def test_lxc_guided_install_uses_a_terminal(tmp_path, proxmox) -> None:
@@ -189,7 +214,7 @@ def test_lxc_guided_install_uses_a_terminal(tmp_path, proxmox) -> None:
     assert "--ssh-public-keys" not in create and "openssh-server" not in log
     assert "raw.githubusercontent.com/radioclub/tm-fork/dev/deploy/update-from-github.sh" in log
     attach = next(line for line in log.splitlines() if line.startswith("lxc-attach"))
-    assert attach.startswith("lxc-attach -n 101 -- env") and "TM_REPO=radioclub/tm-fork" in attach
+    assert attach.startswith("lxc-attach -n 102 -- env") and "TM_REPO=radioclub/tm-fork" in attach
     assert attach.endswith("/usr/local/sbin/tm-activation-update")
 
 
@@ -202,7 +227,7 @@ def test_lxc_cancel_creates_nothing(tmp_path, proxmox) -> None:
 def test_lxc_install_failure_keeps_ct_and_explains(tmp_path, proxmox) -> None:
     r = lxc(proxmox, [*CT_DEFAULTS, "", "", "pw", "pw", "2", "", ""], FAIL="1")
     assert r.returncode == 1
-    assert "la CT 101 est conservée" in r.stderr and "pct enter 101" in r.stdout
+    assert "la CT 102 est conservée" in r.stderr and "pct enter 102" in r.stdout
     assert "destroy" not in calls(tmp_path)
 
 
