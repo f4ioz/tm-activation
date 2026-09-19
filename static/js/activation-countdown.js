@@ -7,6 +7,12 @@
   var els = Array.prototype.slice.call(document.querySelectorAll('.act-countdown'));
   if (!els.length) return;
 
+  // Textes traduits : window.ACT_I18N (rempli par _base.html hors français).
+  function t(s, p) {
+    var m = (window.ACT_I18N || {})[s] || s;
+    return p ? m.replace(/\{(\w+)\}/g, function (_, k) { return p[k]; }) : m;
+  }
+
   function toUTC(iso) {
     // 'YYYY-MM-DDTHH:MM' interprété comme UTC.
     return iso ? new Date(iso.slice(0, 16) + ':00Z').getTime() : NaN;
@@ -18,7 +24,7 @@
     var h = Math.floor(s / 3600); s -= h * 3600;
     var m = Math.floor(s / 60);
     var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-    if (d > 0) return d + 'j ' + pad(h) + 'h ' + pad(m) + 'm';
+    if (d > 0) return t('{d}j', { d: d }) + ' ' + pad(h) + 'h ' + pad(m) + 'm';
     if (h > 0) return pad(h) + 'h ' + pad(m) + 'm';
     if (m > 0) return m + 'm';
     return '< 1 min';
@@ -32,13 +38,13 @@
       if (isNaN(start)) { el.textContent = ''; return; }
       if (now < start) {
         el.className = 'act-countdown is-soon';
-        el.textContent = '⏳ Débute dans ' + fmt(start - now);
+        el.textContent = t('⏳ Débute dans {t}', { t: fmt(start - now) });
       } else if (now < end) {
         el.className = 'act-countdown is-onair';
-        el.textContent = '🔴 En direct — fin dans ' + fmt(end - now);
+        el.textContent = t('🔴 En direct — fin dans {t}', { t: fmt(end - now) });
       } else {
         el.className = 'act-countdown is-done';
-        el.textContent = '✓ Terminé';
+        el.textContent = t('✓ Terminé');
       }
     });
   }

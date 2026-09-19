@@ -1,7 +1,7 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Activation spéciale{% if station.label %} · {{ station.label }}{% endif %}{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Activation spéciale") }}{% if station.label %} · {{ station.label }}{% endif %}{% endblock %}
 {% block robots %}index, follow{% endblock %}
-{% block meta_description %}Suivi en direct de {{ callsign }} — {{ label }} : planning, comptes à rebours, statistiques et recherche de vos QSO.{% endblock %}
+{% block meta_description %}{{ _("Suivi en direct de {call} — {label} : planning, comptes à rebours, statistiques et recherche de vos QSO.", call=callsign, label=label) }}{% endblock %}
 {% block brand_href %}/{{ slug }}{% endblock %}
 {% block head_extra %}
 {% if show_map_stats %}
@@ -14,31 +14,31 @@
 {% include "activation/_hero.html" %}
 
 {% if status == 'archive' %}
-<p class="act-card act-archive-note act-muted">Activation terminée : log, carte et classement restent consultables. <a href="/activations">Tous les indicatifs spéciaux du club →</a></p>
+<p class="act-card act-archive-note act-muted">{{ _("Activation terminée : log, carte et classement restent consultables.") }} <a href="/activations">{{ _("Tous les indicatifs spéciaux du club →") }}</a></p>
 {% elif status == 'upcoming' %}
-<p class="act-card act-archive-note act-muted">Activation à venir : planning et log s'ouvriront à son lancement. <a href="/activations">Tous les indicatifs spéciaux du club →</a></p>
+<p class="act-card act-archive-note act-muted">{{ _("Activation à venir : planning et log s'ouvriront à son lancement.") }} <a href="/activations">{{ _("Tous les indicatifs spéciaux du club →") }}</a></p>
 {% endif %}
 
 {% if search and search.found %}
 <div class="act-card act-results-top">
-  <h2>📋 Vos QSO avec {{ callsign }} — <span class="act-call">{{ search_call }}</span></h2>
+  <h2>{{ _("📋 Vos QSO avec {call}", call=callsign) }} — <span class="act-call">{{ search_call }}</span></h2>
   <div class="act-score">
     <div class="act-kpi"><span class="act-kpi-n">{{ search.total }}</span><span class="act-kpi-l">QSO</span></div>
-    <div class="act-kpi"><span class="act-kpi-n">{{ search.bands|length }}</span><span class="act-kpi-l">bandes</span></div>
-    <div class="act-kpi"><span class="act-kpi-n">{{ search.modes|length }}</span><span class="act-kpi-l">modes</span></div>
-    <div class="act-kpi"><span class="act-kpi-n">{{ search.band_modes }}</span><span class="act-kpi-l">bande×mode</span></div>
+    <div class="act-kpi"><span class="act-kpi-n">{{ search.bands|length }}</span><span class="act-kpi-l">{{ _("bandes") }}</span></div>
+    <div class="act-kpi"><span class="act-kpi-n">{{ search.modes|length }}</span><span class="act-kpi-l">{{ _("modes") }}</span></div>
+    <div class="act-kpi"><span class="act-kpi-n">{{ search.band_modes }}</span><span class="act-kpi-l">{{ _("bande×mode") }}</span></div>
     {% if search_rank %}
-    <div class="act-kpi"><span class="act-kpi-n">{{ search_rank.rank }}<sup>{{ 'er' if search_rank.rank == 1 else 'e' }}</sup></span><span class="act-kpi-l">classement</span></div>
-    {% if scoring.enabled %}<div class="act-kpi"><span class="act-kpi-n">{{ search_rank.points }}</span><span class="act-kpi-l">points</span></div>{% endif %}
+    <div class="act-kpi"><span class="act-kpi-n">{{ search_rank.rank }}<sup>{{ ordinal(search_rank.rank) }}</sup></span><span class="act-kpi-l">{{ _("classement") }}</span></div>
+    {% if scoring.enabled %}<div class="act-kpi"><span class="act-kpi-n">{{ search_rank.points }}</span><span class="act-kpi-l">{{ _("points") }}</span></div>{% endif %}
     {% endif %}
   </div>
   <table class="act-table">
-    <thead><tr><th>Date</th><th>{{ tz_label }}</th><th>Bande</th><th>Mode</th><th>Sat</th><th>Opérateur</th></tr></thead>
+    <thead><tr><th>{{ _("Date") }}</th><th>{{ tz_label }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>{{ _("Opérateur") }}</th></tr></thead>
     <tbody>
       {% for q in search.contacts %}
         {% set d = cdt(q) %}
         <tr>
-          <td>{{ d.strftime('%d/%m/%y') if d else q.qso_date }}</td>
+          <td>{{ date_short(d) if d else q.qso_date }}</td>
           <td>{{ d.strftime('%H:%M') if d else q.time_on }}</td>
           <td>{{ q.band }}</td><td>{{ q.mode }}</td>
           <td class="act-sat-tag">{{ q.sat_name or '' }}</td>
@@ -49,14 +49,14 @@
   </table>
 </div>
 {% elif search %}
-<p class="act-alert act-alert-dupe act-results-top">Aucun QSO trouvé pour <b>{{ search_call }}</b>. Peut-être pas encore loggé — retentez plus tard, ou venez nous contacter !</p>
+<p class="act-alert act-alert-dupe act-results-top">{{ _("Aucun QSO trouvé pour {call}.", call=search_call) }} {{ _("Peut-être pas encore loggé — retentez plus tard, ou venez nous contacter !") }}</p>
 {% endif %}
 
 <div class="act-card act-search-slim">
-  <h2>Vous avez contacté {{ callsign }} ? Retrouvez vos QSO</h2>
+  <h2>{{ _("Vous avez contacté {call} ? Retrouvez vos QSO", call=callsign) }}</h2>
   <form method="get" action="/{{ slug }}" class="act-inline">
-    <label>Votre indicatif <input type="text" name="call" value="{{ search_call }}" autocapitalize="characters" autocomplete="off" placeholder="F1ABC" required></label>
-    <button type="submit">Rechercher</button>
+    <label>{{ _("Votre indicatif") }} <input type="text" name="call" value="{{ search_call }}" autocapitalize="characters" autocomplete="off" placeholder="F1ABC" required></label>
+    <button type="submit">{{ _("Rechercher") }}</button>
   </form>
 </div>
 
@@ -64,21 +64,21 @@
 
 <div class="act-grid">
   <div class="act-card">
-    <h2>QSO réalisés</h2>
+    <h2>{{ _("QSO réalisés") }}</h2>
     <p class="act-big">{{ stats.total }}</p>
-    <p class="act-muted">contacts{% if not live %} · station QRT pour l'instant{% endif %}</p>
+    <p class="act-muted">{{ _("contacts") }}{% if not live %} · {{ _("station QRT pour l'instant") }}{% endif %}</p>
   </div>
   <div class="act-card">
-    <h2>Par bande</h2>
+    <h2>{{ _("Par bande") }}</h2>
     <ul class="act-bars">{% for b in stats.by_band %}<li><span>{{ b.band }}</span><b>{{ b.n }}</b></li>{% else %}<li class="act-muted">—</li>{% endfor %}</ul>
   </div>
   <div class="act-card">
-    <h2>Par mode</h2>
+    <h2>{{ _("Par mode") }}</h2>
     <ul class="act-bars">{% for m in stats.by_mode %}<li><span>{{ m.mode }}</span><b>{{ m.n }}</b></li>{% else %}<li class="act-muted">—</li>{% endfor %}</ul>
   </div>
   {% if show_map_stats %}
   <div class="act-card">
-    <h2>Entités DXCC</h2>
+    <h2>{{ _("Entités DXCC") }}</h2>
     <p class="act-big">{{ dxcc.count }}</p>
   </div>
   {% endif %}
@@ -86,14 +86,14 @@
 
 {% include "activation/_live_now.html" %}
 
-<h2 class="act-next-title">🛰️ Prochaines activations</h2>
+<h2 class="act-next-title">{{ _("🛰️ Prochaines activations") }}</h2>
 {% if slots %}
   <div class="act-next">
     {% for s in slots[:8] %}
       {% set ps = to_disp(s.start_utc) %}{% set pe = to_disp(s.end_utc) %}
       <div class="act-next-card">
-        <div class="act-next-when">{{ (dow_fr(ps) ~ ' ' ~ ps.strftime('%d/%m')) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>
-        <p class="act-next-op">{{ callsign }}<span class="act-op-sub">Op&nbsp;: {{ s.operator_call }}</span></p>
+        <div class="act-next-when">{{ (dow(ps) ~ ' ' ~ day_month(ps)) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>
+        <p class="act-next-op">{{ callsign }}<span class="act-op-sub">{{ _("Op :") }} {{ s.operator_call }}</span></p>
         <p class="act-next-bm">{{ s.band }} · {{ s.mode }}</p>
         {% if s.note %}<p class="act-next-note">{% if note_is_sat(s.note) %}<span class="act-sat-icon" title="Satellite">🛰️</span> {% endif %}{{ s.note }}</p>{% endif %}
         <p class="act-countdown" data-start="{{ s.start_utc }}" data-end="{{ s.end_utc }}"></p>
@@ -101,46 +101,46 @@
     {% endfor %}
   </div>
 {% elif not live %}
-  <p class="act-muted">Planning à venir.</p>
+  <p class="act-muted">{{ _("Planning à venir.") }}</p>
 {% else %}
-  <p class="act-muted">Aucun autre créneau planifié.</p>
+  <p class="act-muted">{{ _("Aucun autre créneau planifié.") }}</p>
 {% endif %}
 
 {% if show_map_stats %}
 <div class="act-card">
   <div class="act-log-head">
-    <h2>🗺️ Carte des contacts</h2>
-    <span class="act-muted act-map-note">{{ map_data.located }} / {{ map_data.stations }} stations localisées</span>
+    <h2>{{ _("🗺️ Carte des contacts") }}</h2>
+    <span class="act-muted act-map-note">{{ _("{n} / {total} stations localisées", n=map_data.located, total=map_data.stations) }}</span>
   </div>
-  <div id="act-map" class="act-map" role="img" aria-label="Carte des stations contactées par {{ callsign }}"></div>
-  <p class="act-muted act-map-note">Position au centre du locator. Zoomez pour afficher les indicatifs, cliquez un point pour le détail.</p>
+  <div id="act-map" class="act-map" role="img" aria-label="{{ _("Carte des stations contactées par {call}", call=callsign) }}"></div>
+  <p class="act-muted act-map-note">{{ _("Position au centre du locator. Zoomez pour afficher les indicatifs, cliquez un point pour le détail.") }}</p>
   <script type="application/json" id="act-map-data">{{ {"points": map_data.points, "home": home}|tojson }}</script>
 </div>
 
 <div class="act-grid act-grid-2">
   <div class="act-card">
-    <h2>🌍 DXCC contactés <span class="act-count">{{ dxcc.count }}</span></h2>
+    <h2>{{ _("🌍 DXCC contactés") }} <span class="act-count">{{ dxcc.count }}</span></h2>
     <div class="act-scroll">
       <table class="act-table">
-        <thead><tr><th>Entité</th><th>Stations</th><th>QSO</th></tr></thead>
+        <thead><tr><th>{{ _("Entité") }}</th><th>{{ _("Stations") }}</th><th>QSO</th></tr></thead>
         <tbody>
           {% for e in dxcc.entities %}
             <tr><td>{{ e.dxcc_name }}</td><td>{{ e.stations }}</td><td>{{ e.qsos }}</td></tr>
           {% else %}
-            <tr><td colspan="3" class="act-muted">Identification en cours…</td></tr>
+            <tr><td colspan="3" class="act-muted">{{ _("Identification en cours…") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% if dxcc.unidentified %}<p class="act-muted act-map-note">{{ dxcc.unidentified }} station(s) pas encore identifiée(s).</p>{% endif %}
+    {% if dxcc.unidentified %}<p class="act-muted act-map-note">{{ _("{n} station(s) pas encore identifiée(s).", n=dxcc.unidentified) }}</p>{% endif %}
   </div>
 
   <div class="act-card">
-    <h2>🏆 Classement des chasseurs</h2>
+    <h2>{{ _("🏆 Classement des chasseurs") }}</h2>
     <div class="act-scroll">
       <table class="act-table act-rank">
         {% set with_km = scoring.enabled and scoring.distance_on %}
-        <thead><tr><th>#</th><th>Indicatif</th><th>Pays</th>{% if scoring.enabled %}<th>Points</th>{% endif %}{% if with_km %}<th>km</th>{% endif %}<th title="Couples bande × mode distincts">B×M</th><th>QSO</th></tr></thead>
+        <thead><tr><th>#</th><th>{{ _("Indicatif") }}</th><th>{{ _("Pays") }}</th>{% if scoring.enabled %}<th>{{ _("Points") }}</th>{% endif %}{% if with_km %}<th>km</th>{% endif %}<th title="{{ _("Couples bande × mode distincts") }}">{{ _("B×M") }}</th><th>QSO</th></tr></thead>
         <tbody>
           {% for h in ranking %}
             <tr{% if h.call == search_call %} class="is-me"{% endif %}>
@@ -150,12 +150,12 @@
               <td>{% if scoring.enabled %}{{ h.band_modes }}{% else %}<b>{{ h.band_modes }}</b>{% endif %}</td><td>{{ h.qsos }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="{{ 5 + (1 if scoring.enabled else 0) + (1 if with_km else 0) }}" class="act-muted">Le classement s'ouvrira avec les premiers QSO.</td></tr>
+            <tr><td colspan="{{ 5 + (1 if scoring.enabled else 0) + (1 if with_km else 0) }}" class="act-muted">{{ _("Le classement s'ouvrira avec les premiers QSO.") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <p class="act-muted act-map-note">{% if scoring.enabled %}Points : {{ scoring_summary }}.{% else %}Classé par couples bande×mode distincts, puis nombre de QSO.{% endif %}</p>
+    <p class="act-muted act-map-note">{% if scoring.enabled %}{{ _("Points : {rule}.", rule=scoring_summary) }}{% else %}{{ _("Classé par couples bande×mode distincts, puis nombre de QSO.") }}{% endif %}</p>
   </div>
 </div>
 {% endif %}
@@ -164,22 +164,22 @@
 
 {% if show_contacts %}
 <div class="act-card">
-  <h2>Derniers contacts</h2>
+  <h2>{{ _("Derniers contacts") }}</h2>
   <table class="act-table">
-    <thead><tr><th>Date</th><th>{{ tz_label }}</th><th>Indicatif</th><th>Bande</th><th>Mode</th><th>Sat</th></tr></thead>
+    <thead><tr><th>{{ _("Date") }}</th><th>{{ tz_label }}</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th></tr></thead>
     <tbody>
       {% for q in recent %}
         {% set d = cdt(q) %}
-        <tr><td>{{ d.strftime('%d/%m/%y') if d else q.qso_date }}</td><td>{{ d.strftime('%H:%M') if d else q.time_on }}</td><td class="act-call">{{ q.call }}</td><td>{{ q.band }}</td><td>{{ q.mode }}</td><td class="act-sat-tag">{{ q.sat_name or '' }}</td></tr>
+        <tr><td>{{ date_short(d) if d else q.qso_date }}</td><td>{{ d.strftime('%H:%M') if d else q.time_on }}</td><td class="act-call">{{ q.call }}</td><td>{{ q.band }}</td><td>{{ q.mode }}</td><td class="act-sat-tag">{{ q.sat_name or '' }}</td></tr>
       {% else %}
-        <tr><td colspan="6" class="act-muted">Le log s'ouvrira au lancement de l'activation.</td></tr>
+        <tr><td colspan="6" class="act-muted">{{ _("Le log s'ouvrira au lancement de l'activation.") }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 {% endif %}
 
-<p class="act-muted act-map-note"><a href="/activations">Tous les indicatifs spéciaux{% if club.name %} — {{ club.name }}{% endif %} →</a></p>
+<p class="act-muted act-map-note"><a href="/activations">{{ _("Tous les indicatifs spéciaux") }}{% if club.name %} — {{ club.name }}{% endif %} →</a></p>
 
 <script src="{{ asset('/static/js/activation-countdown.js') }}"></script>
 {% if show_map_stats %}<script src="{{ asset('/static/js/activation-map.js') }}"></script>{% endif %}

@@ -1,29 +1,29 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Modifier un QSO{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Modifier un QSO") }}{% endblock %}
 {% block topnav %}
-  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
 
 {% block content %}
 <section class="act">
   <header class="act-head">
-    <h1>Modifier un QSO</h1>
+    <h1>{{ _("Modifier un QSO") }}</h1>
     <nav class="act-tabs">
-      <a href="/activation">Tableau de bord</a>
-      <a href="/activation/planning">Planning</a>
-      <a href="/activation/log" class="active">Log QSO</a>
+      <a href="/activation">{{ _("Tableau de bord") }}</a>
+      <a href="/activation/planning">{{ _("Planning") }}</a>
+      <a href="/activation/log" class="active">{{ _("Log QSO") }}</a>
       <a href="/activation/adif">ADIF</a>
-      {% if is_admin %}<a href="/activation/settings">Réglages</a>{% endif %}
+      {% if is_admin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
     </nav>
   </header>
 
   <div class="act-card">
     <form method="post" action="/activation/contacts/{{ contact.id }}" class="act-form">
       <div class="act-row">
-        <label>Indicatif contacté
+        <label>{{ _("Indicatif contacté") }}
           <input type="text" name="call" value="{{ contact.call }}" required autocapitalize="characters" autocomplete="off">
         </label>
-        <label>Opérateur
+        <label>{{ _("Opérateur") }}
           <select name="operator">
             {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == contact.operator_call %} selected{% endif %}>{{ op.callsign }}</option>{% endfor %}
             {% if contact.operator_call not in (operators | map(attribute='callsign') | list) %}
@@ -33,28 +33,28 @@
         </label>
       </div>
       <div class="act-row">
-        <label>Date (UTC, AAAAMMJJ) <input type="text" name="qso_date" value="{{ contact.qso_date }}" maxlength="8" inputmode="numeric" autocomplete="off"></label>
-        <label>Heure (UTC, HHMM) <input type="text" name="time_on" value="{{ contact.time_on }}" maxlength="4" inputmode="numeric" autocomplete="off"></label>
+        <label>{{ _("Date (UTC, AAAAMMJJ)") }} <input type="text" name="qso_date" value="{{ contact.qso_date }}" maxlength="8" inputmode="numeric" autocomplete="off"></label>
+        <label>{{ _("Heure (UTC, HHMM)") }} <input type="text" name="time_on" value="{{ contact.time_on }}" maxlength="4" inputmode="numeric" autocomplete="off"></label>
       </div>
       <div class="act-row">
-        <label>Bande
+        <label>{{ _("Bande") }}
           <select name="band">{% for b in bands %}<option value="{{ b }}"{% if b == contact.band %} selected{% endif %}>{{ b }}</option>{% endfor %}</select>
         </label>
-        <label>Mode
+        <label>{{ _("Mode") }}
           <select name="mode">{% for m in modes %}<option value="{{ m }}"{% if m == contact.mode %} selected{% endif %}>{{ m }}</option>{% endfor %}</select>
         </label>
-        <label>Satellite <input type="text" name="sat_name" value="{{ contact.sat_name or '' }}" maxlength="20" autocapitalize="characters" autocomplete="off"></label>
+        <label>{{ _("Satellite") }} <input type="text" name="sat_name" value="{{ contact.sat_name or '' }}" maxlength="20" autocapitalize="characters" autocomplete="off"></label>
       </div>
       <div class="act-row">
-        <label>RST envoyé <input type="text" name="rst_sent" value="{{ contact.rst_sent or '' }}" maxlength="5" autocomplete="off"></label>
-        <label>RST reçu <input type="text" name="rst_rcvd" value="{{ contact.rst_rcvd or '' }}" maxlength="5" autocomplete="off"></label>
-        <label>Fréq (MHz) <input type="text" name="freq" value="{{ contact.freq_mhz if contact.freq_mhz is not none else '' }}" inputmode="decimal" autocomplete="off"></label>
-        <label>Locator <input type="text" name="gridsquare" value="{{ contact.gridsquare or '' }}" maxlength="6" autocapitalize="characters" autocomplete="off"></label>
+        <label>{{ _("RST envoyé") }} <input type="text" name="rst_sent" value="{{ contact.rst_sent or '' }}" maxlength="5" autocomplete="off"></label>
+        <label>{{ _("RST reçu") }} <input type="text" name="rst_rcvd" value="{{ contact.rst_rcvd or '' }}" maxlength="5" autocomplete="off"></label>
+        <label>{{ _("Fréq (MHz)") }} <input type="text" name="freq" value="{{ contact.freq_mhz if contact.freq_mhz is not none else '' }}" inputmode="decimal" autocomplete="off"></label>
+        <label>{{ _("Locator") }} <input type="text" name="gridsquare" value="{{ contact.gridsquare or '' }}" maxlength="6" autocapitalize="characters" autocomplete="off"></label>
       </div>
-      <label>Commentaire <input type="text" name="comment" value="{{ contact.comment or '' }}" maxlength="120" autocomplete="off"></label>
+      <label>{{ _("Commentaire") }} <input type="text" name="comment" value="{{ contact.comment or '' }}" maxlength="120" autocomplete="off"></label>
       <div class="act-inline">
-        <button type="submit">Enregistrer</button>
-        <a href="/activation/log" class="act-cancel">Annuler</a>
+        <button type="submit">{{ _("Enregistrer") }}</button>
+        <a href="/activation/log" class="act-cancel">{{ _("Annuler") }}</a>
       </div>
     </form>
   </div>

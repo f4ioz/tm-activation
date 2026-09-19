@@ -1,5 +1,5 @@
-<div class="act-tzswitch" title="Fuseau d'affichage — le stockage reste UTC">
-  <span class="act-tz-lbl">Heure&nbsp;:</span>
-  <a href="/activation/tz?mode=local&next={{ request.url.path }}"{% if tz_mode == 'local' %} class="active"{% endif %}>Locale (Paris)</a>
+<div class="act-tzswitch" title="{{ _("Fuseau d'affichage — le stockage reste UTC") }}">
+  <span class="act-tz-lbl">{{ _("Heure :") }}</span>
+  <a href="/activation/tz?mode=local&next={{ request.url.path }}"{% if tz_mode == 'local' %} class="active"{% endif %}>{{ _("Locale (Paris)") }}</a>
   <a href="/activation/tz?mode=utc&next={{ request.url.path }}"{% if tz_mode == 'utc' %} class="active"{% endif %}>UTC</a>
 </div>

@@ -4,6 +4,12 @@
  * (data-filter) masquent ET décochent les lignes hors groupe : seules les
  * lignes visibles et cochées sont envoyées. */
 (function () {
+  // Textes traduits : window.ACT_I18N (rempli par _base.html hors français).
+  function t(s, p) {
+    var m = (window.ACT_I18N || {})[s] || s;
+    return p ? m.replace(/\{(\w+)\}/g, function (_, k) { return p[k]; }) : m;
+  }
+
   document.querySelectorAll('form[data-sel]').forEach(function (form) {
     var rows = Array.prototype.slice.call(form.querySelectorAll('tr[data-sel-row]'));
     var filters = Array.prototype.slice.call(form.querySelectorAll('[data-filter]'));
@@ -22,7 +28,7 @@
         if (on) n++;
       });
       var vis = shown().length;
-      if (countEl) countEl.textContent = n + ' / ' + vis + ' sélectionné' + (n > 1 ? 's' : '');
+      if (countEl) countEl.textContent = t(n > 1 ? '{n} / {total} sélectionnés' : '{n} / {total} sélectionné', { n: n, total: vis });
       if (go) go.disabled = n === 0;
       if (toggleAll) {
         toggleAll.checked = vis > 0 && n === vis;

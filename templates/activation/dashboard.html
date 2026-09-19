@@ -1,73 +1,73 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Tableau de bord{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Tableau de bord") }}{% endblock %}
 {% block topnav %}
-  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
 
 {% block content %}
 {% include "activation/_hero.html" %}
 
 <nav class="act-tabs">
-  <a href="/activation" class="active">Tableau de bord</a>
-  <a href="/activation/planning">Planning</a>
-  <a href="/activation/log">Log QSO</a>
+  <a href="/activation" class="active">{{ _("Tableau de bord") }}</a>
+  <a href="/activation/planning">{{ _("Planning") }}</a>
+  <a href="/activation/log">{{ _("Log QSO") }}</a>
   <a href="/activation/adif">ADIF</a>
-  {% if is_admin %}<a href="/activation/settings">Réglages</a>{% endif %}
+  {% if is_admin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
 </nav>
 
 {% include "activation/_tz_toggle.html" %}
 
 <div class="act-kpis">
   <div class="act-kpi"><span class="act-kpi-n">{{ stats.total }}</span><span class="act-kpi-l">QSO</span></div>
-  <div class="act-kpi"><span class="act-kpi-n">{{ stats.by_band|length }}</span><span class="act-kpi-l">bandes</span></div>
-  <div class="act-kpi"><span class="act-kpi-n">{{ operator_count }}</span><span class="act-kpi-l">opérateurs</span></div>
-  <div class="act-kpi"><span class="act-kpi-n">{{ planned_count }}</span><span class="act-kpi-l">planifiées et en cours</span></div>
+  <div class="act-kpi"><span class="act-kpi-n">{{ stats.by_band|length }}</span><span class="act-kpi-l">{{ _("bandes") }}</span></div>
+  <div class="act-kpi"><span class="act-kpi-n">{{ operator_count }}</span><span class="act-kpi-l">{{ _("opérateurs") }}</span></div>
+  <div class="act-kpi"><span class="act-kpi-n">{{ planned_count }}</span><span class="act-kpi-l">{{ _("planifiées et en cours") }}</span></div>
 </div>
 
 {% include "activation/_live_now.html" %}
 
-<h2 class="act-next-title">🛰️ Prochaines activations</h2>
+<h2 class="act-next-title">{{ _("🛰️ Prochaines activations") }}</h2>
 {% if upcoming %}
   <div class="act-next">
     {% for s in upcoming[:6] %}
       {% set ps = to_disp(s.start_utc) %}{% set pe = to_disp(s.end_utc) %}
       <div class="act-next-card">
-        <div class="act-next-when">{{ (dow_fr(ps) ~ ' ' ~ ps.strftime('%d/%m')) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>
-        <p class="act-next-op">{{ callsign }}<span class="act-op-sub">Op&nbsp;: {{ s.operator_call }}</span></p>
+        <div class="act-next-when">{{ (dow(ps) ~ ' ' ~ day_month(ps)) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>
+        <p class="act-next-op">{{ callsign }}<span class="act-op-sub">{{ _("Op :") }} {{ s.operator_call }}</span></p>
         <p class="act-next-bm">{{ s.band }} · {{ s.mode }}</p>
-        {% if s.note %}<p class="act-next-note">{% if note_is_sat(s.note) %}<span class="act-sat-icon" title="Satellite">🛰️</span> {% endif %}{{ s.note }}</p>{% endif %}
+        {% if s.note %}<p class="act-next-note">{% if note_is_sat(s.note) %}<span class="act-sat-icon" title="{{ _("Satellite") }}">🛰️</span> {% endif %}{{ s.note }}</p>{% endif %}
         <p class="act-countdown" data-start="{{ s.start_utc }}" data-end="{{ s.end_utc }}"></p>
       </div>
     {% endfor %}
   </div>
 {% elif not live %}
-  <p class="act-muted">Aucun créneau planifié. <a href="/activation/planning">Réserver un créneau →</a></p>
+  <p class="act-muted">{{ _("Aucun créneau planifié.") }} <a href="/activation/planning">{{ _("Réserver un créneau →") }}</a></p>
 {% else %}
-  <p class="act-muted">Aucun autre créneau planifié pour le moment.</p>
+  <p class="act-muted">{{ _("Aucun autre créneau planifié pour le moment.") }}</p>
 {% endif %}
 
 {% include "activation/_past.html" %}
 
 <div class="act-grid">
   <div class="act-card">
-    <h2>Export</h2>
+    <h2>{{ _("Export") }}</h2>
     <p><a href="/activation/export.adi">ADIF</a> · <a href="/activation/export.csv">CSV</a></p>
-    <p class="act-muted act-lotw-note">ADIF prêt pour TQSL / LoTW.</p>
+    <p class="act-muted act-lotw-note">{{ _("ADIF prêt pour TQSL / LoTW.") }}</p>
   </div>
   <div class="act-card">
-    <h2>Par bande</h2>
+    <h2>{{ _("Par bande") }}</h2>
     <ul class="act-bars">
       {% for b in stats.by_band %}<li><span>{{ b.band }}</span><b>{{ b.n }}</b></li>{% else %}<li class="act-muted">—</li>{% endfor %}
     </ul>
   </div>
   <div class="act-card">
-    <h2>Par mode</h2>
+    <h2>{{ _("Par mode") }}</h2>
     <ul class="act-bars">
       {% for m in stats.by_mode %}<li><span>{{ m.mode }}</span><b>{{ m.n }}</b></li>{% else %}<li class="act-muted">—</li>{% endfor %}
     </ul>
   </div>
   <div class="act-card">
-    <h2>Par opérateur</h2>
+    <h2>{{ _("Par opérateur") }}</h2>
     <ul class="act-bars">
       {% for o in stats.by_op %}<li><span>{{ o.operator_call }}</span><b>{{ o.n }}</b></li>{% else %}<li class="act-muted">—</li>{% endfor %}
     </ul>
@@ -75,21 +75,21 @@
 </div>
 
 <div class="act-card">
-  <h2>Derniers contacts</h2>
+  <h2>{{ _("Derniers contacts") }}</h2>
   <table class="act-table">
-    <thead><tr><th>Date</th><th>{{ tz_label }}</th><th>Indicatif</th><th>Bande</th><th>Mode</th><th>Sat</th><th>Op</th></tr></thead>
+    <thead><tr><th>{{ _("Date") }}</th><th>{{ tz_label }}</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>Op</th></tr></thead>
     <tbody>
       {% for q in recent %}
         {% set d = cdt(q) %}
         <tr>
-          <td>{{ d.strftime('%d/%m/%y') if d else q.qso_date }}</td><td>{{ d.strftime('%H:%M') if d else q.time_on }}</td>
+          <td>{{ date_short(d) if d else q.qso_date }}</td><td>{{ d.strftime('%H:%M') if d else q.time_on }}</td>
           <td class="act-call">{{ q.call }}</td>
           <td>{{ q.band }}</td><td>{{ q.mode }}</td>
           <td class="act-sat-tag">{{ q.sat_name or '' }}</td>
           <td>{{ q.operator_call }}</td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="act-muted">Aucun QSO pour l'instant.</td></tr>
+        <tr><td colspan="7" class="act-muted">{{ _("Aucun QSO pour l'instant.") }}</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -9,9 +9,9 @@
   {% set sd, ed = station.start_date, station.end_date %}
   {% if sd or ed %}
     <p class="act-hero-cities">
-      {%- if sd and ed %}Du {{ sd[8:10] }}/{{ sd[5:7] }}/{{ sd[:4] }} au {{ ed[8:10] }}/{{ ed[5:7] }}/{{ ed[:4] }}
-      {%- elif sd %}À partir du {{ sd[8:10] }}/{{ sd[5:7] }}/{{ sd[:4] }}
-      {%- else %}Jusqu'au {{ ed[8:10] }}/{{ ed[5:7] }}/{{ ed[:4] }}{% endif -%}
+      {%- if sd and ed %}{{ _("Du {start} au {end}", start=date_long(sd), end=date_long(ed)) }}
+      {%- elif sd %}{{ _("À partir du {start}", start=date_long(sd)) }}
+      {%- else %}{{ _("Jusqu'au {end}", end=date_long(ed)) }}{% endif -%}
     </p>
   {% endif %}
 </header>

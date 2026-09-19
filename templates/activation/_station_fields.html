@@ -1,16 +1,16 @@
 {# Champs d'une fiche d'indicatif spécial (création / modification) ; f = valeurs. #}
 <div class="act-row">
-  <label>Libellé <input type="text" name="label" maxlength="120" value="{{ f.label or '' }}" placeholder="50 ans du radio-club …"></label>
-  <label>Locator de la station <input type="text" name="gridsquare" maxlength="8" value="{{ f.gridsquare or '' }}" autocapitalize="characters" autocomplete="off" placeholder="JN18FS89"></label>
+  <label>{{ _("Libellé") }} <input type="text" name="label" maxlength="120" value="{{ f.label or '' }}" placeholder="{{ _("50 ans du radio-club …") }}"></label>
+  <label>{{ _("Locator de la station") }} <input type="text" name="gridsquare" maxlength="8" value="{{ f.gridsquare or '' }}" autocapitalize="characters" autocomplete="off" placeholder="JN18FS89"></label>
 </div>
 <div class="act-row">
-  <label>Début <input type="date" name="start_date" value="{{ f.start_date or '' }}"></label>
-  <label>Fin <input type="date" name="end_date" value="{{ f.end_date or '' }}"></label>
+  <label>{{ _("Début") }} <input type="date" name="start_date" value="{{ f.start_date or '' }}"></label>
+  <label>{{ _("Fin") }} <input type="date" name="end_date" value="{{ f.end_date or '' }}"></label>
 </div>
 <div class="act-row">
-  <label>Badge du bandeau <input type="text" name="badge" maxlength="30" value="{{ f.badge or '' }}" placeholder="60 ANS"></label>
-  <label>Drapeaux <input type="text" name="flags" value="{{ f.flags or '' }}" autocomplete="off" placeholder="fr,be"></label>
+  <label>{{ _("Badge du bandeau") }} <input type="text" name="badge" maxlength="30" value="{{ f.badge or '' }}" placeholder="{{ _("50 ANS") }}"></label>
+  <label>{{ _("Drapeaux") }} <input type="text" name="flags" value="{{ f.flags or '' }}" autocomplete="off" placeholder="fr,be"></label>
 </div>
-<label>Sous-titre du bandeau <input type="text" name="subtitle" maxlength="160" value="{{ f.subtitle or '' }}" placeholder="Ville A · Ville B · Radio-club"></label>
-<label class="act-check"><input type="checkbox" name="public" value="1"{% if f.public %} checked{% endif %}> Page publique en ligne</label>
-<p class="act-muted act-map-note">Drapeaux disponibles : {{ flag_prefixes|join(', ') }} (séparés par des virgules). Le locator sert à l'export ADIF (MY_GRIDSQUARE) et aux points de distance.</p>
+<label>{{ _("Sous-titre du bandeau") }} <input type="text" name="subtitle" maxlength="160" value="{{ f.subtitle or '' }}" placeholder="{{ _("Ville A · Ville B · Radio-club") }}"></label>
+<label class="act-check"><input type="checkbox" name="public" value="1"{% if f.public %} checked{% endif %}> {{ _("Page publique en ligne") }}</label>
+<p class="act-muted act-map-note">{{ _("Drapeaux disponibles : {flags} (séparés par des virgules). Le locator sert à l'export ADIF (MY_GRIDSQUARE) et aux points de distance.", flags=flag_prefixes|join(', ')) }}</p>

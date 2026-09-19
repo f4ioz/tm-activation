@@ -1275,3 +1275,79 @@ def test_qrz_check_login(monkeypatch) -> None:
 
     _qrz_transport(monkeypatch, down)
     assert QrzXmlClient("F6ABC", "pw").check_login()[0] == "error"
+
+
+# ── Pages en anglais (i18n) ────────────────────────────────────────────────
+
+# Mots français courants : leur présence sur une page anglaise trahit un texte
+# oublié (hors données saisies : les données de test sont neutres).
+_FRENCH_WORDS = re.compile(
+    r"(?i)(?<![\w-])(les|des|du|une|avec|pour|dans|sur|aucun|aucune|créneaux?|opérateurs?|réglages|"
+    r"indicatifs?|bandes?|chasseurs|prochaines|tableau|contacté|mettre|supprimer|enregistrer|"
+    r"à|où|être|été|ou|et|le|la)(?![\w-])"
+)
+
+
+def _visible_text(html: str) -> str:
+    import html as html_mod
+
+    html = re.sub(r"(?s)<script\b.*?</script>|<style\b.*?</style>", " ", html)
+    attrs = " ".join(re.findall(r'(?:title|placeholder|aria-label)="([^"]*)"', html))
+    return html_mod.unescape(re.sub(r"<[^>]+>", " ", html) + " " + attrs)
+
+
+def test_pages_render_in_english(monkeypatch) -> None:
+    from app.routers import activation as act_router
+    from app.templating import templates
+
+    club = {"callsign": "F6ABC", "name": "Radio Club Test", "city": "Testville", "website": ""}
+    monkeypatch.setitem(templates.env.globals, "club", club)
+    monkeypatch.setattr(act_router, "club_config", lambda: club)
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    _public(grid="JN18")
+    activation.update_station("TM25TEST", subtitle="Town A · Town B")   # donnée saisie, pas l'interface
+    activation.set_flag("show_contacts", True)
+    activation.set_flag("show_map_stats", True)
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M"
+    sid = activation.add_slot("F4IOZ", (now + timedelta(hours=1)).strftime(fmt),
+                              (now + timedelta(hours=2)).strftime(fmt), "20M", "CW", "SAT FO-29")
+    _qso("DL1ABC")
+    cid = activation.list_contacts()[0]["id"]
+
+    en = {"Accept-Language": "en-GB,en;q=0.9"}
+    anon = TestClient(app, headers=en)
+    admin = _private_client()
+    admin.headers.update(en)
+    pages = [anon.get(p) for p in ("/tm25test", "/tm25test?call=DL1ABC", "/tm25test?call=ZZ9ZZZ",
+                                    "/activations", "/activation/login")]
+    pages += [admin.get(p) for p in ("/activation", "/activation/planning", "/activation/log",
+                                     "/activation/adif", "/activation/settings",
+                                     "/activation/stations/tm25test/edit", f"/activation/slots/{sid}/edit",
+                                     f"/activation/contacts/{cid}/edit")]
+    for r in pages:
+        assert r.status_code == 200, r.url
+        assert '<html lang="en">' in r.text, r.url
+        words = sorted({m.group(0) for m in _FRENCH_WORDS.finditer(_visible_text(r.text))})
+        assert not words, f"{r.url} : mots français {words}"
+    assert "Upcoming activations" in pages[0].text and "Your QSOs with TM25TEST" in pages[1].text
+    assert 'window.ACT_I18N' in pages[0].text and "Starts in {t}" in pages[0].text
+
+
+def test_language_switch_cookie_and_fallbacks() -> None:
+    _public()
+    client = TestClient(app, follow_redirects=False)
+    assert '<html lang="fr">' in client.get("/tm25test").text          # sans en-tête : français
+    r = client.get("/activation/lang/en?next=/tm25test%3Fcall%3DDL1ABC")
+    assert r.status_code == 303 and r.headers["location"] == "/tm25test?call=DL1ABC"
+    assert "lang=en" in r.headers["set-cookie"] and "Max-Age=31536000" in r.headers["set-cookie"]
+    page = client.get("/tm25test", headers={"Accept-Language": "fr-FR"}).text
+    assert '<html lang="en">' in page                                  # le cookie prime sur le navigateur
+    assert 'href="/activation/lang/fr?next=/tm25test"' in page
+    # Redirection externe refusée, langue inconnue ignorée.
+    assert client.get("/activation/lang/fr?next=//evil.example").headers["location"] == "/activations"
+    assert "set-cookie" not in client.get("/activation/lang/xx").headers
+    # Messages d'erreur Python traduits (ValueError de la couche données).
+    r = TestClient(app).post("/activation/login", data={"callsign": "!!", "password": "x"},
+                             headers={"Accept-Language": "en"})
+    assert "Invalid callsign" in r.text

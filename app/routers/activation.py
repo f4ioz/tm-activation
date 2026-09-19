@@ -12,7 +12,7 @@ import asyncio
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -25,15 +25,17 @@ from starlette.concurrency import run_in_threadpool
 
 from starlette.convertors import Convertor, register_url_convertor
 
-from app import activation, security, visits
+from app import activation, i18n, security, visits
 from app.auth import is_private
 from app.config import club_config
+from app.i18n import _
 from app.templating import templates
 
-router = APIRouter(prefix="/activation", tags=["activation"])
+# Langue de chaque requête (cookie « lang », sinon navigateur) : voir app/i18n.py.
+router = APIRouter(prefix="/activation", tags=["activation"], dependencies=[Depends(i18n.request_lang)])
 
 # Board public (hors préfixe /activation) — URL partageable sans login.
-public_router = APIRouter(tags=["activation"])
+public_router = APIRouter(tags=["activation"], dependencies=[Depends(i18n.request_lang)])
 
 COOKIE_OP = "tm_op"
 COOKIE_TZ = "tm_tz"
@@ -135,13 +137,13 @@ async def operator_login_submit(
     blocked = security.login_blocked(visits.client_ip(request))
     error = None
     if blocked:
-        error = "Trop de tentatives échouées : réessaie dans 15 minutes."
+        error = _("Trop de tentatives échouées : réessaie dans 15 minutes.")
     elif not activation.valid_callsign(op):
-        error = "Indicatif invalide"
+        error = _("Indicatif invalide")
     elif not expected:
-        error = "Accès opérateur non configuré — voir l'admin du site"
+        error = _("Accès opérateur non configuré — voir l'admin du site")
     elif not password or password != expected:
-        error = "Mot de passe incorrect"
+        error = _("Mot de passe incorrect")
 
     if not blocked:
         visits.record_auth(request, "operator", op, error is None)
@@ -185,6 +187,19 @@ async def operator_login_submit(
 async def operator_logout() -> Response:
     resp = RedirectResponse("/activation/login", status_code=303)
     resp.delete_cookie(activation.OP_COOKIE, path="/activation")
+    return resp
+
+
+@router.get("/lang/{code}")
+async def set_language(request: Request, code: str, next: str = "/activations") -> Response:
+    """Choix de la langue (bouton FR | EN du bandeau), mémorisé un an.
+
+    Non protégé, comme /tz : simple préférence d'affichage, valable aussi pour
+    les pages publiques (cookie path=/)."""
+    resp = RedirectResponse(security.safe_next(next, "/activations"), status_code=303)
+    if code in i18n.LANGS:
+        resp.set_cookie(i18n.COOKIE, code, max_age=i18n.COOKIE_MAX_AGE, samesite="lax", path="/",
+                        secure=security.is_https(request))
     return resp
 
 
@@ -914,7 +929,7 @@ async def stations_page(request: Request) -> Response:
         "activation/stations.html",
         {
             "callsign": club_config().get("callsign") or activation.callsign(),
-            "label": club_config().get("name") or "Indicatifs spéciaux",
+            "label": club_config().get("name") or _("Indicatifs spéciaux"),
             "stations": [
                 {**s, "status": activation.station_status(s)}
                 for s in activation.list_stations() if s["public"]

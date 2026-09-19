@@ -88,6 +88,15 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-tzswitch a:hover { color: var(--accent); border-color: var(--accent); }
 .act-tzswitch a.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 
+/* ── Sélecteur de langue (FR | EN) du bandeau ─────────────────────────── */
+.act-lang { display: flex; gap: 0.2rem; font-family: var(--font-mono, monospace); font-size: 0.75rem; }
+.act-lang a {
+  text-decoration: none; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 3px; padding: 0.1rem 0.4rem;
+}
+.act-lang a:hover { color: var(--accent); border-color: var(--accent); }
+.act-lang a.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+
 .act { display: flex; flex-direction: column; gap: 1.1rem; }
 
 .act-head h1 {

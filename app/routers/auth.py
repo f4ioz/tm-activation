@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from app import activation, auth as auth_mod, security, visits
+from app import activation, auth as auth_mod, i18n, security, visits
+from app.i18n import _
 from app.templating import templates
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(tags=["auth"], dependencies=[Depends(i18n.request_lang)])
 
 DEFAULT_NEXT = "/activation/settings"
 
@@ -52,7 +53,7 @@ async def login_submit(
 ) -> Response:
     target = _safe_next(next)
     if security.login_blocked(visits.client_ip(request)):
-        return _page(request, target, "Trop de tentatives échouées : réessaie dans 15 minutes.", 429)
+        return _page(request, target, _("Trop de tentatives échouées : réessaie dans 15 minutes."), 429)
     expected = auth_mod.auth_password()
     ok = bool(expected and password and password == expected)
     visits.record_auth(request, "admin", "", ok)
@@ -69,7 +70,7 @@ async def login_submit(
         )
         return resp
     await asyncio.sleep(security.FAILED_LOGIN_DELAY)  # ralentit les essais de mots de passe
-    return _page(request, target, "Mot de passe incorrect" if expected else "Administration non configurée", 401)
+    return _page(request, target, _("Mot de passe incorrect") if expected else _("Administration non configurée"), 401)
 
 
 @router.post("/logout")

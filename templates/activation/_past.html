@@ -1,11 +1,11 @@
 {% if past %}
-<h2 class="act-next-title act-past-title">📻 Activations passées</h2>
+<h2 class="act-next-title act-past-title">{{ _("📻 Activations passées") }}</h2>
 <div class="act-next">
   {% for s in past[:12] %}
     {% set ps = to_disp(s.start_utc) %}{% set pe = to_disp(s.end_utc) %}
     <div class="act-next-card act-past-card">
-      <div class="act-next-when">{{ (dow_fr(ps) ~ ' ' ~ ps.strftime('%d/%m')) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>
-      <p class="act-next-op">{{ callsign }}<span class="act-op-sub">Op&nbsp;: {{ s.operator_call }}</span></p>
+      <div class="act-next-when">{{ (dow(ps) ~ ' ' ~ day_month(ps)) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>
+      <p class="act-next-op">{{ callsign }}<span class="act-op-sub">{{ _("Op :") }} {{ s.operator_call }}</span></p>
       <p class="act-next-bm">{{ s.band }} · {{ s.mode }}</p>
       {% if s.note %}<p class="act-next-note">{% if note_is_sat(s.note) %}<span class="act-sat-icon" title="Satellite">🛰️</span> {% endif %}{{ s.note }}</p>{% endif %}
     </div>

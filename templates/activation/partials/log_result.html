@@ -1,16 +1,16 @@
 {% if error %}
   <p class="act-alert act-alert-err">⚠ {{ error }}</p>
 {% elif dupe|default(false) %}
-  <p class="act-alert act-alert-dupe">⚑ Doublon : {{ last_call }} déjà loggé sur cette bande/mode (QSO tout de même enregistré).</p>
+  <p class="act-alert act-alert-dupe">{{ _("⚑ Doublon : {call} déjà loggé sur cette bande/mode (QSO tout de même enregistré).", call=last_call) }}</p>
 {% endif %}
 
 <div class="act-card">
   <div class="act-log-head">
-    <h2>Contacts <span class="act-count">{{ stats.total }}</span></h2>
+    <h2>{{ _("Contacts") }} <span class="act-count">{{ stats.total }}</span></h2>
     <span class="act-exports"><a href="/activation/export.adi">ADIF</a> · <a href="/activation/export.csv">CSV</a></span>
   </div>
   <table class="act-table">
-    <thead><tr><th>Date</th><th>UTC</th><th>Indicatif</th><th>Bande</th><th>Mode</th><th>Sat</th><th>RST</th><th>Op</th><th></th></tr></thead>
+    <thead><tr><th>{{ _("Date") }}</th><th>UTC</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>RST</th><th>Op</th><th></th></tr></thead>
     <tbody>
       {% for q in contacts %}
         <tr>
@@ -21,15 +21,15 @@
           <td>{{ q.rst_sent }}/{{ q.rst_rcvd }}</td>
           <td>{{ q.operator_call }}</td>
           <td class="act-actions">
-            <a class="act-edit" href="/activation/contacts/{{ q.id }}/edit" title="Modifier">✎</a>
+            <a class="act-edit" href="/activation/contacts/{{ q.id }}/edit" title="{{ _("Modifier") }}">✎</a>
             <button type="button" class="act-del"
                     hx-post="/activation/contacts/{{ q.id }}/delete"
                     hx-target="#act-log-result" hx-swap="innerHTML"
-                    hx-confirm="Supprimer le QSO avec {{ q.call }} ?">✕</button>
+                    hx-confirm="{{ _("Supprimer le QSO avec {call} ?", call=q.call) }}">✕</button>
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="9" class="act-muted">Aucun QSO pour l'instant.</td></tr>
+        <tr><td colspan="9" class="act-muted">{{ _("Aucun QSO pour l'instant.") }}</td></tr>
       {% endfor %}
     </tbody>
   </table>

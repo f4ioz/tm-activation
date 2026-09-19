@@ -1,29 +1,29 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Accès opérateurs{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Accès opérateurs") }}{% endblock %}
 
 {% block content %}
 <section class="act">
-  {% with hero_sub = ('Espace opérateurs ' ~ club.callsign) if club.callsign else 'Espace opérateurs' %}{% include "activation/_hero.html" %}{% endwith %}
+  {% with hero_sub = _("Espace opérateurs") ~ ((' ' ~ club.callsign) if club.callsign else '') %}{% include "activation/_hero.html" %}{% endwith %}
 
   <div class="act-grid act-grid-2">
     <div class="act-card">
-      <h2>Connexion opérateur</h2>
+      <h2>{{ _("Connexion opérateur") }}</h2>
       {% if error %}<p class="act-alert act-alert-err">{{ error }}</p>{% endif %}
       {% if not configured %}
-        <p class="act-muted">L'accès opérateur n'est pas encore configuré. L'administrateur du site doit définir le mot de passe commun dans les Réglages de l'espace activation.</p>
+        <p class="act-muted">{{ _("L'accès opérateur n'est pas encore configuré. L'administrateur du site doit définir le mot de passe commun dans les Réglages de l'espace activation.") }}</p>
       {% endif %}
       <form method="post" action="/activation/login" class="act-form">
-        <label>Votre indicatif
+        <label>{{ _("Votre indicatif") }}
           <input type="text" name="callsign" value="{{ last_call|default('') }}" required autofocus
                  autocapitalize="characters" autocomplete="username" placeholder="F4XXX">
         </label>
-        <label>Mot de passe opérateurs
+        <label>{{ _("Mot de passe opérateurs") }}
           <input type="password" name="password" required autocomplete="current-password">
         </label>
         <input type="hidden" name="next" value="{{ next }}">
-        <button type="submit">Entrer</button>
+        <button type="submit">{{ _("Entrer") }}</button>
       </form>
-      <p class="act-muted">Votre indicatif sera ajouté à la liste des opérateurs. Le mot de passe est commun aux opérateurs autorisés à activer {{ callsign }}.</p>
+      <p class="act-muted">{{ _("Votre indicatif sera ajouté à la liste des opérateurs. Le mot de passe est commun aux opérateurs autorisés à activer {call}.", call=callsign) }}</p>
     </div>
   </div>
 </section>

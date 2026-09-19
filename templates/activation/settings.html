@@ -1,68 +1,68 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Réglages{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Réglages") }}{% endblock %}
 {% block topnav %}
-  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
 
 {% block content %}
 <section class="act">
   <header class="act-head">
-    <h1>Réglages</h1>
+    <h1>{{ _("Réglages") }}</h1>
     <nav class="act-tabs">
-      <a href="/activation">Tableau de bord</a>
-      <a href="/activation/planning">Planning</a>
-      <a href="/activation/log">Log QSO</a>
+      <a href="/activation">{{ _("Tableau de bord") }}</a>
+      <a href="/activation/planning">{{ _("Planning") }}</a>
+      <a href="/activation/log">{{ _("Log QSO") }}</a>
       <a href="/activation/adif">ADIF</a>
-      <a href="/activation/settings" class="active">Réglages</a>
+      <a href="/activation/settings" class="active">{{ _("Réglages") }}</a>
     </nav>
   </header>
 
   {% if pw_flash == 'ok' %}
-    <p class="act-alert act-alert-ok">Mot de passe opérateurs mis à jour. Actif immédiatement (les sessions déjà ouvertes restent valides).</p>
+    <p class="act-alert act-alert-ok">{{ _("Mot de passe opérateurs mis à jour. Actif immédiatement (les sessions déjà ouvertes restent valides).") }}</p>
   {% elif pw_flash == 'mismatch' %}
-    <p class="act-alert act-alert-err">Les deux saisies ne correspondent pas (ou champ vide).</p>
+    <p class="act-alert act-alert-err">{{ _("Les deux saisies ne correspondent pas (ou champ vide).") }}</p>
   {% elif pw_flash == 'empty' %}
-    <p class="act-alert act-alert-err">Le mot de passe ne peut pas être vide.</p>
+    <p class="act-alert act-alert-err">{{ _("Le mot de passe ne peut pas être vide.") }}</p>
   {% endif %}
   {% if bk_flash == 'ok' %}
-    <p class="act-alert act-alert-ok">Sauvegarde effectuée.</p>
+    <p class="act-alert act-alert-ok">{{ _("Sauvegarde effectuée.") }}</p>
   {% elif bk_flash == 'err' %}
-    <p class="act-alert act-alert-err">La sauvegarde a échoué (voir les logs).</p>
+    <p class="act-alert act-alert-err">{{ _("La sauvegarde a échoué (voir les logs).") }}</p>
   {% endif %}
   {% if flags_flash == 'ok' %}
-    <p class="act-alert act-alert-ok">Réglage d'affichage mis à jour.</p>
+    <p class="act-alert act-alert-ok">{{ _("Réglage d'affichage mis à jour.") }}</p>
   {% endif %}
   {% if st_flash == 'created' %}
-    <p class="act-alert act-alert-ok">Indicatif spécial créé (pas encore en cours).</p>
+    <p class="act-alert act-alert-ok">{{ _("Indicatif spécial créé (pas encore en cours).") }}</p>
   {% elif st_flash == 'updated' %}
-    <p class="act-alert act-alert-ok">Fiche d'indicatif mise à jour.</p>
+    <p class="act-alert act-alert-ok">{{ _("Fiche d'indicatif mise à jour.") }}</p>
   {% elif st_flash == 'deleted' %}
-    <p class="act-alert act-alert-ok">Fiche supprimée (sauvegarde faite juste avant).</p>
+    <p class="act-alert act-alert-ok">{{ _("Fiche supprimée (sauvegarde faite juste avant).") }}</p>
   {% elif st_flash == 'current' %}
-    <p class="act-alert act-alert-ok">Indicatif en cours : <b>{{ callsign }}</b>. Log, planning, ADIF et points portent désormais sur lui.</p>
+    <p class="act-alert act-alert-ok">{{ _("Indicatif en cours : {call}. Log, planning, ADIF et points portent désormais sur lui.", call=callsign) }}</p>
   {% endif %}
 
   <div class="act-grid act-grid-2">
     <div class="act-card act-card-wide" id="stations">
-      <h2>Indicatifs spéciaux</h2>
+      <h2>{{ _("Indicatifs spéciaux") }}</h2>
       {% if st_error %}<p class="act-alert act-alert-err">⚠ {{ st_error }}</p>{% endif %}
       <div class="act-scroll">
         <table class="act-table">
-          <thead><tr><th>Indicatif</th><th>Libellé</th><th>Locator</th><th>Dates</th><th>QSO</th><th>Page publique</th><th></th></tr></thead>
+          <thead><tr><th>{{ _("Indicatif") }}</th><th>{{ _("Libellé") }}</th><th>{{ _("Locator") }}</th><th>{{ _("Dates") }}</th><th>QSO</th><th>{{ _("Page publique") }}</th><th></th></tr></thead>
           <tbody>
             {% for s in stations %}
               {% set is_cur = s.callsign == callsign %}
               <tr{% if is_cur %} class="is-current"{% endif %}>
-                <td class="act-call">{{ s.callsign }}{% if is_cur %} <span class="act-live-tag">EN COURS</span>{% endif %}</td>
+                <td class="act-call">{{ s.callsign }}{% if is_cur %} <span class="act-live-tag">{{ _("EN COURS") }}</span>{% endif %}</td>
                 <td>{{ s.label }}</td>
                 <td>{{ s.gridsquare }}</td>
-                <td>{{ s.start_date }}{% if s.end_date %} → {{ s.end_date }}{% endif %}</td>
+                <td>{{ date_long(s.start_date) }}{% if s.end_date %} → {{ date_long(s.end_date) }}{% endif %}</td>
                 <td>{{ s.qsos }}</td>
-                <td>{% if s.public %}<a href="/{{ s.slug }}">/{{ s.slug }}</a>{% else %}<span class="act-muted">masquée</span>{% endif %}</td>
+                <td>{% if s.public %}<a href="/{{ s.slug }}">/{{ s.slug }}</a>{% else %}<span class="act-muted">{{ _("masquée") }}</span>{% endif %}</td>
                 <td class="act-actions">
-                  <a class="act-edit" href="/activation/stations/{{ s.slug }}/edit" title="Modifier la fiche">✎</a>
-                  {% if not is_cur %}<form method="post" action="/activation/stations/{{ s.slug }}/current" onsubmit="return confirm('Mettre {{ s.callsign }} en cours ? Log, planning, ADIF et points des opérateurs basculeront sur cet indicatif.')"><button type="submit" class="act-cancel-btn">Mettre en cours</button></form>{% endif %}
-                  {% if not is_cur and not s.qsos %}<form method="post" action="/activation/stations/{{ s.slug }}/delete" onsubmit="return confirm('Supprimer la fiche {{ s.callsign }} ?{% if s.slots %} Ses {{ s.slots }} créneau(x) planifié(s) seront supprimés aussi.{% endif %} Une sauvegarde est faite juste avant.')"><button type="submit" class="act-del" title="Supprimer la fiche (aucun QSO)">✕</button></form>{% endif %}
+                  <a class="act-edit" href="/activation/stations/{{ s.slug }}/edit" title="{{ _("Modifier la fiche") }}">✎</a>
+                  {% if not is_cur %}<form method="post" action="/activation/stations/{{ s.slug }}/current" onsubmit="return confirm({{ _("Mettre {call} en cours ? Log, planning, ADIF et points des opérateurs basculeront sur cet indicatif.", call=s.callsign)|tojson|forceescape }})"><button type="submit" class="act-cancel-btn">{{ _("Mettre en cours") }}</button></form>{% endif %}
+                  {% if not is_cur and not s.qsos %}<form method="post" action="/activation/stations/{{ s.slug }}/delete" onsubmit="return confirm({{ (_("Supprimer la fiche {call} ?", call=s.callsign) ~ ((' ' ~ _("Ses {n} créneau(x) planifié(s) seront supprimés aussi.", n=s.slots)) if s.slots else '') ~ ' ' ~ _("Une sauvegarde est faite juste avant."))|tojson|forceescape }})"><button type="submit" class="act-del" title="{{ _("Supprimer la fiche (aucun QSO)") }}">✕</button></form>{% endif %}
                 </td>
               </tr>
             {% endfor %}
@@ -70,158 +70,154 @@
         </table>
       </div>
       <details class="act-new-station"{% if st_error %} open{% endif %}>
-        <summary>+ Nouvel indicatif spécial</summary>
+        <summary>{{ _("+ Nouvel indicatif spécial") }}</summary>
         <form method="post" action="/activation/stations" class="act-form">
-          <label>Indicatif <input type="text" name="callsign" required maxlength="14" autocapitalize="characters" autocomplete="off" placeholder="TM61XYZ" value="{{ st_form.callsign or '' }}"></label>
+          <label>{{ _("Indicatif") }} <input type="text" name="callsign" required maxlength="14" autocapitalize="characters" autocomplete="off" placeholder="TM61XYZ" value="{{ st_form.callsign or '' }}"></label>
           {% with f = st_form %}{% include "activation/_station_fields.html" %}{% endwith %}
-          <button type="submit">Créer l'indicatif</button>
+          <button type="submit">{{ _("Créer l'indicatif") }}</button>
         </form>
       </details>
-      <p class="act-muted act-map-note">Un seul indicatif est « en cours » : c'est lui que les opérateurs loguent et planifient. Les autres restent consultables sur leur page publique et dans <a href="/activations">/activations</a>. Roster et mot de passe opérateurs sont communs à tous. Une fiche sans QSO peut être supprimée (✕) ; dès qu'elle a des QSO, elle est conservée.</p>
+      <p class="act-muted act-map-note">{{ _("Un seul indicatif est « en cours » : c'est lui que les opérateurs loguent et planifient. Les autres restent consultables sur leur page publique et dans /activations.") }} {{ _("Roster et mot de passe opérateurs sont communs à tous. Une fiche sans QSO peut être supprimée (✕) ; dès qu'elle a des QSO, elle est conservée.") }}</p>
     </div>
 
     <div class="act-card">
-      <h2>Mot de passe opérateurs</h2>
+      <h2>{{ _("Mot de passe opérateurs") }}{% if club.callsign %} {{ club.callsign }}{% endif %}</h2>
       <p class="act-muted">
-        Mot de passe commun aux opérateurs autorisés à activer {{ callsign }}. Il protège
-        l'espace opérateurs (planning, log, ADIF) de tous les indicatifs spéciaux du club,
-        indépendamment du mot de passe admin du site.
-        {% if op_configured %}<br><b>État :</b> configuré.{% else %}<br><b>État :</b> <span class="act-warn">non configuré</span> — à définir ci-dessous.{% endif %}
+        {{ _("Mot de passe commun aux opérateurs autorisés à activer {call}. Il protège l'espace opérateurs (planning, log, ADIF) de tous les indicatifs spéciaux du club, indépendamment du mot de passe admin du site.", call=callsign) }}
+        {% if op_configured %}<br><b>{{ _("État :") }}</b> {{ _("configuré.") }}{% else %}<br><b>{{ _("État :") }}</b> <span class="act-warn">{{ _("non configuré") }}</span> — {{ _("à définir ci-dessous.") }}{% endif %}
       </p>
       <form method="post" action="/activation/settings/password" class="act-form">
-        <label>Nouveau mot de passe <input type="password" name="new_password" required autocomplete="new-password"></label>
-        <label>Confirmer <input type="password" name="confirm" required autocomplete="new-password"></label>
-        <button type="submit">Mettre à jour</button>
+        <label>{{ _("Nouveau mot de passe") }} <input type="password" name="new_password" required autocomplete="new-password"></label>
+        <label>{{ _("Confirmer") }} <input type="password" name="confirm" required autocomplete="new-password"></label>
+        <button type="submit">{{ _("Mettre à jour") }}</button>
       </form>
       <form method="post" action="/activation/logout" class="act-form" style="margin-top:0.8rem;">
-        <button type="submit" class="act-cancel-btn">Se déconnecter de l'espace opérateurs</button>
+        <button type="submit" class="act-cancel-btn">{{ _("Se déconnecter de l'espace opérateurs") }}</button>
       </form>
     </div>
 
     <div class="act-card">
-      <h2>Affichage public</h2>
-      <p class="act-muted">Contrôle ce qui est visible sur les pages publiques (ex. <a href="/{{ station.slug }}">/{{ station.slug }}</a>).</p>
+      <h2>{{ _("Affichage public") }}</h2>
+      <p class="act-muted">{{ _("Contrôle ce qui est visible sur les pages publiques") }} ({{ _("ex.") }} <a href="/{{ station.slug }}">/{{ station.slug }}</a>).</p>
       <form method="post" action="/activation/settings/flags" class="act-form">
-        <label class="act-check"><input type="checkbox" name="show_contacts" value="1"{% if show_contacts %} checked{% endif %}> Afficher la liste des contacts (« Derniers contacts »)</label>
-        <label class="act-check"><input type="checkbox" name="show_map_stats" value="1"{% if show_map_stats %} checked{% endif %}> Afficher la carte, le tableau DXCC et le classement des chasseurs</label>
-        <button type="submit">Enregistrer</button>
+        <label class="act-check"><input type="checkbox" name="show_contacts" value="1"{% if show_contacts %} checked{% endif %}> {{ _("Afficher la liste des contacts (« Derniers contacts »)") }}</label>
+        <label class="act-check"><input type="checkbox" name="show_map_stats" value="1"{% if show_map_stats %} checked{% endif %}> {{ _("Afficher la carte, le tableau DXCC et le classement des chasseurs") }}</label>
+        <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
-      <p class="act-muted">Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.</p>
+      <p class="act-muted">{{ _("Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.") }}</p>
     </div>
 
     <div class="act-card">
-      <h2>Board public</h2>
+      <h2>{{ _("Board public") }}</h2>
       <p class="act-muted">
         {% if station.public %}
-          En ligne : la page de {{ callsign }} est sur <a href="/{{ station.slug }}">/{{ station.slug }}</a>.
+          {{ _("En ligne : la page de {call} est sur", call=callsign) }} <a href="/{{ station.slug }}">/{{ station.slug }}</a>.
         {% else %}
-          Masquée : coche « Page publique en ligne » dans la fiche de {{ callsign }} (Indicatifs spéciaux).
+          {{ _("Masquée : coche « Page publique en ligne » dans la fiche de {call} (Indicatifs spéciaux).", call=callsign) }}
         {% endif %}
       </p>
-      <p class="act-muted">Toutes les activations publiées : <a href="/activations">/activations</a>.</p>
-      {% if is_admin %}<p class="act-muted">Tu es connecté en <b>admin site</b> (accès garanti même sans mot de passe opérateur).</p>{% endif %}
+      <p class="act-muted">{{ _("Toutes les activations publiées :") }} <a href="/activations">/activations</a>.</p>
+      {% if is_admin %}<p class="act-muted">{{ _("Tu es connecté en admin site (accès garanti même sans mot de passe opérateur).") }}</p>{% endif %}
     </div>
 
     <div class="act-card">
-      <h2>Connexions</h2>
+      <h2>{{ _("Connexions") }}</h2>
       <p class="act-muted">
-        <b>7 jours :</b> {{ visits_summary.logins_7d }} connexion(s) réussie(s)
-        {%- if visits_summary.failed_logins_7d %}<br><span class="act-warn">{{ visits_summary.failed_logins_7d }} connexion(s) ratée(s)</span>{% else %} · aucune ratée{% endif %}
+        <b>{{ _("7 jours :") }}</b> {{ _("{n} connexion(s) réussie(s)", n=visits_summary.logins_7d) }}
+        {%- if visits_summary.failed_logins_7d %}<br><span class="act-warn">{{ _("{n} connexion(s) ratée(s)", n=visits_summary.failed_logins_7d) }}</span>{% else %} · {{ _("aucune ratée") }}{% endif %}
       </p>
       {% if visits_summary.recent_failures %}
       <div class="act-scroll">
         <table class="act-table">
-          <thead><tr><th>Date (UTC)</th><th>IP</th><th>Accès</th><th>Indicatif</th></tr></thead>
+          <thead><tr><th>{{ _("Date (UTC)") }}</th><th>IP</th><th>{{ _("Accès") }}</th><th>{{ _("Indicatif") }}</th></tr></thead>
           <tbody>
             {% for f in visits_summary.recent_failures %}<tr><td>{{ f.when }}</td><td>{{ f.ip }}</td><td>{{ f.kind }}</td><td>{{ f.callsign }}</td></tr>{% endfor %}
           </tbody>
         </table>
       </div>
       {% endif %}
-      <p class="act-muted act-map-note">Une IP publique est bloquée 15 min après 5 échecs de connexion ; le réseau local ne l'est jamais. Journal conservé 90 jours.</p>
-      <form method="post" action="/logout" class="act-form"><button type="submit" class="act-cancel-btn">Se déconnecter (admin)</button></form>
+      <p class="act-muted act-map-note">{{ _("Une IP publique est bloquée 15 min après 5 échecs de connexion ; le réseau local ne l'est jamais. Journal conservé 90 jours.") }}</p>
+      <form method="post" action="/logout" class="act-form"><button type="submit" class="act-cancel-btn">{{ _("Se déconnecter (admin)") }}</button></form>
     </div>
 
     <div class="act-card" id="qrz">
-      <h2>Callbook QRZ</h2>
-      {% if qz_flash == 'ok' %}<p class="act-alert act-alert-ok">Compte QRZ enregistré : connexion réussie.</p>
-      {% elif qz_flash == 'nosub' %}<p class="act-alert act-alert-err">Compte QRZ enregistré, mais sans abonnement XML : QRZ ne renverra pas les fiches complètes.</p>
-      {% elif qz_flash == 'offline' %}<p class="act-alert act-alert-err">Compte enregistré sans vérification : QRZ.com est injoignable pour l'instant.</p>
-      {% elif qz_flash == 'refused' %}<p class="act-alert act-alert-err">QRZ.com a refusé la connexion (identifiant ou mot de passe incorrect) : compte non enregistré.</p>
-      {% elif qz_flash == 'incomplete' %}<p class="act-alert act-alert-err">Identifiant et mot de passe QRZ requis.</p>
-      {% elif qz_flash == 'cleared' %}<p class="act-alert act-alert-ok">Compte QRZ retiré des Réglages.</p>{% endif %}
+      <h2>{{ _("Callbook QRZ") }}</h2>
+      {% if qz_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Compte QRZ enregistré : connexion réussie.") }}</p>
+      {% elif qz_flash == 'nosub' %}<p class="act-alert act-alert-err">{{ _("Compte QRZ enregistré, mais sans abonnement XML : QRZ ne renverra pas les fiches complètes.") }}</p>
+      {% elif qz_flash == 'offline' %}<p class="act-alert act-alert-err">{{ _("Compte enregistré sans vérification : QRZ.com est injoignable pour l'instant.") }}</p>
+      {% elif qz_flash == 'refused' %}<p class="act-alert act-alert-err">{{ _("QRZ.com a refusé la connexion (identifiant ou mot de passe incorrect) : compte non enregistré.") }}</p>
+      {% elif qz_flash == 'incomplete' %}<p class="act-alert act-alert-err">{{ _("Identifiant et mot de passe QRZ requis.") }}</p>
+      {% elif qz_flash == 'cleared' %}<p class="act-alert act-alert-ok">{{ _("Compte QRZ retiré des Réglages.") }}</p>{% endif %}
       <p class="act-muted">
-        Fiches QRZ (nom, locator, DXCC) des stations contactées : récupérées à la saisie
-        dans le log, et doucement en tâche de fond (1 indicatif toutes les ~10 s).
-        <br><b>Identifiées :</b> {{ callbook.ok }} / {{ callbook.stations }}
-        {% if callbook.notfound %} · {{ callbook.notfound }} inconnue(s) de QRZ{% endif %}
-        {% if callbook.pending %} · <span class="act-warn">{{ callbook.pending }} en attente</span>{% endif %}
+        {{ _("Fiches QRZ (nom, locator, DXCC) des stations contactées : récupérées à la saisie dans le log, et doucement en tâche de fond (1 indicatif toutes les ~10 s).") }}
+        <br><b>{{ _("Identifiées :") }}</b> {{ callbook.ok }} / {{ callbook.stations }}
+        {% if callbook.notfound %} · {{ _("{n} inconnue(s) de QRZ", n=callbook.notfound) }}{% endif %}
+        {% if callbook.pending %} · <span class="act-warn">{{ _("{n} en attente", n=callbook.pending) }}</span>{% endif %}
       </p>
-      <p class="act-muted"><b>Compte utilisé :</b>
-        {% if qrz_account.source == 'settings' %}{{ qrz_account.username }} (saisi ici)
-        {% elif qrz_account.source == 'config' %}{{ qrz_account.username }} (compte par défaut, config.yml)
-        {% else %}<span class="act-warn">aucun : pas de recherche QRZ</span>{% endif %}
+      <p class="act-muted"><b>{{ _("Compte utilisé :") }}</b>
+        {% if qrz_account.source == 'settings' %}{{ qrz_account.username }} ({{ _("saisi ici") }})
+        {% elif qrz_account.source == 'config' %}{{ qrz_account.username }} ({{ _("compte par défaut, config.yml") }})
+        {% else %}<span class="act-warn">{{ _("aucun : pas de recherche QRZ") }}</span>{% endif %}
       </p>
       <form method="post" action="/activation/settings/qrz" class="act-form">
-        <label>Identifiant QRZ.com <input type="text" name="username" maxlength="40" autocomplete="off" required
+        <label>{{ _("Identifiant QRZ.com") }} <input type="text" name="username" maxlength="40" autocomplete="off" required
           value="{{ qrz_account.username if qrz_account.source == 'settings' else '' }}"></label>
-        <label>Mot de passe QRZ.com <input type="password" name="password" autocomplete="new-password"
-          {% if qrz_account.source == 'settings' %}placeholder="inchangé si vide"{% endif %}></label>
-        <button type="submit" name="action" value="save">Enregistrer et tester</button>
+        <label>{{ _("Mot de passe QRZ.com") }} <input type="password" name="password" autocomplete="new-password"
+          {% if qrz_account.source == 'settings' %}placeholder="{{ _("inchangé si vide") }}"{% endif %}></label>
+        <button type="submit" name="action" value="save">{{ _("Enregistrer et tester") }}</button>
       </form>
       {% if qrz_account.source == 'settings' %}
       <form method="post" action="/activation/settings/qrz" class="act-form">
-        <button type="submit" name="action" value="clear" class="act-cancel-btn">Retirer ce compte (retour au compte par défaut)</button>
+        <button type="submit" name="action" value="clear" class="act-cancel-btn">{{ _("Retirer ce compte (retour au compte par défaut)") }}</button>
       </form>
       {% endif %}
-      <p class="act-muted act-map-note">Abonnement QRZ XML nécessaire. Le mot de passe reste sur le serveur : jamais réaffiché, ni inclus dans les sauvegardes.</p>
+      <p class="act-muted act-map-note">{{ _("Abonnement QRZ XML nécessaire. Le mot de passe reste sur le serveur : jamais réaffiché, ni inclus dans les sauvegardes.") }}</p>
     </div>
 
     <div class="act-card act-card-wide" id="points">
-      <h2>Classement aux points — {{ callsign }}</h2>
-      {% if sc_flash == 'ok' %}<p class="act-alert act-alert-ok">Règle de points enregistrée.</p>{% endif %}
+      <h2>{{ _("Classement aux points") }} — {{ callsign }}</h2>
+      {% if sc_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Règle de points enregistrée.") }}</p>{% endif %}
       <form method="post" action="/activation/settings/scoring" class="act-form">
-        <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if scoring.enabled %} checked{% endif %}> Classer les chasseurs aux points sur <a href="/{{ station.slug }}">/{{ station.slug }}</a> (sinon : couples bande×mode)</label>
-        <label class="act-check"><input type="checkbox" name="unique_band_mode" value="1"{% if scoring.unique_band_mode %} checked{% endif %}> Un seul QSO compté par bande × mode (les doublons rapportent 0)</label>
+        <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if scoring.enabled %} checked{% endif %}> {{ _("Classer les chasseurs aux points sur") }} <a href="/{{ station.slug }}">/{{ station.slug }}</a> ({{ _("sinon : couples bande×mode") }})</label>
+        <label class="act-check"><input type="checkbox" name="unique_band_mode" value="1"{% if scoring.unique_band_mode %} checked{% endif %}> {{ _("Un seul QSO compté par bande × mode (les doublons rapportent 0)") }}</label>
         <fieldset class="act-fieldset">
-          <legend><label class="act-check"><input type="checkbox" name="per_qso_on" value="1"{% if scoring.per_qso_on %} checked{% endif %}> Nombre de contacts</label></legend>
-          <label>Points par QSO <input type="number" name="per_qso" min="0" max="1000" value="{{ scoring.per_qso }}"></label>
+          <legend><label class="act-check"><input type="checkbox" name="per_qso_on" value="1"{% if scoring.per_qso_on %} checked{% endif %}> {{ _("Nombre de contacts") }}</label></legend>
+          <label>{{ _("Points par QSO") }} <input type="number" name="per_qso" min="0" max="1000" value="{{ scoring.per_qso }}"></label>
         </fieldset>
         <fieldset class="act-fieldset">
-          <legend><label class="act-check"><input type="checkbox" name="mode_on" value="1"{% if scoring.mode_on %} checked{% endif %}> Mode</label></legend>
+          <legend><label class="act-check"><input type="checkbox" name="mode_on" value="1"{% if scoring.mode_on %} checked{% endif %}> {{ _("Mode") }}</label></legend>
           <div class="act-mode-grid">
             {% for m in modes %}<label>{{ m }} <input type="number" name="mode_{{ m }}" min="0" max="1000" value="{{ scoring.mode_points.get(m, scoring.mode_default) }}"></label>{% endfor %}
-            <label>Autres <input type="number" name="mode_default" min="0" max="1000" value="{{ scoring.mode_default }}"></label>
+            <label>{{ _("Autres") }} <input type="number" name="mode_default" min="0" max="1000" value="{{ scoring.mode_default }}"></label>
           </div>
         </fieldset>
         <fieldset class="act-fieldset">
-          <legend><label class="act-check"><input type="checkbox" name="distance_on" value="1"{% if scoring.distance_on %} checked{% endif %}> Distance depuis {{ my_grid or 'la station' }}</label></legend>
+          <legend><label class="act-check"><input type="checkbox" name="distance_on" value="1"{% if scoring.distance_on %} checked{% endif %}> {{ _("Distance depuis {grid}", grid=my_grid or _("la station")) }}</label></legend>
           <div class="act-row">
-            <label>1 point tous les (km) <input type="number" name="km_per_point" min="1" max="20000" value="{{ scoring.km_per_point }}"></label>
-            <label>Plafond (0 = aucun) <input type="number" name="distance_max" min="0" max="1000" value="{{ scoring.distance_max }}"></label>
+            <label>{{ _("1 point tous les (km)") }} <input type="number" name="km_per_point" min="1" max="20000" value="{{ scoring.km_per_point }}"></label>
+            <label>{{ _("Plafond (0 = aucun)") }} <input type="number" name="distance_max" min="0" max="1000" value="{{ scoring.distance_max }}"></label>
           </div>
         </fieldset>
-        <button type="submit">Enregistrer la règle</button>
+        <button type="submit">{{ _("Enregistrer la règle") }}</button>
       </form>
-      <p class="act-muted act-map-note">Règle actuelle : {{ scoring_summary }}. Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).</p>
+      <p class="act-muted act-map-note">{{ _("Règle actuelle : {rule}.", rule=scoring_summary) }} {{ _("Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).") }}</p>
     </div>
 
     <div class="act-card">
-      <h2>Sauvegardes</h2>
+      <h2>{{ _("Sauvegardes") }}</h2>
       <p class="act-muted">
-        Snapshots automatiques (base + mot de passe) dans <code>var/backups/</code> :
-        au démarrage et après chaque modification. Rotation sur les 40 derniers.
+        {{ _("Snapshots automatiques (base + mot de passe) dans") }} <code>var/backups/</code> : {{ _("au démarrage et après chaque modification. Rotation sur les 40 derniers.") }}
         {% if last_backup_str %}
-          <br><b>Dernière :</b> {{ last_backup_str }} · {{ backup_count }} snapshot(s).
+          <br><b>{{ _("Dernière :") }}</b> {{ last_backup_str }} · {{ _("{n} snapshot(s).", n=backup_count) }}
         {% else %}
-          <br><span class="act-warn">Aucune sauvegarde encore.</span>
+          <br><span class="act-warn">{{ _("Aucune sauvegarde encore.") }}</span>
         {% endif %}
       </p>
       <div class="act-inline">
-        <form method="post" action="/activation/settings/backup"><button type="submit">Sauvegarder maintenant</button></form>
-        <a class="act-cancel-btn" href="/activation/settings/backup.sqlite">Télécharger (.sqlite)</a>
+        <form method="post" action="/activation/settings/backup"><button type="submit">{{ _("Sauvegarder maintenant") }}</button></form>
+        <a class="act-cancel-btn" href="/activation/settings/backup.sqlite">{{ _("Télécharger (.sqlite)") }}</a>
       </div>
-      <p class="act-muted">Le téléchargement récupère une copie de la base à conserver hors serveur.</p>
+      <p class="act-muted">{{ _("Le téléchargement récupère une copie de la base à conserver hors serveur.") }}</p>
     </div>
   </div>
 </section>

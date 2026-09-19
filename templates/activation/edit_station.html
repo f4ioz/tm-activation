@@ -1,18 +1,18 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Fiche {{ st.callsign }}{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Fiche {call}", call=st.callsign) }}{% endblock %}
 {% block topnav %}
-  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
 
 {% block content %}
 <header class="act-head">
-  <h1>Fiche {{ st.callsign }}</h1>
+  <h1>{{ _("Fiche {call}", call=st.callsign) }}</h1>
   <nav class="act-tabs">
-    <a href="/activation">Tableau de bord</a>
-    <a href="/activation/planning">Planning</a>
-    <a href="/activation/log">Log QSO</a>
+    <a href="/activation">{{ _("Tableau de bord") }}</a>
+    <a href="/activation/planning">{{ _("Planning") }}</a>
+    <a href="/activation/log">{{ _("Log QSO") }}</a>
     <a href="/activation/adif">ADIF</a>
-    <a href="/activation/settings" class="active">Réglages</a>
+    <a href="/activation/settings" class="active">{{ _("Réglages") }}</a>
   </nav>
 </header>
 
@@ -22,10 +22,10 @@
   <form method="post" action="/activation/stations/{{ st.slug }}" class="act-form">
     {% with f = form %}{% include "activation/_station_fields.html" %}{% endwith %}
     <div class="act-inline">
-      <button type="submit">Enregistrer</button>
-      <a href="/activation/settings#stations" class="act-cancel">Annuler</a>
+      <button type="submit">{{ _("Enregistrer") }}</button>
+      <a href="/activation/settings#stations" class="act-cancel">{{ _("Annuler") }}</a>
     </div>
   </form>
-  <p class="act-muted act-map-note">L'indicatif lui-même ne se modifie pas : il signe les QSO. Page publique : <a href="/{{ st.slug }}">/{{ st.slug }}</a>{% if not st.public %} (masquée){% endif %}.</p>
+  <p class="act-muted act-map-note">{{ _("L'indicatif lui-même ne se modifie pas : il signe les QSO.") }} {{ _("Page publique :") }} <a href="/{{ st.slug }}">/{{ st.slug }}</a>{% if not st.public %} ({{ _("masquée") }}){% endif %}.</p>
 </div>
 {% endblock %}

@@ -38,6 +38,7 @@ from zoneinfo import ZoneInfo
 
 from app import auth as _auth
 from app.config import activation_config, qrz_config
+from app.i18n import N_, _
 from app.qrz_xml import QrzXmlClient, get_shared_client
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -161,7 +162,7 @@ def set_current_station(call: str) -> None:
     """Bascule l'espace opérateurs (log, planning, ADIF, points) sur ``call``."""
     st = get_station(call)
     if st is None:
-        raise ValueError("indicatif inconnu")
+        raise ValueError(_("indicatif inconnu"))
     data = load_settings()
     data["current_station"] = st["callsign"]
     _save_settings(data)
@@ -171,15 +172,15 @@ def _clean_station(fields: dict[str, Any]) -> dict[str, Any]:
     """Champs modifiables d'une fiche, validés (ValueError sinon)."""
     grid = str(fields.get("gridsquare") or "").strip().upper()
     if grid and not (_RE_LOCATOR.match(grid) or _RE_LOCATOR8.match(grid)):
-        raise ValueError("locator invalide (4, 6 ou 8 caractères)")
+        raise ValueError(_("locator invalide (4, 6 ou 8 caractères)"))
     dates = {}
     for key in ("start_date", "end_date"):
         value = str(fields.get(key) or "").strip()
         if value and not _RE_DATE.match(value):
-            raise ValueError("date invalide (AAAA-MM-JJ)")
+            raise ValueError(_("date invalide (AAAA-MM-JJ)"))
         dates[key] = value
     if dates["start_date"] and dates["end_date"] and dates["end_date"] < dates["start_date"]:
-        raise ValueError("date de fin avant la date de début")
+        raise ValueError(_("date de fin avant la date de début"))
     flags = [f.strip().lower() for f in str(fields.get("flags") or "").split(",")]
     return {
         "label": str(fields.get("label") or "").strip()[:120],
@@ -198,12 +199,12 @@ def create_station(call: str, **fields: Any) -> dict[str, Any]:
     slug = slugify_call(cs)
     # Un chiffre dans le slug : un indicatif ne peut pas masquer une page du site (/grid…).
     if not valid_callsign(cs) or not re.search(r"\d", slug):
-        raise ValueError("indicatif invalide")
+        raise ValueError(_("indicatif invalide"))
     data = _clean_station(fields)
     init_db()
     with conn() as c:
         if c.execute("SELECT 1 FROM stations WHERE callsign=? OR slug=?", (cs, slug)).fetchone():
-            raise ValueError("indicatif déjà enregistré")
+            raise ValueError(_("indicatif déjà enregistré"))
         c.execute(
             "INSERT INTO stations(callsign, slug, label, gridsquare, start_date, end_date, public, "
             "badge, subtitle, flags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -218,7 +219,7 @@ def update_station(call: str, **fields: Any) -> dict[str, Any]:
     """Modifie une fiche. L'indicatif lui-même ne change pas : il signe les QSO."""
     st = get_station(call)
     if st is None:
-        raise ValueError("indicatif inconnu")
+        raise ValueError(_("indicatif inconnu"))
     data = _clean_station({**st, **fields})
     with conn() as c:
         c.execute(
@@ -239,15 +240,15 @@ def delete_station(call: str) -> None:
     """
     st = get_station(call)
     if st is None:
-        raise ValueError("indicatif inconnu")
+        raise ValueError(_("indicatif inconnu"))
     cs = st["callsign"]
     if cs == callsign():
-        raise ValueError(f"{cs} est l'indicatif en cours : mets-en un autre en cours d'abord")
+        raise ValueError(_("{call} est l'indicatif en cours : mets-en un autre en cours d'abord", call=cs))
     backup_now()
     with conn() as c:
         # Vérifié dans la même transaction que la suppression.
         if c.execute("SELECT 1 FROM contacts WHERE station=? LIMIT 1", (cs,)).fetchone():
-            raise ValueError(f"{cs} a des QSO : sa fiche est conservée")
+            raise ValueError(_("{call} a des QSO : sa fiche est conservée", call=cs))
         c.execute("DELETE FROM slots WHERE station=?", (cs,))
         c.execute("DELETE FROM stations WHERE callsign=?", (cs,))
     data = load_settings()
@@ -325,7 +326,7 @@ def operator_password() -> str:
 def set_operator_password(new_password: str) -> None:
     pw = (new_password or "").strip()
     if not pw:
-        raise ValueError("mot de passe vide")
+        raise ValueError(_("mot de passe vide"))
     OP_PASSWORD_FILE.parent.mkdir(parents=True, exist_ok=True)
     OP_PASSWORD_FILE.write_text(pw, encoding="utf-8")
     OP_PASSWORD_FILE.chmod(0o600)
@@ -627,7 +628,7 @@ def utc_iso_to_parts(utc_iso: str) -> tuple[str, str] | None:
 def add_operator(call: str, name: str = "") -> None:
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
-        raise ValueError("indicatif invalide")
+        raise ValueError(_("indicatif invalide"))
     init_db()
     with conn() as c:
         c.execute(
@@ -682,9 +683,9 @@ def add_slot(
 ) -> int:
     cs = (operator_call or "").strip().upper()
     if not valid_callsign(cs):
-        raise ValueError("indicatif opérateur invalide")
+        raise ValueError(_("indicatif opérateur invalide"))
     if not start_utc or not end_utc or end_utc <= start_utc:
-        raise ValueError("créneau invalide (fin ≤ début)")
+        raise ValueError(_("créneau invalide (fin ≤ début)"))
     init_db()
     with conn() as c:
         cur = c.execute(
@@ -723,9 +724,9 @@ def update_slot(
 ) -> None:
     cs = (operator_call or "").strip().upper()
     if not valid_callsign(cs):
-        raise ValueError("indicatif opérateur invalide")
+        raise ValueError(_("indicatif opérateur invalide"))
     if not start_utc or not end_utc or end_utc <= start_utc:
-        raise ValueError("créneau invalide (fin ≤ début)")
+        raise ValueError(_("créneau invalide (fin ≤ début)"))
     init_db()
     with conn() as c:
         c.execute(
@@ -818,13 +819,13 @@ def add_contact(
 ) -> int:
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
-        raise ValueError("indicatif contacté invalide")
+        raise ValueError(_("indicatif contacté invalide"))
     op = (operator_call or "").strip().upper()
     if not valid_callsign(op):
-        raise ValueError("indicatif opérateur invalide")
+        raise ValueError(_("indicatif opérateur invalide"))
     grid = (gridsquare or "").strip().upper()
     if not valid_locator(grid):
-        raise ValueError("locator invalide")
+        raise ValueError(_("locator invalide"))
     if not qso_date or not time_on:
         qso_date, time_on = now_utc_parts()
     init_db()
@@ -861,11 +862,11 @@ def update_contact(contact_id: int, **fields: Any) -> None:
         if k in ("call", "operator_call"):
             v = str(v).strip().upper()
             if not valid_callsign(v):
-                raise ValueError(f"{k} invalide")
+                raise ValueError(_("{field} invalide", field=k))
         elif k == "gridsquare":
             v = str(v).strip().upper()
             if not valid_locator(v):
-                raise ValueError("locator invalide")
+                raise ValueError(_("locator invalide"))
         elif k in ("band", "mode", "sat_name"):
             v = str(v).strip().upper()
         elif k == "freq_mhz":
@@ -1039,7 +1040,7 @@ def check_qrz_account(username: str, password: str) -> tuple[str, str]:
 def set_qrz_account(username: str, password: str) -> None:
     username = username.strip()
     if not valid_qrz_username(username) or not password:
-        raise ValueError("compte QRZ incomplet")
+        raise ValueError(_("compte QRZ incomplet"))
     QRZ_ACCOUNT_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = QRZ_ACCOUNT_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps({"username": username, "password": password}), encoding="utf-8")
@@ -1427,19 +1428,19 @@ def scoring_summary(rule: dict[str, Any] | None = None) -> str:
     rule = rule or get_scoring()
     bits = []
     if rule["per_qso_on"]:
-        bits.append(f"{rule['per_qso']} pt{'s' if rule['per_qso'] > 1 else ''} par QSO")
+        bits.append(_("{n} pts par QSO", n=rule["per_qso"]) if rule["per_qso"] > 1 else _("{n} pt par QSO", n=rule["per_qso"]))
     if rule["mode_on"]:
         by_pts: dict[int, list[str]] = {}
         for m, p in rule["mode_points"].items():
             by_pts.setdefault(p, []).append(m)
         modes = ", ".join(f"{'/'.join(ms)} {p}" for p, ms in sorted(by_pts.items(), reverse=True))
-        bits.append(f"mode : {modes}, autres {rule['mode_default']}")
+        bits.append(_("mode : {modes}, autres {other}", modes=modes, other=rule["mode_default"]))
     if rule["distance_on"]:
         cap = f" (max {rule['distance_max']})" if rule["distance_max"] else ""
-        bits.append(f"distance : 1 pt / {rule['km_per_point']} km{cap}")
+        bits.append(_("distance : 1 pt / {km} km", km=rule["km_per_point"]) + cap)
     if rule["unique_band_mode"]:
-        bits.append("un seul QSO compté par bande×mode")
-    return " · ".join(bits) or "aucun critère actif"
+        bits.append(_("un seul QSO compté par bande×mode"))
+    return " · ".join(bits) or _("aucun critère actif")
 
 
 def _hunter_sort_key(h: dict[str, Any]) -> tuple:
@@ -1558,11 +1559,11 @@ IMPORT_TMP_TTL = 3600
 IMPORT_TIME_TOLERANCE_MIN = 10  # même QSO à ±10 min (horloges des logiciels)
 
 IMPORT_STATUS = {
-    "new": "Nouveau",
-    "worked": "Déjà contacté sur cette bande/mode",
-    "in_log": "Déjà dans le log",
-    "file_dupe": "En double dans le fichier",
-    "invalid": "Invalide",
+    "new": N_("Nouveau"),
+    "worked": N_("Déjà contacté sur cette bande/mode"),
+    "in_log": N_("Déjà dans le log"),
+    "file_dupe": N_("En double dans le fichier"),
+    "invalid": N_("Invalide"),
 }
 IMPORT_DEFAULT_CHECKED = ("new", "worked")
 
@@ -1640,13 +1641,13 @@ def analyze_adif(
             minutes = _utc_minutes(qso_date, time_on)
         reason = ""
         if not valid_callsign(call):
-            reason = "indicatif invalide"
+            reason = _("indicatif invalide")
         elif not band or not mode:
-            reason = "bande ou mode manquant"
+            reason = _("bande ou mode manquant")
         elif minutes is None:
-            reason = "date/heure manquante ou invalide"
+            reason = _("date/heure manquante ou invalide")
         elif not valid_callsign(op):
-            reason = "opérateur à choisir"
+            reason = _("opérateur à choisir")
         if reason:
             status = "invalid"
         else:

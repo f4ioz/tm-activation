@@ -1,66 +1,66 @@
 {% extends "activation/_base.html" %}
 {% block title %}{{ callsign }} — ADIF{% endblock %}
 {% block topnav %}
-  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
 
-{% macro fmt_d(d) %}{% if d and d|length == 8 %}{{ d[6:8] }}/{{ d[4:6] }}/{{ d[2:4] }}{% else %}{{ d }}{% endif %}{% endmacro %}
+{% macro fmt_d(d) %}{% if d and d|length == 8 %}{{ date_short(d[:4] ~ '-' ~ d[4:6] ~ '-' ~ d[6:8]) }}{% else %}{{ d }}{% endif %}{% endmacro %}
 {% macro fmt_t(t) %}{% if t and t|length >= 4 %}{{ t[:2] }}:{{ t[2:4] }}{% else %}{{ t }}{% endif %}{% endmacro %}
 
 {% block content %}
 <header class="act-head">
-  <h1>Import / export ADIF</h1>
+  <h1>{{ _("Import / export ADIF") }}</h1>
   <nav class="act-tabs">
-    <a href="/activation">Tableau de bord</a>
-    <a href="/activation/planning">Planning</a>
-    <a href="/activation/log">Log QSO</a>
+    <a href="/activation">{{ _("Tableau de bord") }}</a>
+    <a href="/activation/planning">{{ _("Planning") }}</a>
+    <a href="/activation/log">{{ _("Log QSO") }}</a>
     <a href="/activation/adif" class="active">ADIF</a>
-    {% if is_admin %}<a href="/activation/settings">Réglages</a>{% endif %}
+    {% if is_admin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
   </nav>
 </header>
 
 {% if flash %}
-<p class="act-alert act-alert-ok">Import ADIF : <b>{{ flash.added }}</b> QSO ajouté(s), {{ flash.skipped }} non retenu(s), {{ flash.invalid }} invalide(s).</p>
+<p class="act-alert act-alert-ok">{{ _("Import ADIF : {added} QSO ajouté(s), {skipped} non retenu(s), {invalid} invalide(s).", added=flash.added, skipped=flash.skipped, invalid=flash.invalid) }}</p>
 {% elif err == 'expired' %}
-<p class="act-alert act-alert-err">Aperçu expiré ou déjà importé : recharge le fichier.</p>
+<p class="act-alert act-alert-err">{{ _("Aperçu expiré ou déjà importé : recharge le fichier.") }}</p>
 {% elif err == 'empty' %}
-<p class="act-alert act-alert-dupe">Aucun QSO sélectionné pour l'export.</p>
+<p class="act-alert act-alert-dupe">{{ _("Aucun QSO sélectionné pour l'export.") }}</p>
 {% endif %}
 
 {% if preview %}
 <div class="act-card act-results-top">
-  <h2>Aperçu de l'import — {{ preview.filename }}</h2>
+  <h2>{{ _("Aperçu de l'import") }} — {{ preview.filename }}</h2>
   <p class="act-muted">
-    {{ preview.rows|length }} QSO lus :
-    {% for k, lbl in import_status.items() %}{% if preview.counts[k] %}<span class="act-imp-tag act-imp-{{ k }}">{{ lbl }} : {{ preview.counts[k] }}</span> {% endif %}{% endfor %}
-    <br>Rattachés à <b>{{ preview.operator or '—' }}</b>{% if preview.op_source == 'file' %} (sauf champ OPERATOR du fichier){% endif %}.
-    Rien n'est écrit dans le log avant « Importer la sélection ».
+    {{ _("{n} QSO lus :", n=preview.rows|length) }}
+    {% for k, lbl in import_status.items() %}{% if preview.counts[k] %}<span class="act-imp-tag act-imp-{{ k }}">{{ _(lbl) }} : {{ preview.counts[k] }}</span> {% endif %}{% endfor %}
+    <br>{{ _("Rattachés à") }} <b>{{ preview.operator or '—' }}</b>{% if preview.op_source == 'file' %} ({{ _("sauf champ OPERATOR du fichier") }}){% endif %}.
+    {{ _("Rien n'est écrit dans le log avant « Importer la sélection ».") }}
   </p>
   <form method="post" action="/activation/import/confirm" data-sel>
     <input type="hidden" name="token" value="{{ preview.token }}">
     <input type="hidden" name="operator" value="{{ preview.operator }}">
     <input type="hidden" name="op_source" value="{{ preview.op_source }}">
     <div class="act-sel-bar">
-      <button type="button" class="act-cancel-btn" data-sel-all>Tout cocher</button>
-      <button type="button" class="act-cancel-btn" data-sel-none>Tout décocher</button>
+      <button type="button" class="act-cancel-btn" data-sel-all>{{ _("Tout cocher") }}</button>
+      <button type="button" class="act-cancel-btn" data-sel-none>{{ _("Tout décocher") }}</button>
       <span class="act-sel-count" data-sel-count></span>
-      <button type="submit" class="act-sel-go">Importer la sélection</button>
-      <a class="act-cancel" href="/activation/adif">Annuler</a>
+      <button type="submit" class="act-sel-go">{{ _("Importer la sélection") }}</button>
+      <a class="act-cancel" href="/activation/adif">{{ _("Annuler") }}</a>
     </div>
     <div class="act-scroll act-scroll-tall">
       <table class="act-table act-sel-table">
-        <thead><tr><th></th><th>Statut</th><th>Date</th><th>UTC</th><th>Indicatif</th><th>Bande</th><th>Mode</th><th>Opérateur</th><th>Locator</th></tr></thead>
+        <thead><tr><th></th><th>{{ _("Statut") }}</th><th>{{ _("Date") }}</th><th>UTC</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>{{ _("Opérateur") }}</th><th>{{ _("Locator") }}</th></tr></thead>
         <tbody>
           {% for r in preview.rows %}
             <tr{% if r.status != 'invalid' %} data-sel-row{% else %} class="is-invalid"{% endif %}>
               <td>{% if r.status != 'invalid' %}<input type="checkbox" name="sel" value="{{ r.idx }}"{% if r.status in import_checked %} checked{% endif %}>{% endif %}</td>
-              <td><span class="act-imp-tag act-imp-{{ r.status }}">{{ import_status[r.status] }}</span>{% if r.reason %} <span class="act-muted">{{ r.reason }}</span>{% endif %}</td>
+              <td><span class="act-imp-tag act-imp-{{ r.status }}">{{ _(import_status[r.status]) }}</span>{% if r.reason %} <span class="act-muted">{{ r.reason }}</span>{% endif %}</td>
               <td>{{ fmt_d(r.qso_date) }}</td><td>{{ fmt_t(r.time_on) }}</td>
               <td class="act-call">{{ r.call }}</td><td>{{ r.band }}</td><td>{{ r.mode }}</td>
               <td>{{ r.operator_call }}</td><td>{{ r.gridsquare }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="9" class="act-muted">Aucun QSO trouvé dans ce fichier.</td></tr>
+            <tr><td colspan="9" class="act-muted">{{ _("Aucun QSO trouvé dans ce fichier.") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -71,48 +71,48 @@
 
 <div class="act-grid act-grid-2">
   <div class="act-card">
-    <h2>Importer un ADIF</h2>
+    <h2>{{ _("Importer un ADIF") }}</h2>
     <form method="post" action="/activation/import" enctype="multipart/form-data" class="act-form">
-      <label>Fichier ADIF <input type="file" name="file" accept=".adi,.adif,text/plain" required></label>
-      <label>Rattacher à l'opérateur
+      <label>{{ _("Fichier ADIF") }} <input type="file" name="file" accept=".adi,.adif,text/plain" required></label>
+      <label>{{ _("Rattacher à l'opérateur") }}
         <select name="operator" required>
-          <option value="">— choisir —</option>
+          <option value="">{{ _("— choisir —") }}</option>
           {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == current_op %} selected{% endif %}>{{ op.callsign }}{% if op.name %} — {{ op.name }}{% endif %}</option>{% endfor %}
         </select>
       </label>
-      <label class="act-check"><input type="radio" name="op_source" value="form" checked> Tous les QSO pour cet opérateur</label>
-      <label class="act-check"><input type="radio" name="op_source" value="file"> Garder le champ OPERATOR du fichier quand il existe</label>
-      <button type="submit">Analyser le fichier</button>
+      <label class="act-check"><input type="radio" name="op_source" value="form" checked> {{ _("Tous les QSO pour cet opérateur") }}</label>
+      <label class="act-check"><input type="radio" name="op_source" value="file"> {{ _("Garder le champ OPERATOR du fichier quand il existe") }}</label>
+      <button type="submit">{{ _("Analyser le fichier") }}</button>
     </form>
-    <p class="act-muted act-map-note">Un aperçu signale les doublons avant tout import : QSO déjà dans le log (même indicatif, bande et mode à ±10 min), en double dans le fichier, ou station déjà contactée sur la bande/mode.</p>
+    <p class="act-muted act-map-note">{{ _("Un aperçu signale les doublons avant tout import : QSO déjà dans le log (même indicatif, bande et mode à ±10 min), en double dans le fichier, ou station déjà contactée sur la bande/mode.") }}</p>
   </div>
 
   <div class="act-card">
-    <h2>Export complet</h2>
-    <p class="act-muted">Tout le log ({{ contacts|length }} QSO), prêt pour TQSL / LoTW.</p>
-    <p class="act-inline"><a class="act-cancel-btn" href="/activation/export.adi">ADIF complet</a> <a class="act-cancel-btn" href="/activation/export.csv">CSV</a></p>
+    <h2>{{ _("Export complet") }}</h2>
+    <p class="act-muted">{{ _("Tout le log ({n} QSO), prêt pour TQSL / LoTW.", n=contacts|length) }}</p>
+    <p class="act-inline"><a class="act-cancel-btn" href="/activation/export.adi">{{ _("ADIF complet") }}</a> <a class="act-cancel-btn" href="/activation/export.csv">CSV</a></p>
   </div>
 </div>
 
 <div class="act-card">
-  <h2>Exporter une sélection</h2>
+  <h2>{{ _("Exporter une sélection") }}</h2>
   <form method="post" action="/activation/export-selection.adi" data-sel>
     <div class="act-sel-bar">
-      <label>Opérateur <select data-filter="op"><option value="">Tous</option>{% for v in groups.op %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
-      <label>Bande <select data-filter="band"><option value="">Toutes</option>{% for v in groups.band %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
-      <label>Mode <select data-filter="mode"><option value="">Tous</option>{% for v in groups.mode %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
-      <label>Jour (UTC) <select data-filter="day"><option value="">Tous</option>{% for v in groups.day %}<option value="{{ v }}">{{ fmt_d(v) }}</option>{% endfor %}</select></label>
+      <label>{{ _("Opérateur") }} <select data-filter="op"><option value="">{{ _("Tous") }}</option>{% for v in groups.op %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>{{ _("Bande") }} <select data-filter="band"><option value="">{{ _("Toutes") }}</option>{% for v in groups.band %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>{{ _("Mode") }} <select data-filter="mode"><option value="">{{ _("Tous") }}</option>{% for v in groups.mode %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>{{ _("Jour (UTC)") }} <select data-filter="day"><option value="">{{ _("Tous") }}</option>{% for v in groups.day %}<option value="{{ v }}">{{ fmt_d(v) }}</option>{% endfor %}</select></label>
     </div>
     <div class="act-sel-bar">
-      <button type="button" class="act-cancel-btn" data-sel-all>Tout cocher</button>
-      <button type="button" class="act-cancel-btn" data-sel-none>Tout décocher</button>
+      <button type="button" class="act-cancel-btn" data-sel-all>{{ _("Tout cocher") }}</button>
+      <button type="button" class="act-cancel-btn" data-sel-none>{{ _("Tout décocher") }}</button>
       <span class="act-sel-count" data-sel-count></span>
-      <button type="submit" class="act-sel-go">Exporter la sélection (ADIF)</button>
+      <button type="submit" class="act-sel-go">{{ _("Exporter la sélection (ADIF)") }}</button>
     </div>
-    <p class="act-muted act-map-note">À la souris : clic sur une ligne pour la cocher, Maj+clic pour une plage, cliquer-glisser pour en cocher plusieurs d'un geste. Les filtres isolent un groupe (opérateur, bande, mode, jour) : seules les lignes affichées et cochées partent dans le fichier.</p>
+    <p class="act-muted act-map-note">{{ _("À la souris : clic sur une ligne pour la cocher, Maj+clic pour une plage, cliquer-glisser pour en cocher plusieurs d'un geste. Les filtres isolent un groupe (opérateur, bande, mode, jour) : seules les lignes affichées et cochées partent dans le fichier.") }}</p>
     <div class="act-scroll act-scroll-tall">
       <table class="act-table act-sel-table">
-        <thead><tr><th><input type="checkbox" data-sel-toggle title="Tout cocher / décocher"></th><th>Date</th><th>UTC</th><th>Indicatif</th><th>Bande</th><th>Mode</th><th>Sat</th><th>RST</th><th>Opérateur</th></tr></thead>
+        <thead><tr><th><input type="checkbox" data-sel-toggle title="{{ _("Tout cocher / décocher") }}"></th><th>{{ _("Date") }}</th><th>UTC</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>RST</th><th>{{ _("Opérateur") }}</th></tr></thead>
         <tbody>
           {% for q in contacts %}
             <tr data-sel-row data-op="{{ q.operator_call }}" data-band="{{ q.band }}" data-mode="{{ q.mode }}" data-day="{{ q.qso_date }}">
@@ -123,7 +123,7 @@
               <td>{{ q.operator_call }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="9" class="act-muted">Aucun QSO dans le log.</td></tr>
+            <tr><td colspan="9" class="act-muted">{{ _("Aucun QSO dans le log.") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -172,3 +172,17 @@ def test_config_path_from_environment(tmp_path, monkeypatch) -> None:
     finally:
         monkeypatch.delenv("TM_CONFIG")
         config.load_config.cache_clear()
+
+
+def test_admin_pages_in_english(admin_pw) -> None:
+    """Pages propres au package (connexion admin, journal des connexions) en anglais."""
+    en = {"Accept-Language": "en-US,en;q=0.9"}
+    anon = TestClient(app, follow_redirects=False, headers=en)
+    login = anon.get("/login").text
+    assert '<html lang="en">' in login and "Administrator login" in login and "Operator?" in login
+    assert "Wrong password" in anon.post("/login", data={"password": "faux"}).text
+    admin = _admin_client()
+    admin.headers.update(en)
+    page = admin.get("/activation/settings").text
+    assert "Logins" in page and "1 failed login(s)" in page and "Log out (admin)" in page
+    assert "Connexions" not in page and "connexion(s)" not in page

@@ -1,40 +1,40 @@
 {% extends "activation/_base.html" %}
-{% block title %}{{ callsign }} — Log QSO{% endblock %}
+{% block title %}{{ callsign }} — {{ _("Log QSO") }}{% endblock %}
 {% block head_extra %}
 <script src="{{ asset('/static/vendor/htmx/htmx.min.js') }}"></script>
 {% endblock %}
 {% block topnav %}
-  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="Quitter l'espace opérateurs">⎋</button></form>
+  <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
 
 {% block content %}
 <header class="act-head">
-  <h1>Log QSO</h1>
+  <h1>{{ _("Log QSO") }}</h1>
   <nav class="act-tabs">
-    <a href="/activation">Tableau de bord</a>
-    <a href="/activation/planning">Planning</a>
-    <a href="/activation/log" class="active">Log QSO</a>
+    <a href="/activation">{{ _("Tableau de bord") }}</a>
+    <a href="/activation/planning">{{ _("Planning") }}</a>
+    <a href="/activation/log" class="active">{{ _("Log QSO") }}</a>
     <a href="/activation/adif">ADIF</a>
-    {% if is_admin %}<a href="/activation/settings">Réglages</a>{% endif %}
+    {% if is_admin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
   </nav>
 </header>
 
 <div class="act-card act-op-select">
   <form method="post" action="/activation/whoami" class="act-inline">
-    <label>Opérateur au micro
+    <label>{{ _("Opérateur au micro") }}
       <select name="operator" onchange="this.form.submit()">
-        <option value="">— choisir —</option>
+        <option value="">{{ _("— choisir —") }}</option>
         {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == current_op %} selected{% endif %}>{{ op.callsign }}{% if op.name %} — {{ op.name }}{% endif %}</option>{% endfor %}
       </select>
     </label>
     <input type="hidden" name="next" value="/activation/log">
     <noscript><button type="submit">OK</button></noscript>
   </form>
-  {% if not current_op %}<p class="act-warn">Sélectionne ton indicatif avant de logger.</p>{% endif %}
+  {% if not current_op %}<p class="act-warn">{{ _("Sélectionne ton indicatif avant de logger.") }}</p>{% endif %}
 </div>
 
 <div class="act-card">
-  <h2>Nouveau contact <span class="act-utc-hint">(« Maintenant » coché : heure prise à la validation)</span></h2>
+  <h2>{{ _("Nouveau contact") }} <span class="act-utc-hint">{{ _("(« Maintenant » coché : heure prise à la validation)") }}</span></h2>
   <form class="act-form act-log-form"
         hx-post="/activation/contacts"
         hx-target="#act-log-result"
@@ -42,37 +42,37 @@
         hx-on::after-request="if(event.detail.successful){this.reset(); if(window.actAfterLog)window.actAfterLog(); this.querySelector('[name=call]').focus();}">
     <input type="hidden" name="operator" value="{{ current_op }}">
     <div class="act-row">
-      <label>Indicatif contacté <input type="text" name="call" required autofocus autocapitalize="characters" autocomplete="off" placeholder="DL1ABC"></label>
-      <label>Bande <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
-      <label>Mode <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
+      <label>{{ _("Indicatif contacté") }} <input type="text" name="call" required autofocus autocapitalize="characters" autocomplete="off" placeholder="DL1ABC"></label>
+      <label>{{ _("Bande") }} <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+      <label>{{ _("Mode") }} <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
     </div>
     <div class="act-toggles">
-      <label class="act-check"><input type="checkbox" id="act-qrz-toggle" checked> 🔎 Recherche QRZ en quittant la case indicatif</label>
+      <label class="act-check"><input type="checkbox" id="act-qrz-toggle" checked> {{ _("🔎 Recherche QRZ en quittant la case indicatif") }}</label>
     </div>
     <p id="act-qrz-hint" class="act-qrz-hint" aria-live="polite"></p>
     <div class="act-row">
       <div class="act-when">
-        <label>Date &amp; heure ({{ tz_label }}) <input type="datetime-local" name="when" value="{{ now_input }}" data-tz="{{ tz_mode }}"></label>
-        <label class="act-check"><input type="checkbox" id="act-now-toggle" name="now" value="1" checked> Maintenant</label>
+        <label>{{ _("Date et heure ({tz})", tz=tz_label) }} <input type="datetime-local" name="when" value="{{ now_input }}" data-tz="{{ tz_mode }}"></label>
+        <label class="act-check"><input type="checkbox" id="act-now-toggle" name="now" value="1" checked> {{ _("Maintenant") }}</label>
       </div>
-      <label>RST envoyé <input type="text" name="rst_sent" value="59" maxlength="5" autocomplete="off"></label>
-      <label>RST reçu <input type="text" name="rst_rcvd" value="59" maxlength="5" autocomplete="off"></label>
-      <label>Fréq (MHz) <input type="text" name="freq" inputmode="decimal" placeholder="14.190" autocomplete="off"></label>
-      <label>Locator (option) <input type="text" name="gridsquare" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="JO31"></label>
+      <label>{{ _("RST envoyé") }} <input type="text" name="rst_sent" value="59" maxlength="5" autocomplete="off"></label>
+      <label>{{ _("RST reçu") }} <input type="text" name="rst_rcvd" value="59" maxlength="5" autocomplete="off"></label>
+      <label>{{ _("Fréq (MHz)") }} <input type="text" name="freq" inputmode="decimal" placeholder="14.190" autocomplete="off"></label>
+      <label>{{ _("Locator (option)") }} <input type="text" name="gridsquare" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="JO31"></label>
     </div>
     <div class="act-satrow">
-      <label class="act-check"><input type="checkbox" id="act-sat-toggle" name="via_sat" value="1"> 🛰️ Contact via satellite</label>
-      <label class="act-sat-field" id="act-sat-field" hidden>Satellite
+      <label class="act-check"><input type="checkbox" id="act-sat-toggle" name="via_sat" value="1"> {{ _("🛰️ Contact via satellite") }}</label>
+      <label class="act-sat-field" id="act-sat-field" hidden>{{ _("Satellite") }}
         <input type="text" name="sat_name" maxlength="20" autocapitalize="characters" autocomplete="off" placeholder="SO-50" list="act-sats" disabled>
       </label>
       <datalist id="act-sats">
         <option value="ISS"><option value="SO-50"><option value="RS-44"><option value="AO-7"><option value="PO-101"><option value="IO-117"><option value="CAS-4A"><option value="CAS-4B">
       </datalist>
     </div>
-    <label>Commentaire <input type="text" name="comment" maxlength="120" autocomplete="off"></label>
-    <button type="submit"{% if not current_op %} disabled{% endif %}>Logger le QSO</button>
+    <label>{{ _("Commentaire") }} <input type="text" name="comment" maxlength="120" autocomplete="off"></label>
+    <button type="submit"{% if not current_op %} disabled{% endif %}>{{ _("Logger le QSO") }}</button>
   </form>
-  <p class="act-muted act-lotw-note">Export <a href="/activation/export.adi">ADIF</a> prêt pour TQSL / LoTW. Aussi en <a href="/activation/export.csv">CSV</a>. Import et export d'une sélection : onglet <a href="/activation/adif">ADIF</a>.</p>
+  <p class="act-muted act-lotw-note">{{ _("Export ADIF prêt pour TQSL / LoTW, aussi en CSV :") }} <a href="/activation/export.adi">ADIF</a> · <a href="/activation/export.csv">CSV</a>. {{ _("Import et export d'une sélection : onglet ADIF.") }}</p>
 </div>
 
 <div id="act-log-result">
@@ -144,7 +144,8 @@
         if (autoGrid && gridInput.value === autoGrid) gridInput.value = '';
         autoGrid = '';
         if (!d || !d.found) {
-          show(d && d.configured === false ? '⚠ Compte QRZ non configuré' : '✗ ' + call + ' introuvable sur QRZ', true);
+          show(d && d.configured === false ? {{ _("⚠ Compte QRZ non configuré")|tojson }}
+                                           : {{ _("✗ {call} introuvable sur QRZ")|tojson }}.replace('{call}', call), true);
           return;
         }
         var who = [d.fname, (d.name || '').toUpperCase()].filter(Boolean).join(' ');
