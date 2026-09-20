@@ -44,15 +44,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.1.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.1.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.1.tar.gz
 ```
 
 ## Features
@@ -92,8 +92,9 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14
     spotter, the age and the comment; clicking the frequency copies it into the
     form. With no Internet the panel simply disappears, with no error.
   - **Countries worked**: the flags of the DXCC entities already worked are added
-    with every QSO logged, most recent first (derived from the prefix: no network
-    access needed).
+    with every QSO logged, most recent first (derived from the callsign prefix,
+    with the images served by the application: no network access needed, and it
+    looks the same on Windows, Android or Linux).
   - **ADIF**: two-stage import (preview of new QSOs, duplicates and invalid
     lines, then confirmation) and full or selective export, ready to sign with
     TQSL for LoTW. CSV export.
@@ -160,22 +161,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.14.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.14.1.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.14.0.tar.gz
-   cd tm-activation-1.14.0
+   tar xzf tm-activation-1.14.1.tar.gz
+   cd tm-activation-1.14.1
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.14.0.zip
-   cd tm-activation-1.14.0
+   unzip tm-activation-1.14.1.zip
+   cd tm-activation-1.14.1
    sudo bash install.sh --lan
    ```
 
@@ -253,8 +254,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.14.0.tar.gz
-cd tm-activation-1.14.0
+tar xzf tm-activation-1.14.1.tar.gz
+cd tm-activation-1.14.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

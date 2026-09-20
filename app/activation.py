@@ -1406,9 +1406,10 @@ def stats(station: str | None = None) -> dict[str, Any]:
 def worked_entities(station: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
     """Entités DXCC contactées, la plus récemment travaillée en tête.
 
-    Le drapeau vient du préfixe de l'indicatif (aucun réseau nécessaire) ; le
-    nom du pays vient du callbook QRZ quand il est connu, sinon de la table des
-    préfixes. Les indicatifs dont l'entité est inconnue sont ignorés.
+    Le code du drapeau vient du préfixe de l'indicatif (aucun réseau
+    nécessaire, la vignette est servie par l'application) ; le nom du pays vient
+    du callbook QRZ quand il est connu, sinon de la table des préfixes. Les
+    indicatifs dont l'entité est inconnue sont ignorés.
     """
     init_db()
     st = (_st(station),)
@@ -1421,11 +1422,11 @@ def worked_entities(station: str | None = None, limit: int | None = None) -> lis
                  for r in c.execute("SELECT call, dxcc_name, country FROM callbook").fetchall()}
     seen: dict[str, dict[str, Any]] = {}
     for row in rows:
-        iso, name = dxcc_flags.entity_for_call(row["call"])
-        if not iso:
+        code, name = dxcc_flags.entity_for_call(row["call"])
+        if not code:
             continue
-        item = seen.setdefault(iso, {"iso": iso, "flag": dxcc_flags.flag(iso), "name": name,
-                                     "n": 0, "last": "", "calls": 0, "from_qrz": False})
+        item = seen.setdefault(code, {"code": code, "name": name,
+                                      "n": 0, "last": "", "calls": 0, "from_qrz": False})
         item["n"] += int(row["n"])
         item["calls"] += 1
         item["last"] = max(item["last"], row["last"] or "")

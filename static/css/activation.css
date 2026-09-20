@@ -535,9 +535,9 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
   font-family: var(--font-mono, monospace); font-size: 0.8rem;
 }
 .act-dxcc-item.is-last { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-/* Police emoji explicite : certains systèmes ne la prennent pas par défaut. */
-.act-dxcc-flag { font-size: 1.05rem; line-height: 1;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; }
+/* Vignette servie par l'application : les emojis drapeaux ne s'affichent pas
+   sous Windows, ni sur un Linux sans police emoji. */
+.act-dxcc-flag { width: 24px; height: 18px; border: 1px solid var(--border); border-radius: 2px; }
 .act-dxcc-name { color: var(--text-muted); }
 .act-dxcc-n { color: var(--accent); font-weight: 600; }
 @media (max-width: 640px) {

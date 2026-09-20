@@ -1811,16 +1811,31 @@ def test_slot_conflict_route_needs_the_operator_area() -> None:
 # ── Spots DX et drapeaux des pays contactés ────────────────────────────────
 
 
-def test_flag_for_call_reads_the_prefix() -> None:
+def test_entity_for_call_reads_the_prefix() -> None:
     from app import dxcc_flags
 
-    assert dxcc_flags.flag_for_call("F4IOZ") == ("🇫🇷", "France")
-    assert dxcc_flags.flag_for_call("TM25TEST")[1] == "France"
-    assert dxcc_flags.flag_for_call("EA8XX")[1] == "Canary Islands"   # préfixe long d'abord
-    assert dxcc_flags.flag_for_call("GM4ABC")[1] == "Scotland"
-    assert dxcc_flags.flag_for_call("F4IOZ/P")[0] == "🇫🇷"            # suffixe portable ignoré
-    assert dxcc_flags.flag_for_call("F/DL1ABC")[1] == "France"        # préfixe portable = pays d'émission
-    assert dxcc_flags.flag_for_call("XYZZY") == ("", "")              # inconnu : pas de drapeau
+    assert dxcc_flags.entity_for_call("F4IOZ") == ("FR", "France")
+    assert dxcc_flags.entity_for_call("TM25TEST")[1] == "France"
+    assert dxcc_flags.entity_for_call("EA8XX")[1] == "Canary Islands"   # préfixe long d'abord
+    assert dxcc_flags.entity_for_call("GM4ABC") == ("GB-SCT", "Scotland")
+    assert dxcc_flags.entity_for_call("F4IOZ/P")[0] == "FR"             # suffixe portable ignoré
+    assert dxcc_flags.entity_for_call("F/DL1ABC")[1] == "France"        # préfixe portable = pays d'émission
+    assert dxcc_flags.entity_for_call("XYZZY") == ("", "")              # inconnu : pas de drapeau
+    assert dxcc_flags.flag("FR") == "🇫🇷" and dxcc_flags.flag("GB-SCT") == ""
+
+
+def test_every_dxcc_code_has_a_flag_image() -> None:
+    """Les vignettes sont servies par l'application (Windows n'affiche pas les
+    emojis drapeaux) : chaque préfixe doit avoir son image dans static/vendor."""
+    from pathlib import Path
+
+    from app import dxcc_flags
+
+    flags = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flags"
+    manquants = sorted({code for code, _n in dxcc_flags.PREFIXES.values()
+                        if not (flags / f"{code.lower()}.png").exists()})
+    assert not manquants, ("vignettes absentes (relancer packaging/tm-activation/fetch_flags.py) : "
+                           + ", ".join(manquants))
 
 
 def test_worked_entities_lists_countries_most_recent_first() -> None:
@@ -1830,8 +1845,8 @@ def test_worked_entities_lists_countries_most_recent_first() -> None:
         activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
                                qso_date=date, time_on=t)
     ents = activation.worked_entities()
-    assert [e["iso"] for e in ents] == ["CA", "DE"]      # XYZZY9 : entité inconnue, ignorée
-    assert ents[0]["flag"] == "🇨🇦" and ents[0]["n"] == 1
+    assert [e["code"] for e in ents] == ["CA", "DE"]     # XYZZY9 : entité inconnue, ignorée
+    assert ents[0]["name"] == "Canada" and ents[0]["n"] == 1
     assert ents[1]["n"] == 2 and ents[1]["calls"] == 2   # deux indicatifs allemands
     assert activation.worked_entities(limit=1) == [ents[0]]
 
@@ -1843,7 +1858,8 @@ def test_log_page_shows_the_worked_country_flags(monkeypatch) -> None:
     assert "Pays contactés" not in page                  # aucun QSO : pas d'encart
     r = admin.post("/activation/contacts",
                    data={"call": "DL1ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
-    assert "Pays contactés" in r.text and "🇩🇪" in r.text and "Germany" in r.text
+    assert "Pays contactés" in r.text and "Germany" in r.text
+    assert "/static/vendor/flags/de.png" in r.text       # vignette locale, pas un emoji
 
 
 def test_spots_panel_survives_a_network_outage(monkeypatch) -> None:

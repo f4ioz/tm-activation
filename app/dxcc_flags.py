@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import re
 
-# Préfixe d'appel → (code ISO 3166-1 alpha-2, nom de l'entité).
+# Préfixe d'appel → (code du drapeau, nom de l'entité). Le code est un ISO 3166-1
+# alpha-2, ou un code de subdivision pour les nations du Royaume-Uni (GB-SCT…),
+# chacune étant une entité DXCC à part entière.
 PREFIXES: dict[str, tuple[str, str]] = {
     # ── Europe ──
     "F": ("FR", "France"), "TM": ("FR", "France"), "TK": ("FR", "Corsica"),
@@ -25,9 +27,9 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "DG": ("DE", "Germany"), "DH": ("DE", "Germany"), "DJ": ("DE", "Germany"),
     "DK": ("DE", "Germany"), "DM": ("DE", "Germany"), "DO": ("DE", "Germany"),
     "DP": ("DE", "Germany"), "DQ": ("DE", "Germany"), "DR": ("DE", "Germany"),
-    "G": ("GB", "England"), "M": ("GB", "England"), "2E": ("GB", "England"),
-    "GM": ("GB", "Scotland"), "MM": ("GB", "Scotland"), "GW": ("GB", "Wales"),
-    "MW": ("GB", "Wales"), "GI": ("GB", "Northern Ireland"), "MI": ("GB", "Northern Ireland"),
+    "G": ("GB-ENG", "England"), "M": ("GB-ENG", "England"), "2E": ("GB-ENG", "England"),
+    "GM": ("GB-SCT", "Scotland"), "MM": ("GB-SCT", "Scotland"), "GW": ("GB-WLS", "Wales"),
+    "MW": ("GB-WLS", "Wales"), "GI": ("GB-NIR", "Northern Ireland"), "MI": ("GB-NIR", "Northern Ireland"),
     "GD": ("IM", "Isle of Man"), "GU": ("GG", "Guernsey"), "GJ": ("JE", "Jersey"),
     "EI": ("IE", "Ireland"), "EJ": ("IE", "Ireland"),
     "EA": ("ES", "Spain"), "EB": ("ES", "Spain"), "EC": ("ES", "Spain"), "ED": ("ES", "Spain"),

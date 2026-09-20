@@ -13,8 +13,9 @@
   </div>
   <ul class="act-dxcc">
     {% for e in ents %}
-      <li class="act-dxcc-item{% if loop.first %} is-last{% endif %}" title="{{ e.name }} ({{ e.iso }}) — {{ _("{n} QSO", n=e.n) }}">
-        <span class="act-dxcc-flag">{{ e.flag }}</span>
+      <li class="act-dxcc-item{% if loop.first %} is-last{% endif %}" title="{{ e.name }} ({{ e.code }}) — {{ _("{n} QSO", n=e.n) }}">
+        <img class="act-dxcc-flag" src="{{ asset('/static/vendor/flags/' ~ e.code|lower ~ '.png') }}"
+             width="24" height="18" alt="{{ e.code }}" loading="lazy">
         <span class="act-dxcc-name">{{ e.name }}</span>
         <span class="act-dxcc-n">{{ e.n }}</span>
       </li>
