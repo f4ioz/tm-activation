@@ -423,3 +423,24 @@ a.act-station-card:hover { border-color: var(--accent); }
    robots le remplissent, pas les humains). */
 .act-captcha { max-width: 6rem; }
 .act-trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* ── Calendrier de saisie (flatpickr) aux couleurs du site ────────────────── */
+.flatpickr-calendar {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius, 4px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-mono, monospace);
+}
+.flatpickr-calendar.arrowTop::before, .flatpickr-calendar.arrowTop::after { border-bottom-color: var(--border); }
+.flatpickr-calendar.arrowBottom::before, .flatpickr-calendar.arrowBottom::after { border-top-color: var(--border); }
+.flatpickr-months, .flatpickr-weekdays, span.flatpickr-weekday { background: transparent; color: var(--text-muted); fill: var(--text-muted); }
+.flatpickr-current-month, .flatpickr-monthDropdown-months, .numInputWrapper input { color: var(--text); }
+.flatpickr-monthDropdown-months { background: var(--panel); }
+.flatpickr-months .flatpickr-prev-month svg, .flatpickr-months .flatpickr-next-month svg { fill: var(--text-muted); }
+.flatpickr-months .flatpickr-prev-month:hover svg, .flatpickr-months .flatpickr-next-month:hover svg { fill: var(--accent); }
+.flatpickr-day { color: var(--text); border-radius: 3px; }
+.flatpickr-day:hover, .flatpickr-day.today { border-color: var(--accent); color: var(--accent); }
+.flatpickr-day.selected, .flatpickr-day.selected:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.flatpickr-day.flatpickr-disabled, .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay { color: var(--text-dim, var(--text-muted)); opacity: 0.45; }
+.flatpickr-time input, .flatpickr-time .flatpickr-time-separator, .flatpickr-time .flatpickr-am-pm { color: var(--text); }
+.flatpickr-time input:hover, .flatpickr-time input:focus { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.flatpickr-innerContainer, .flatpickr-time { border-color: var(--border); }

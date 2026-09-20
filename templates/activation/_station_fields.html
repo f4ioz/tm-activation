@@ -4,8 +4,10 @@
   <label>{{ _("Locator de la station") }} <input type="text" name="gridsquare" maxlength="8" value="{{ f.gridsquare or '' }}" autocapitalize="characters" autocomplete="off" placeholder="JN18FS89"></label>
 </div>
 <div class="act-row">
-  <label>{{ _("Début") }} <input type="date" name="start_date" value="{{ f.start_date or '' }}"></label>
-  <label>{{ _("Fin") }} <input type="date" name="end_date" value="{{ f.end_date or '' }}"></label>
+  <label>{{ _("Début") }} <input type="date" name="start_date" value="{{ f.start_date or '' }}"
+    data-picker="date" data-picker-id="station-start"></label>
+  <label>{{ _("Fin") }} <input type="date" name="end_date" value="{{ f.end_date or '' }}"
+    data-picker="date" data-after="station-start"></label>
 </div>
 <div class="act-row">
   <label>{{ _("Badge du bandeau") }} <input type="text" name="badge" maxlength="30" value="{{ f.badge or '' }}" placeholder="{{ _("50 ANS") }}"></label>

@@ -1,5 +1,8 @@
 {% extends "activation/_base.html" %}
 {% block title %}{{ callsign }} — {{ _("Réglages") }}{% endblock %}
+{% block head_extra %}
+{% include "activation/_flatpickr.html" %}
+{% endblock %}
 {% block topnav %}
   <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}

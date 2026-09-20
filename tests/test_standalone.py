@@ -144,6 +144,12 @@ def test_web_assets_are_served_locally(admin_pw) -> None:
         assert not re.search(r"unpkg\.com|fonts\.(googleapis|gstatic)\.com", text)
         assert "/static/vendor/fonts/fonts.css" in text
     assert "/static/vendor/leaflet/leaflet.js" in pub and "/static/vendor/leaflet/leaflet.css" in pub
+    # Calendrier de saisie : servi localement lui aussi (planning).
+    planning = _admin_client().get("/activation/planning").text
+    for asset in ("/static/vendor/flatpickr/flatpickr.min.js", "/static/vendor/flatpickr/flatpickr.min.css",
+                  "/static/vendor/flatpickr/fr.js", "/static/js/activation-datetime.js"):
+        assert asset in planning, asset
+        assert TestClient(app).get(asset.split("?")[0]).status_code == 200, asset
     assert "/static/vendor/htmx/htmx.min.js" in log
     for path in ("/static/vendor/htmx/htmx.min.js", "/static/vendor/leaflet/leaflet.js",
                  "/static/vendor/leaflet/leaflet.css", "/static/vendor/leaflet/images/layers.png"):

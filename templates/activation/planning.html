@@ -1,5 +1,8 @@
 {% extends "activation/_base.html" %}
 {% block title %}{{ callsign }} — {{ _("Planning") }}{% endblock %}
+{% block head_extra %}
+{% include "activation/_flatpickr.html" %}
+{% endblock %}
 {% block topnav %}
   <form method="post" action="/activation/logout" class="act-bar-logout"><button type="submit" title="{{ _("Quitter l'espace opérateurs") }}">⎋</button></form>
 {% endblock %}
@@ -32,8 +35,10 @@
           {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == current_op %} selected{% endif %}>{{ op.callsign }}{% if op.name %} — {{ op.name }}{% endif %}</option>{% endfor %}
         </select>
       </label>
-      <label>{{ _("Début (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="start" value="{{ now_input }}" required></label>
-      <label>{{ _("Fin (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="end" required></label>
+      <label>{{ _("Début (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="start" value="{{ now_input }}" required
+        data-picker="datetime" data-picker-id="slot-start"></label>
+      <label>{{ _("Fin (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="end" required
+        data-picker="datetime" data-after="slot-start"></label>
       <div class="act-row">
         <label>{{ _("Bande") }} <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
         <label>{{ _("Mode") }} <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
