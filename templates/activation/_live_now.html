@@ -3,7 +3,7 @@
 <div class="act-live-now">
   <span class="act-live-tag">{{ _("🔴 EN DIRECT") }}</span>
   <span class="act-live-op">{{ callsign }}<span class="act-op-sub">{{ _("Op :") }} {{ s.operator_call }}</span></span>
-  <span class="act-live-bm">{{ s.band }} · {{ s.mode }} · <b class="act-slot-qso">{{ _("{n} QSO", n=slot_qsos.get(s.id, 0)) }}</b></span>
+  <span class="act-live-bm">{{ s.band }} · {{ s.mode }}{% if slot_qsos.get(s.id) %} · <b class="act-slot-qso">{{ _("{n} QSO", n=slot_qsos[s.id]) }}</b>{% endif %}</span>
   <span class="act-live-until">{{ _("jusqu'à {when}", when=(day_month(pe) ~ ' ' ~ pe.strftime('%H:%M')) if pe else '') }} ({{ tz_label }}){% if s.note %} — {% if note_is_sat(s.note) %}<span class="act-sat-icon" title="Satellite">🛰️</span> {% endif %}{{ s.note }}{% endif %}</span>
   <span class="act-countdown" data-start="{{ s.start_utc }}" data-end="{{ s.end_utc }}"></span>
 </div>

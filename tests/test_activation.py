@@ -1514,6 +1514,28 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
     assert "2 QSO" in TestClient(app).get("/tm25test").text
 
 
+def test_slot_without_qso_shows_nothing_rather_than_zero() -> None:
+    """Aucun QSO compté = log peut-être pas encore importé : on n'affiche rien."""
+    activation.add_slot("F4IOZ", "2026-09-05T10:00", "2026-09-05T12:00", "20M", "SSB")  # passé, vide
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M"
+    activation.add_slot("F4IOZ", (now - timedelta(minutes=30)).strftime(fmt),
+                        (now + timedelta(hours=1)).strftime(fmt), "40M", "CW")          # en cours, vide
+    _public()
+    public = TestClient(app).get("/tm25test").text
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(auth_mod, "auth_password", lambda: "secret")
+        admin = _private_client()
+        board = admin.get("/activation").text
+        planning = admin.get("/activation/planning").text
+    for page in (public, board, planning):
+        # Le compteur d'un créneau n'apparaît que s'il y a des QSO ; le « 0 » du
+        # total de l'activation (« QSO réalisés »), lui, reste légitime.
+        assert '<b class="act-slot-qso">' not in page and "0 QSO" not in page
+    # Dans le planning, la colonne QSO reste simplement vide.
+    assert '<td class="act-slot-qso"></td>' in planning
+
+
 def test_admin_logout_button_is_everywhere_for_the_main_admin(monkeypatch) -> None:
     """Bouton « Admin ⎋ » : visible pour l'admin principal, sur toutes les pages
     de l'espace activation (publiques comprises), et il ferme bien la session."""

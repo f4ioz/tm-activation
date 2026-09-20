@@ -214,7 +214,7 @@
  "Première connexion : indiquez votre indicatif et choisissez votre mot de passe, le compte est créé aussitôt.": "First login: enter your callsign and choose your password, the account is created straight away.",
  "Prénom (optionnel)": "First name (optional)",
  "QRZ.com a refusé la connexion (identifiant ou mot de passe incorrect) : compte non enregistré.": "QRZ.com refused the login (wrong username or password): account not saved.",
- "QSO loggés pendant le créneau (même opérateur, bande et mode)": "QSOs logged during the slot (same operator, band and mode)",
+ "QSO loggés pendant le créneau (même opérateur, bande et mode) ; vide tant qu'aucun n'est enregistré, par exemple avant l'import du log": "QSOs logged during the slot (same operator, band and mode); empty until any is recorded, for instance before the log is imported",
  "QSO réalisés": "QSOs made",
  "Quitter l'espace opérateurs": "Leave the operators area",
  "Quitter le mode administrateur": "Leave administrator mode",
