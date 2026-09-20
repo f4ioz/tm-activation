@@ -2255,3 +2255,39 @@ def test_admin_operator_keeps_the_full_scope() -> None:
     page = client.get("/activation/log").text
     assert '<select name="operator"' in page                     # il choisit qui est au micro
     assert "DL1ABC" in client.get("/activation/export.adi").text  # et exporte tout le log
+
+
+def _shared_client(call: str = "F5ABC") -> TestClient:
+    """Session ouverte avec le MOT DE PASSE COMMUN, sous un indicatif donné."""
+    activation.set_flag("per_operator_auth", False)
+    activation.set_flag("auto_slots", False)
+    activation.set_operator_password("oppass")
+    client = _op_client()
+    assert client.post("/activation/login",
+                       data={"callsign": call, "password": "oppass"}).status_code == 303
+    return client
+
+
+def test_shared_password_also_keeps_each_operator_on_their_callsign() -> None:
+    client = _shared_client("F5ABC")
+    client.post("/activation/contacts",
+                data={"call": "DL1ABC", "band": "20M", "mode": "SSB",
+                      "operator": "F5RRO", "now": "1"})
+    assert [q["operator_call"] for q in activation.list_contacts()] == ["F5ABC"]
+    page = client.get("/activation/log").text
+    assert "F5ABC" in page and '<select name="operator"' not in page
+
+
+def test_shared_password_admin_flag_frees_the_choice_but_not_the_settings() -> None:
+    """Coché « administrateur », on choisit de nouveau qui est au micro ; les
+    Réglages restent fermés tant qu'il n'y a pas de mot de passe personnel."""
+    activation.add_operator("F5BOS", "Chef")
+    activation.set_operator_admin("F5BOS", True)
+    client = _shared_client("F5BOS")
+    page = client.get("/activation/log").text
+    assert '<select name="operator"' in page
+    client.post("/activation/contacts",
+                data={"call": "DL1ABC", "band": "20M", "mode": "SSB",
+                      "operator": "F5RRO", "now": "1"})
+    assert [q["operator_call"] for q in activation.list_contacts()] == ["F5RRO"]
+    assert client.get("/activation/settings").status_code == 303   # mot de passe commun : non

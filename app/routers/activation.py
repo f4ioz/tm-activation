@@ -52,7 +52,7 @@ def _authed(request: Request) -> bool:
 
 
 def _session_op(request: Request) -> str:
-    """Indicatif du compte opérateur connecté ("" : mot de passe commun ou admin site)."""
+    """Indicatif saisi à la connexion ("" : session ouverte avant la 1.21, ou admin site)."""
     token = request.cookies.get(activation.OP_COOKIE)
     if not activation.operator_authed(token):
         return ""
@@ -60,11 +60,16 @@ def _session_op(request: Request) -> str:
 
 
 def _is_admin(request: Request) -> bool:
-    """Admin site (mot de passe de config.yml) OU opérateur marqué administrateur."""
+    """Admin site (mot de passe de config.yml) OU opérateur marqué administrateur.
+
+    L'indicatif ne suffit pas : il faut un mot de passe personnel. Avec le mot
+    de passe commun, tout le monde le connaît — se dire administrateur en tapant
+    le bon indicatif ne doit pas ouvrir les Réglages.
+    """
     if is_private(request):
         return True
     op = _session_op(request)
-    return bool(op) and activation.operator_is_admin(op)
+    return bool(op) and activation.per_operator_auth() and activation.operator_is_admin(op)
 
 
 def _guard(request: Request) -> Response | None:
@@ -97,13 +102,16 @@ def _safe_next(value: str | None) -> str:
 def _locked_op(request: Request) -> str:
     """Indicatif imposé à la session ("" = libre de choisir).
 
-    Un opérateur connecté avec son propre mot de passe et non administrateur
-    reste sur son périmètre : il logue, planifie, importe et exporte sous son
-    seul indicatif. L'admin du site et le mot de passe commun ne sont pas
-    concernés (une seule connexion pour toute l'équipe).
+    Un opérateur non coché « administrateur » reste sur son périmètre : il
+    logue, planifie, importe et exporte sous le seul indicatif donné à la
+    connexion. Vrai aussi avec le mot de passe commun — c'est alors un garde-fou
+    contre les erreurs, pas une barrière : qui connaît le mot de passe peut se
+    reconnecter sous un autre indicatif. Seul l'admin du site n'est pas concerné.
     """
     op = _session_op(request)
-    return "" if not op or _is_admin(request) else op
+    if not op or is_private(request) or activation.operator_is_admin(op):
+        return ""
+    return op
 
 
 def _current_op(request: Request) -> str:
@@ -208,7 +216,7 @@ async def operator_login_submit(
                 pass
         resp = RedirectResponse(target, status_code=303)
         resp.set_cookie(
-            activation.OP_COOKIE, activation.make_op_token(op if per_op else ""),
+            activation.OP_COOKIE, activation.make_op_token(op),
             httponly=True, samesite="lax", max_age=activation.OP_TOKEN_TTL, path="/activation",
             secure=security.is_https(request),
         )
