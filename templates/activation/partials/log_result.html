@@ -29,12 +29,13 @@
     <h2>{{ _("Contacts") }} <span class="act-count">{{ stats.total }}</span></h2>
     <span class="act-exports"><a href="/activation/export.adi">ADIF</a> · <a href="/activation/export.csv">CSV</a></span>
   </div>
+  <div class="act-scroll">
   <table class="act-table">
     <thead><tr><th>{{ _("Date") }}</th><th>UTC</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>RST</th><th>Op</th><th></th></tr></thead>
     <tbody>
       {% for q in contacts %}
         <tr>
-          <td>{{ q.qso_date }}</td><td>{{ q.time_on }}</td>
+          <td class="act-log-date">{{ q.qso_date[6:8] }}/{{ q.qso_date[4:6] }}</td><td>{{ q.time_on }}</td>
           <td class="act-call act-dxcc-cell">{{ call_flag(q.call) }} {{ q.call }}</td>
           <td>{{ q.band }}</td><td>{{ q.mode }}</td>
           <td class="act-sat-tag">{{ q.sat_name or '' }}</td>
@@ -53,4 +54,5 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>

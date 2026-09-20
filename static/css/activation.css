@@ -292,7 +292,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-op-select { flex-direction: row; flex-wrap: wrap; align-items: flex-start;
   justify-content: space-between; gap: 0.8rem; }
 .act-op-select > form, .act-op-select > .act-warn { flex: 1 1 14rem; }
-.act-op-select > #act-rate { flex: 0 1 20rem; }
+.act-op-select > #act-rate { flex: 1 1 22rem; }
 .act-utc-hint { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
 
 /* Tables */
@@ -365,7 +365,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-map .act-map-label:not(.is-home) { display: none; }
 .act-map.act-map-labels .act-map-label { display: block; }
 .act-map-note { font-size: 0.8rem; margin: 0.4rem 0 0; }
-.act-scroll { max-height: 440px; overflow: auto; }
+.act-scroll { max-height: 440px; overflow: auto; max-width: 100%; }
 .act-rank td:first-child { color: var(--text-muted); }
 .act-rank tr.is-me td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .act-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
@@ -555,7 +555,8 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 /* Jauges de cadence (QSO/h et 10 min) — le compteur qui motive à enchaîner. */
 .act-rate { display: flex; flex-direction: column; gap: 0.5rem;
   border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem; }
-.act-rate-head { font-family: var(--font-mono, monospace); font-size: 0.75rem;
+.act-rate-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem;
+  font-family: var(--font-mono, monospace); font-size: 0.75rem;
   text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
 .act-rate-head .act-call { color: var(--accent); }
 .act-gauge-top, .act-gauge-foot { display: flex; align-items: baseline; gap: 0.35rem;
@@ -573,5 +574,45 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-trend.is-up { color: var(--green, #2ecc71); }
 .act-trend.is-down { color: var(--warn, #e0a800); }
 .act-trend.is-flat { color: var(--text-muted); }
-.act-rate-level { margin: 0; font-family: var(--font-mono, monospace); font-size: 0.75rem;
-  color: var(--text-muted); text-align: right; }
+.act-rate-level { margin: 0; color: var(--text); }
+
+/* ── Page de log compacte ──────────────────────────────────────────────────
+   Objectif : voir les derniers QSO enregistrés SANS quitter le formulaire.
+   Sur grand écran, saisie à gauche et carnet à droite ; partout, des marges
+   resserrées et les lignes d'aide qui disparaissent tant qu'elles sont vides. */
+.act-log-page { max-width: 1440px; gap: 0.7rem; }
+.act-log-page .act-card { padding: 0.7rem 0.85rem; }
+.act-log-page .act-card h2 { margin-bottom: 0.45rem; }
+.act-log-page .act-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1.2rem; }
+.act-log-page .act-head h1 { font-size: 1.35rem; margin: 0; }
+.act-log-page .act-tabs { margin: 0; }
+.act-log-page .act-form { gap: 0.5rem; }
+.act-log-page .act-row { gap: 0.5rem; }
+.act-log-page .act-satrow { gap: 0.6rem 1rem; }
+.act-log-page .act-lotw-note { margin-top: 0.5rem; font-size: 0.75rem; }
+.act-log-page .act-map-note { margin-top: 0.35rem; }
+.act-log-page .act-slots-list li { padding: 0.2rem 0.45rem; }
+.act-log-page p:empty { display: none; }          /* aides QRZ / doublon / blocage */
+/* Carnet : pastilles « drapeau + nombre » seules (le pays reste en infobulle),
+   pour que la liste des contacts remonte à l'écran. */
+.act-log-page .act-dxcc-name { display: none; }
+.act-log-page .act-dxcc-item { padding: 0.15rem 0.4rem; }
+.act-log-page .act-table { font-size: 0.8rem; }
+.act-log-page .act-table th, .act-log-page .act-table td { padding: 0.25rem 0.35rem; }
+.act-log-page .act-table th { letter-spacing: 0.02em; }
+.act-log-page .act-actions { gap: 0.2rem; }
+.act-log-page .act-del, .act-log-page .act-edit { padding: 0.1rem 0.3rem; }
+.act-log-page .act-log-date { white-space: nowrap; }
+
+.act-log-cols { display: grid; gap: 0.7rem; align-items: start; }
+.act-log-cols > * { min-width: 0; }        /* sinon une colonne élargit la page */
+@media (min-width: 1040px) {
+  .act-log-cols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+  /* Le carnet suit la saisie : il reste à l'écran et défile tout seul. */
+  .act-log-cols > #act-log-result { position: sticky; top: 0.7rem; }
+  .act-log-cols .act-scroll { max-height: calc(100vh - 12rem); overflow: auto; }
+}
+
+/* Jauges côte à côte (gain de hauteur dans la carte « Opérateur au micro »). */
+.act-gauges { display: flex; flex-wrap: wrap; gap: 0.9rem; }
+.act-gauges > .act-gauge { flex: 1 1 8.5rem; min-width: 8.5rem; }

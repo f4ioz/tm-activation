@@ -2,11 +2,14 @@
    toutes les 30 s et après chaque QSO enregistré. #}
 <div class="act-rate">
   <div class="act-rate-head">
-    {{ _("Cadence") }}
-    {% if rate.operator %}<b class="act-call">{{ rate.operator }}</b>
-    {% else %}<span class="act-muted">{{ _("toute la station") }}</span>{% endif %}
+    <span>{{ _("Cadence") }}
+      {% if rate.operator %}<b class="act-call">{{ rate.operator }}</b>
+      {% else %}<span class="act-muted">{{ _("toute la station") }}</span>{% endif %}
+    </span>
+    <span class="act-rate-level">{{ _(rate.hour.level) }}</span>
   </div>
 
+  <div class="act-gauges">
   {% for w, label in [(rate.hour, _("dernière heure")), (rate.ten, _("10 dernières min"))] %}
     <div class="act-gauge{% if w.gauge >= 60 %} is-hot{% elif w.gauge >= 30 %} is-warm{% endif %}">
       <div class="act-gauge-top">
@@ -24,6 +27,5 @@
       </div>
     </div>
   {% endfor %}
-
-  <p class="act-rate-level">{{ _(rate.hour.level) }}</p>
+  </div>
 </div>

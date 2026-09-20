@@ -48,15 +48,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.17.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.17.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.17.0.tar.gz
 ```
 
 ## Features
@@ -91,11 +91,14 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16
     already in the log (with the bands/modes and the date of the last QSO), or a
     **duplicate** on the chosen band and mode; QSOs made under another club
     callsign are reported separately.
-  - **Rate gauges**: next to "Operator on the mic", the number of QSOs in the
-    last hour and in the last 10 minutes, the rate per hour, a trend arrow
-    (▲ / ▼ against the previous period) and two gauges that turn green when it
-    takes off — from "quiet station" to "pile-up!". Updated with every QSO
-    logged.
+  - **Rate gauges**: next to "Operator on the mic", side by side, the number of
+    QSOs in the last hour and in the last 10 minutes, the rate per hour, a trend
+    arrow (▲ / ▼ against the previous period) and two gauges that turn green
+    when it takes off — from "quiet station" to "pile-up!". Updated with every
+    QSO logged.
+  - **The log stays in sight**: on a wide screen, entry on the left and the
+    latest QSOs on the right, visible while logging; the page is tightened so
+    that about ten rows fit without scrolling.
   - **Am I being spotted?**: the latest DX spots for the callsign (DXWatch, with
     HamQTH as a fallback) are shown above the form, with the frequency, the
     spotter, the age and the comment; clicking the frequency copies it into the
@@ -173,22 +176,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.16.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.17.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.16.0.tar.gz
-   cd tm-activation-1.16.0
+   tar xzf tm-activation-1.17.0.tar.gz
+   cd tm-activation-1.17.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.16.0.zip
-   cd tm-activation-1.16.0
+   unzip tm-activation-1.17.0.zip
+   cd tm-activation-1.17.0
    sudo bash install.sh --lan
    ```
 
@@ -271,8 +274,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.16.0.tar.gz
-cd tm-activation-1.16.0
+tar xzf tm-activation-1.17.0.tar.gz
+cd tm-activation-1.17.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
