@@ -67,7 +67,7 @@ _RE_LOCATOR8 = re.compile(r"^[A-R]{2}\d{2}[A-X]{2}\d{2}$")  # station (ex. JN18F
 # Le club active des indicatifs spéciaux de temps à autre (TM25TEST, puis
 # d'autres). Un seul est « en cours » à la fois (réglage admin) : c'est lui que
 # l'espace opérateurs logue et planifie ; les autres restent consultables sur
-# leur page publique /<slug>. Roster, mot de passe opérateurs et callbook QRZ
+# leur page publique /<slug>. Liste des opérateurs, mot de passe et callbook QRZ
 # sont communs à tous les indicatifs.
 
 # Drapeaux dessinés en CSS (activation.css) → préfixe radio affiché à côté.
