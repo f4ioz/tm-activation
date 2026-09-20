@@ -43,15 +43,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.1.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.1.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.10.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.10.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.10.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -70,9 +70,10 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.
     QSO loggés** dans chaque créneau (même opérateur, même bande, même mode) ;
     rien n'est affiché tant qu'aucun QSO n'est enregistré, le log n'ayant
     peut-être pas encore été importé. Les dates et heures se choisissent dans un
-    **petit calendrier** (embarqué, donc sans Internet) ; déplacer le début
-    déplace la fin en gardant la durée. Sur téléphone, le sélecteur du mobile
-    est conservé.
+    **calendrier** avec réglage de l'heure au curseur et des **raccourcis**
+    (Maintenant, Ce soir 20 h, Demain 9 h, +1 h/+2 h/+4 h) ; déplacer le début
+    déplace la fin en gardant la durée. Sans Internet, un calendrier simple
+    embarqué prend le relais ; sur téléphone, c'est le sélecteur du mobile.
   - **Log QSO** rapide : heure « maintenant », détection des doublons, recherche
     QRZ (nom, locator, pays), mode satellite. Dès l'indicatif saisi, l'écran dit
     si la **station a déjà été contactée** : jamais vue, déjà au log (avec les
@@ -144,22 +145,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.9.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.10.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.9.1.tar.gz
-   cd tm-activation-1.9.1
+   tar xzf tm-activation-1.10.0.tar.gz
+   cd tm-activation-1.10.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.9.1.zip
-   cd tm-activation-1.9.1
+   unzip tm-activation-1.10.0.zip
+   cd tm-activation-1.10.0
    sudo bash install.sh --lan
    ```
 
@@ -240,8 +241,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.9.1.tar.gz
-cd tm-activation-1.9.1
+tar xzf tm-activation-1.10.0.tar.gz
+cd tm-activation-1.10.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

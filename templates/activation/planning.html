@@ -36,9 +36,19 @@
         </select>
       </label>
       <label>{{ _("Début (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="start" value="{{ now_input }}" required
-        data-picker="datetime" data-picker-id="slot-start"></label>
+        data-picker="datetime" data-picker-id="slot-start" data-tz="{{ tz_mode }}"></label>
+      <div class="act-quick" data-quick-for="slot-start">
+        <button type="button" data-set="now">{{ _("Maintenant") }}</button>
+        <button type="button" data-set="today 20:00">{{ _("Ce soir 20 h") }}</button>
+        <button type="button" data-set="tomorrow 09:00">{{ _("Demain 9 h") }}</button>
+      </div>
       <label>{{ _("Fin (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="end" required
-        data-picker="datetime" data-after="slot-start"></label>
+        data-picker="datetime" data-picker-id="slot-end" data-after="slot-start" data-tz="{{ tz_mode }}"></label>
+      <div class="act-quick" data-quick-for="slot-end">
+        <button type="button" data-add="60">+1 h</button>
+        <button type="button" data-add="120">+2 h</button>
+        <button type="button" data-add="240">+4 h</button>
+      </div>
       <div class="act-row">
         <label>{{ _("Bande") }} <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
         <label>{{ _("Mode") }} <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
