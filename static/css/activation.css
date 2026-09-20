@@ -418,3 +418,8 @@ a.act-station-card:hover { border-color: var(--accent); }
 .act-acct-actions form { margin: 0; }
 /* Sortie du mode administrateur, depuis n'importe quelle page d'activation. */
 .act-admin-out button { font-family: var(--font-mono, monospace); font-size: 0.75rem; }
+
+/* Question anti-robot : champ court ; le champ-piège reste hors écran (les
+   robots le remplissent, pas les humains). */
+.act-captcha { max-width: 6rem; }
+.act-trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }

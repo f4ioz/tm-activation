@@ -140,6 +140,8 @@ async def operator_login_page(request: Request, next: str = "/activation") -> Re
             "site_admin": is_private(request),
             "configured": bool(activation.operator_password()) or activation.per_operator_auth(),
             "per_operator": activation.per_operator_auth(),
+            "captcha": activation.make_captcha() if activation.per_operator_auth() else None,
+            "password_rule": activation.password_rule(),
             "last_call": "",
         },
     )
@@ -151,6 +153,9 @@ async def operator_login_submit(
     callsign: str = Form(""),
     password: str = Form(""),
     next: str = Form("/activation"),
+    captcha: str = Form(""),
+    captcha_token: str = Form(""),
+    website: str = Form(""),          # champ-piège, invisible : rempli = robot
 ) -> Response:
     target = _safe_next(next)
     per_op = activation.per_operator_auth()
@@ -160,11 +165,14 @@ async def operator_login_submit(
     error = None
     if blocked:
         error = _("Trop de tentatives échouées : réessaie dans 15 minutes.")
+    elif per_op and not activation.check_captcha(captcha_token, captcha, website):
+        error = _("Réponse à la question incorrecte : recommencez.")
     elif per_op:
         # Compte créé à la première connexion ; validation éventuelle par un admin.
         error = {
             "invalid": _("Indicatif invalide"),
             "bad": _("Mot de passe incorrect"),
+            "weak": activation.password_rule(),
             "pending": _("Compte en attente de validation par un administrateur."),
             "disabled": _("Compte désactivé : voir un administrateur."),
         }.get(activation.operator_login(op, password))
@@ -211,6 +219,8 @@ async def operator_login_submit(
             "site_admin": is_private(request),
             "configured": bool(expected) or per_op,
             "per_operator": per_op,
+            "captcha": activation.make_captcha() if per_op else None,
+            "password_rule": activation.password_rule(),
             "last_call": op,
         },
         status_code=429 if blocked else 401,

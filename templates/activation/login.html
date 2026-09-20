@@ -18,12 +18,26 @@
                  autocapitalize="characters" autocomplete="username" placeholder="F4XXX">
         </label>
         <label>{% if per_operator %}{{ _("Votre mot de passe") }}{% else %}{{ _("Mot de passe opérateurs") }}{% endif %}
-          <input type="password" name="password" required autocomplete="current-password">
+          <input type="password" name="password" required autocomplete="current-password"{% if per_operator %} minlength="8" aria-describedby="act-pw-rule"{% endif %}>
         </label>
+        {% if per_operator %}
+        <p id="act-pw-rule" class="act-muted act-map-note">{{ password_rule }}</p>
+        {% endif %}
+        {% if captcha %}
+        <label>{{ _("Question anti-robot : combien font {question} ?", question=captcha.question) }}
+          <input type="text" name="captcha" required inputmode="numeric" autocomplete="off" class="act-captcha">
+        </label>
+        <input type="hidden" name="captcha_token" value="{{ captcha.token }}">
+        <div class="act-trap" aria-hidden="true">
+          <label>{{ _("Laissez ce champ vide") }}
+            <input type="text" name="website" tabindex="-1" autocomplete="off">
+          </label>
+        </div>
+        {% endif %}
         <input type="hidden" name="next" value="{{ next }}">
         <button type="submit">{{ _("Entrer") }}</button>
       </form>
-      <p class="act-muted">{% if per_operator %}{{ _("Première connexion : indiquez votre indicatif et choisissez votre mot de passe, le compte est créé aussitôt.") }}{% else %}{{ _("Votre indicatif sera ajouté à la liste des opérateurs. Le mot de passe est commun aux opérateurs autorisés à activer {call}.", call=callsign) }}{% endif %}</p>
+      <p class="act-muted">{% if per_operator %}{{ _("Première connexion : indiquez votre indicatif et choisissez votre mot de passe, le compte est créé aussitôt.") }} {{ _("La question anti-robot évite les inscriptions automatiques.") }}{% else %}{{ _("Votre indicatif sera ajouté à la liste des opérateurs. Le mot de passe est commun aux opérateurs autorisés à activer {call}.", call=callsign) }}{% endif %}</p>
     </div>
   </div>
 </section>

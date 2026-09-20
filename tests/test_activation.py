@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -1356,12 +1357,24 @@ def test_language_switch_cookie_and_fallbacks() -> None:
 # ── Comptes opérateurs (mot de passe par opérateur) ────────────────────────
 
 
+# Mot de passe conforme à la règle (majuscule, chiffre, caractère spécial).
+PW = "Motdepasse1!"
+
+
 def _op_client() -> TestClient:
     return TestClient(app, follow_redirects=False)
 
 
-def _login(client: TestClient, call: str, password: str):
-    return client.post("/activation/login", data={"callsign": call, "password": password})
+def _captcha_fields(answer_shift: int = 0, age: int = 5) -> dict[str, str]:
+    """Question anti-robot déjà résolue (jeton antidaté : un humain a pris son temps)."""
+    ts, good = str(int(time.time()) - age), 7
+    return {"captcha_token": f"{ts}.{activation._captcha_sig(ts, good)}",
+            "captcha": str(good + answer_shift)}
+
+
+def _login(client: TestClient, call: str, password: str, **extra: str):
+    data = {"callsign": call, "password": password, **_captcha_fields(), **extra}
+    return client.post("/activation/login", data=data)
 
 
 def test_password_hashing_never_stores_clear_text() -> None:
@@ -1374,7 +1387,7 @@ def test_password_hashing_never_stores_clear_text() -> None:
 def test_per_operator_account_is_created_at_first_login() -> None:
     activation.set_flag("per_operator_auth", True)
     client = _op_client()
-    r = _login(client, "f5abc", "motdepasse")
+    r = _login(client, "f5abc", PW)
     assert r.status_code == 303
     acc = activation.get_operator("F5ABC")
     assert acc["status"] == "active" and acc["active"] == 1 and acc["is_admin"] == 0
@@ -1382,10 +1395,10 @@ def test_per_operator_account_is_created_at_first_login() -> None:
     assert client.get("/activation").status_code == 200          # session ouverte
     # Mot de passe faux, puis bon : le compte reste celui créé.
     other = _op_client()
-    bad = _login(other, "F5ABC", "autre")
+    bad = _login(other, "F5ABC", "AutreMdp2!")
     assert bad.status_code == 401 and "Mot de passe incorrect" in bad.text
     assert other.get("/activation").status_code == 303
-    assert _login(other, "F5ABC", "motdepasse").status_code == 303
+    assert _login(other, "F5ABC", PW).status_code == 303
     assert other.get("/activation").status_code == 200
 
 
@@ -1393,14 +1406,14 @@ def test_new_account_waits_for_approval_when_enabled() -> None:
     activation.set_flag("per_operator_auth", True)
     activation.set_flag("operator_approval", True)
     client = _op_client()
-    r = _login(client, "F5NEW", "pw")
+    r = _login(client, "F5NEW", PW)
     assert r.status_code == 401 and "en attente de validation" in r.text
     assert activation.get_operator("F5NEW")["status"] == "pending"
     assert client.get("/activation").status_code == 303          # pas de session
     # Le même mot de passe reste refusé tant que l'admin n'a pas validé.
-    assert _login(client, "F5NEW", "pw").status_code == 401
+    assert _login(client, "F5NEW", PW).status_code == 401
     activation.approve_operator("F5NEW")
-    assert _login(client, "F5NEW", "pw").status_code == 303
+    assert _login(client, "F5NEW", PW).status_code == 303
     assert client.get("/activation").status_code == 200
 
 
@@ -1409,7 +1422,7 @@ def test_roster_operator_sets_password_without_approval() -> None:
     activation.set_flag("per_operator_auth", True)
     activation.set_flag("operator_approval", True)
     activation.add_operator("F5ROS", "Jean")
-    assert _login(_op_client(), "F5ROS", "pw").status_code == 303
+    assert _login(_op_client(), "F5ROS", PW).status_code == 303
     acc = activation.get_operator("F5ROS")
     assert acc["status"] == "active" and acc["name"] == "Jean"
 
@@ -1418,7 +1431,7 @@ def test_operator_admin_reaches_settings_but_not_site_stats(monkeypatch) -> None
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("per_operator_auth", True)
     op = _op_client()
-    _login(op, "F5OP", "pw")
+    _login(op, "F5OP", PW)
     assert op.get("/activation/settings").status_code == 303     # simple opérateur
     activation.set_operator_admin("F5OP", True)
     page = op.get("/activation/settings")
@@ -1441,18 +1454,18 @@ def test_operator_admin_reaches_settings_but_not_site_stats(monkeypatch) -> None
 def test_disabled_account_loses_its_session() -> None:
     activation.set_flag("per_operator_auth", True)
     client = _op_client()
-    _login(client, "F5OFF", "pw")
+    _login(client, "F5OFF", PW)
     assert client.get("/activation").status_code == 200
     activation.set_operator_active("F5OFF", False)
     assert client.get("/activation").status_code == 303          # session invalidée
-    assert _login(client, "F5OFF", "pw").status_code == 401      # et connexion refusée
+    assert _login(client, "F5OFF", PW).status_code == 401      # et connexion refusée
     activation.set_operator_active("F5OFF", True)
-    assert _login(client, "F5OFF", "pw").status_code == 303
+    assert _login(client, "F5OFF", PW).status_code == 303
 
 
 def test_session_token_is_bound_to_its_callsign() -> None:
     activation.set_flag("per_operator_auth", True)
-    _login(_op_client(), "F5BOB", "pw")
+    _login(_op_client(), "F5BOB", PW)
     # Jeton du mot de passe commun (sans indicatif) : refusé en mode comptes.
     shared = TestClient(app, follow_redirects=False)
     shared.cookies.set(activation.OP_COOKIE, activation.make_op_token())
@@ -1468,12 +1481,12 @@ def test_session_token_is_bound_to_its_callsign() -> None:
 
 def test_admin_resets_and_clears_operator_password() -> None:
     activation.set_flag("per_operator_auth", True)
-    _login(_op_client(), "F5RST", "ancien")
-    activation.set_operator_password_for("F5RST", "nouveau")
-    assert _login(_op_client(), "F5RST", "ancien").status_code == 401
-    assert _login(_op_client(), "F5RST", "nouveau").status_code == 303
+    _login(_op_client(), "F5RST", "AncienMdp1!")
+    activation.set_operator_password_for("F5RST", "NouveauMdp2!")
+    assert _login(_op_client(), "F5RST", "AncienMdp1!").status_code == 401
+    assert _login(_op_client(), "F5RST", "NouveauMdp2!").status_code == 303
     activation.clear_operator_password("F5RST")                  # oubli : nouveau choix libre
-    assert _login(_op_client(), "F5RST", "tout-neuf").status_code == 303
+    assert _login(_op_client(), "F5RST", "ToutNeuf3!").status_code == 303
     with pytest.raises(ValueError):
         activation.set_operator_password_for("F5RST", "")
     with pytest.raises(ValueError):
@@ -1496,7 +1509,8 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
     def qso(call, op="F4IOZ", band="20M", mode="SSB", time_on="1030"):
         activation.add_contact(call=call, band=band, mode=mode, operator_call=op,
                                qso_date="20260907", time_on=time_on)
-    qso("DL1ABC"); qso("DL2ABC", time_on="1159")
+    qso("DL1ABC")
+    qso("DL2ABC", time_on="1159")
     qso("DL3ABC", time_on="1200")          # après la fin
     qso("DL4ABC", time_on="0959")          # avant le début
     qso("DL5ABC", band="40M")              # autre bande
@@ -1557,3 +1571,55 @@ def test_admin_logout_button_is_everywhere_for_the_main_admin(monkeypatch) -> No
     cookie = r.headers.get("set-cookie", "")
     assert auth_mod.COOKIE_NAME in cookie and "Max-Age=0" in cookie
     assert TestClient(app, follow_redirects=False).get("/activation/settings").status_code == 303
+
+
+def test_password_rule_is_enforced_at_account_creation() -> None:
+    activation.set_flag("per_operator_auth", True)
+    for weak in ("motdepasse", "Motdepasse", "Motdepas1", "Mdp1!", "motdepasse1!"):
+        r = _login(_op_client(), "F5WEAK", weak)
+        assert r.status_code == 401, weak
+        assert "majuscule" in r.text and activation.get_operator("F5WEAK") is None, weak
+    assert _login(_op_client(), "F5WEAK", PW).status_code == 303
+    assert activation.get_operator("F5WEAK")["password_hash"]
+    # La règle est affichée sur la page de connexion.
+    assert "une majuscule, un chiffre et un caractère spécial" in _op_client().get("/activation/login").text
+    # Un administrateur ne peut pas poser un mot de passe trop simple non plus.
+    with pytest.raises(ValueError, match="majuscule"):
+        activation.set_operator_password_for("F5WEAK", "faible")
+
+
+def test_robot_signups_are_blocked() -> None:
+    activation.set_flag("per_operator_auth", True)
+    page = _op_client().get("/activation/login").text
+    assert "Question anti-robot" in page and 'name="captcha_token"' in page and 'name="website"' in page
+    base = {"callsign": "F5BOT", "password": PW}
+
+    def post(**extra):
+        return _op_client().post("/activation/login", data={**base, **extra})
+
+    # Sans question résolue, mauvaise réponse, jeton bricolé : rien n'est créé.
+    for extra in ({}, _captcha_fields(answer_shift=1), {"captcha": "7", "captcha_token": "1.2"},
+                  {"captcha": "7", "captcha_token": f"{int(time.time())}.deadbeef"}):
+        r = post(**extra)
+        assert r.status_code == 401 and "question" in r.text.lower()
+        assert activation.get_operator("F5BOT") is None
+    # Formulaire renvoyé instantanément (robot) : refusé malgré la bonne réponse.
+    assert post(**_captcha_fields(age=0)).status_code == 401
+    # Jeton périmé : refusé.
+    assert post(**_captcha_fields(age=activation.CAPTCHA_TTL + 60)).status_code == 401
+    # Champ-piège rempli : refusé, même avec la bonne réponse.
+    assert post(**_captcha_fields(), website="https://spam.example").status_code == 401
+    assert activation.get_operator("F5BOT") is None
+    # Réponse correcte, formulaire rempli normalement : compte créé.
+    assert post(**_captcha_fields()).status_code == 303
+    assert activation.get_operator("F5BOT")["password_hash"]
+
+
+def test_captcha_only_in_per_operator_mode() -> None:
+    """Mot de passe commun : pas de question (le compte n'est pas créé ici)."""
+    activation.set_operator_password("commun")
+    page = _op_client().get("/activation/login").text
+    assert "Question anti-robot" not in page and 'name="captcha_token"' not in page
+    client = _op_client()
+    r = client.post("/activation/login", data={"callsign": "F5CLA", "password": "commun"})
+    assert r.status_code == 303 and client.get("/activation").status_code == 200

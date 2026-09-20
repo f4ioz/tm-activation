@@ -433,6 +433,63 @@ def operator_approval() -> bool:
     return get_flag("operator_approval", False)
 
 
+# Exigences du mot de passe d'un compte opérateur (création et remise à zéro).
+PASSWORD_MIN_LEN = 8
+_RE_UPPER = re.compile(r"[A-ZÀ-Þ]")
+_RE_DIGIT = re.compile(r"[0-9]")
+_RE_SPECIAL = re.compile(r"[^0-9A-Za-zÀ-ÿ]")
+
+
+def password_rule() -> str:
+    """Règle affichée sur la page de connexion."""
+    return _("Au moins {n} caractères, dont une majuscule, un chiffre et un caractère spécial.",
+             n=PASSWORD_MIN_LEN)
+
+
+def password_is_strong(password: str) -> bool:
+    pw = password or ""
+    return bool(len(pw) >= PASSWORD_MIN_LEN and _RE_UPPER.search(pw)
+                and _RE_DIGIT.search(pw) and _RE_SPECIAL.search(pw))
+
+
+# ── Question anti-robot (sans service extérieur, sans état serveur) ────────
+# Le jeton signe l'heure ET la bonne réponse : on revérifie la signature avec la
+# réponse envoyée, sans garder la question côté serveur. Un formulaire rempli en
+# moins de MIN_FILL_SECONDS, ou dont le champ-piège est rempli, vient d'un robot.
+
+CAPTCHA_TTL = 900          # 15 min pour répondre
+CAPTCHA_MIN_FILL = 2.0     # un humain met plus de 2 s à remplir le formulaire
+CAPTCHA_TRAP = "website"   # champ-piège, masqué : les robots le remplissent
+
+
+def _captcha_sig(ts: str, answer: int) -> str:
+    return hmac.new(_auth.get_secret(), f"captcha:{ts}:{answer}".encode(), hashlib.sha256).hexdigest()
+
+
+def make_captcha() -> dict[str, str]:
+    """Question arithmétique simple + jeton signé ({"question", "token"})."""
+    a, b = secrets.randbelow(8) + 2, secrets.randbelow(8) + 2
+    ts = str(int(time.time()))
+    return {"question": f"{a} + {b}", "token": f"{ts}.{_captcha_sig(ts, a + b)}"}
+
+
+def check_captcha(token: str | None, answer: str | None, trap: str | None = "") -> bool:
+    """Réponse juste, jeton frais, formulaire ni instantané ni pré-rempli par un robot."""
+    if (trap or "").strip():
+        return False
+    if not token or "." not in token:
+        return False
+    ts_str, sig = token.split(".", 1)
+    try:
+        ts, value = int(ts_str), int((answer or "").strip())
+    except ValueError:
+        return False
+    age = time.time() - ts
+    if age < CAPTCHA_MIN_FILL or age > CAPTCHA_TTL:
+        return False
+    return hmac.compare_digest(_captcha_sig(ts_str, value), sig)
+
+
 def get_operator(call: str) -> dict[str, Any] | None:
     init_db()
     with conn() as c:
@@ -444,8 +501,9 @@ def operator_login(call: str, password: str) -> str:
     """Connexion d'un opérateur avec SON mot de passe.
 
     Renvoie ``invalid`` (indicatif incorrect), ``bad`` (mot de passe vide ou
-    faux), ``created`` (compte créé et actif), ``pending`` (compte à valider par
-    un administrateur), ``disabled`` (compte désactivé) ou ``ok``.
+    faux), ``weak`` (mot de passe trop simple à la création), ``created``
+    (compte créé et actif), ``pending`` (compte à valider par un
+    administrateur), ``disabled`` (compte désactivé) ou ``ok``.
     """
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
@@ -461,6 +519,8 @@ def operator_login(call: str, password: str) -> str:
         if not row.get("active"):
             return "disabled"
         return "ok"
+    if not password_is_strong(password):
+        return "weak"
     # Première connexion : le mot de passe saisi devient celui du compte.
     # Un indicatif inconnu attend l'accord d'un admin si la validation est active ;
     # un opérateur déjà au roster a déjà été approuvé en y étant ajouté.
@@ -483,6 +543,8 @@ def set_operator_password_for(call: str, password: str) -> None:
     cs = (call or "").strip().upper()
     if not password:
         raise ValueError(_("mot de passe vide"))
+    if not password_is_strong(password):
+        raise ValueError(password_rule())
     if get_operator(cs) is None:
         raise ValueError(_("indicatif inconnu"))
     with conn() as c:
