@@ -80,8 +80,49 @@
       <p class="act-muted act-map-note">{{ _("Un seul indicatif est « en cours » : c'est lui que les opérateurs loguent et planifient. Les autres restent consultables sur leur page publique et dans /activations.") }} {{ _("Roster et mot de passe opérateurs sont communs à tous. Une fiche sans QSO peut être supprimée (✕) ; dès qu'elle a des QSO, elle est conservée.") }}</p>
     </div>
 
+    <div class="act-card act-card-wide" id="comptes">
+      <h2>{{ _("Comptes opérateurs") }}</h2>
+      {% if au_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Mode de connexion enregistré.") }}</p>{% endif %}
+      {% if ac_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Compte mis à jour.") }}</p>
+      {% elif ac_flash == 'self' %}<p class="act-alert act-alert-err">{{ _("Impossible de retirer ses propres droits : demandez-le à un autre administrateur.") }}</p>
+      {% elif ac_flash == 'error' %}<p class="act-alert act-alert-err">{{ _("Action impossible (compte inconnu ou mot de passe vide).") }}</p>{% endif %}
+      <form method="post" action="/activation/settings/auth" class="act-form">
+        <label class="act-check"><input type="checkbox" name="per_operator" value="1"{% if per_operator_auth %} checked{% endif %}> {{ _("Un mot de passe par opérateur (au lieu du mot de passe commun)") }}</label>
+        <label class="act-check"><input type="checkbox" name="approval" value="1"{% if operator_approval %} checked{% endif %}> {{ _("Valider les nouveaux comptes avant de les laisser loguer") }}</label>
+        <button type="submit">{{ _("Enregistrer") }}</button>
+      </form>
+      <p class="act-muted act-map-note">{{ _("Avec les comptes individuels, chaque opérateur crée son mot de passe à sa première connexion (son indicatif suffit). Un opérateur déjà au roster n'a pas besoin d'être validé : il a été ajouté par un administrateur.") }}</p>
+      <div class="act-scroll">
+        <table class="act-table">
+          <thead><tr><th>{{ _("Indicatif") }}</th><th>{{ _("Nom") }}</th><th>{{ _("État") }}</th><th>{{ _("Mot de passe") }}</th><th>{{ _("Administrateur") }}</th><th></th></tr></thead>
+          <tbody>
+            {% for o in accounts %}
+              <tr{% if o.status == 'pending' %} class="act-row-conflict"{% endif %}>
+                <td class="act-call">{{ o.callsign }}{% if o.callsign == session_op %} <span class="act-muted">({{ _("vous") }})</span>{% endif %}</td>
+                <td>{{ o.name }}</td>
+                <td>{% if o.status == 'pending' %}<span class="act-warn">{{ _("à valider") }}</span>{% elif not o.active %}<span class="act-muted">{{ _("désactivé") }}</span>{% else %}{{ _("actif") }}{% endif %}</td>
+                <td>{% if o.password_hash %}{{ _("défini") }}{% else %}<span class="act-muted">{{ _("à créer") }}</span>{% endif %}</td>
+                <td>{% if o.is_admin %}✓{% endif %}</td>
+                <td class="act-actions act-acct-actions">
+                  {% if o.status == 'pending' %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="approve" class="act-cancel-btn">{{ _("Valider") }}</button></form>{% endif %}
+                  {% if o.is_admin %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="unadmin" class="act-cancel-btn">{{ _("Retirer admin") }}</button></form>
+                  {% else %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="admin" class="act-cancel-btn">{{ _("Rendre admin") }}</button></form>{% endif %}
+                  {% if o.password_hash %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}" onsubmit="return confirm({{ _("Effacer le mot de passe de {call} ? Il en choisira un nouveau à sa prochaine connexion.", call=o.callsign)|tojson|forceescape }})"><button type="submit" name="action" value="forget" class="act-cancel-btn">{{ _("Oubli de mot de passe") }}</button></form>{% endif %}
+                  {% if o.active %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="disable" class="act-del" title="{{ _("Désactiver le compte") }}">✕</button></form>
+                  {% else %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="enable" class="act-cancel-btn">{{ _("Réactiver") }}</button></form>{% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="act-muted">{{ _("Aucun opérateur au roster.") }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="act-card">
       <h2>{{ _("Mot de passe opérateurs") }}{% if club.callsign %} {{ club.callsign }}{% endif %}</h2>
+      {% if per_operator_auth %}<p class="act-alert act-alert-dupe">{{ _("Mot de passe commun inutilisé : les comptes individuels sont actifs.") }}</p>{% endif %}
       <p class="act-muted">
         {{ _("Mot de passe commun aux opérateurs autorisés à activer {call}. Il protège l'espace opérateurs (planning, log, ADIF) de tous les indicatifs spéciaux du club, indépendamment du mot de passe admin du site.", call=callsign) }}
         {% if op_configured %}<br><b>{{ _("État :") }}</b> {{ _("configuré.") }}{% else %}<br><b>{{ _("État :") }}</b> <span class="act-warn">{{ _("non configuré") }}</span> — {{ _("à définir ci-dessous.") }}{% endif %}
@@ -120,7 +161,7 @@
       {% if is_admin %}<p class="act-muted">{{ _("Tu es connecté en admin site (accès garanti même sans mot de passe opérateur).") }}</p>{% endif %}
     </div>
 
-    <div class="act-card">
+    {% if site_admin %}<div class="act-card">
       <h2>{{ _("Connexions") }}</h2>
       <p class="act-muted">
         <b>{{ _("7 jours :") }}</b> {{ _("{n} connexion(s) réussie(s)", n=visits_summary.logins_7d) }}
@@ -138,7 +179,7 @@
       {% endif %}
       <p class="act-muted act-map-note">{{ _("Une IP publique est bloquée 15 min après 5 échecs de connexion ; le réseau local ne l'est jamais. Journal conservé 90 jours.") }}</p>
       <form method="post" action="/logout" class="act-form"><button type="submit" class="act-cancel-btn">{{ _("Se déconnecter (admin)") }}</button></form>
-    </div>
+    </div>{% endif %}
 
     <div class="act-card" id="qrz">
       <h2>{{ _("Callbook QRZ") }}</h2>

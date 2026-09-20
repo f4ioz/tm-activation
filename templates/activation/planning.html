@@ -58,7 +58,7 @@
 <div class="act-card">
   <h2>{{ _("Créneaux") }} {% if conflicts %}<span class="act-conflict-count">{{ _("{n} en conflit", n=conflicts|length) }}</span>{% endif %}</h2>
   <table class="act-table">
-    <thead><tr><th>{{ _("Opérateur") }}</th><th>{{ _("Début ({tz})", tz=tz_label) }}</th><th>{{ _("Fin") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>{{ _("Note") }}</th><th></th></tr></thead>
+    <thead><tr><th>{{ _("Opérateur") }}</th><th>{{ _("Début ({tz})", tz=tz_label) }}</th><th>{{ _("Fin") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th title="{{ _("QSO loggés pendant le créneau (même opérateur, bande et mode)") }}">QSO</th><th>{{ _("Note") }}</th><th></th></tr></thead>
     <tbody>
       {% for s in slots %}
         {% set ps = to_disp(s.start_utc) %}{% set pe = to_disp(s.end_utc) %}
@@ -67,6 +67,7 @@
           <td>{{ (day_month(ps) ~ ' ' ~ ps.strftime('%H:%M')) if ps }}{% if s.id in conflicts %} <span class="act-conflict-flag" title="{{ _("Chevauchement même bande") }}">⚠</span>{% endif %}</td>
           <td>{{ (day_month(pe) ~ ' ' ~ pe.strftime('%H:%M')) if pe }}</td>
           <td>{{ s.band }}</td><td>{{ s.mode }}</td>
+          <td class="act-slot-qso">{{ slot_qsos.get(s.id, 0) or '—' }}</td>
           <td>{{ s.note }}</td>
           <td class="act-actions">
             <a class="act-edit" href="/activation/slots/{{ s.id }}/edit" title="{{ _("Modifier") }}">✎</a>
@@ -74,7 +75,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="act-muted">{{ _("Aucun créneau réservé.") }}</td></tr>
+        <tr><td colspan="8" class="act-muted">{{ _("Aucun créneau réservé.") }}</td></tr>
       {% endfor %}
     </tbody>
   </table>

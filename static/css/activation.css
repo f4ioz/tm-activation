@@ -410,3 +410,9 @@ a.act-station-card:hover { border-color: var(--accent); }
 .act-actions form { display: inline; }
 .act-archive-note { border-left: 4px solid var(--text-muted); }
 .act code { font-family: var(--font-mono, monospace); background: var(--bg-2, var(--bg)); padding: 0 0.25em; border-radius: 2px; }
+
+/* Bilan d'un créneau : nombre de QSO loggés pendant celui-ci. */
+.act-slot-qso { color: var(--accent); }
+/* Boutons de gestion des comptes opérateurs (Réglages) : au fil du texte. */
+.act-acct-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.act-acct-actions form { margin: 0; }

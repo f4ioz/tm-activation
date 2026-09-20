@@ -337,31 +337,193 @@ def set_operator_password(new_password: str) -> None:
         pass
 
 
-def _op_sig(ts: str) -> str:
-    return hmac.new(_auth.get_secret(), f"activation:{ts}".encode(), hashlib.sha256).hexdigest()
+def _op_sig(ts: str, call: str = "") -> str:
+    payload = f"activation:{ts}:{call}" if call else f"activation:{ts}"
+    return hmac.new(_auth.get_secret(), payload.encode(), hashlib.sha256).hexdigest()
 
 
-def make_op_token(now: int | None = None) -> str:
+def make_op_token(call: str = "", now: int | None = None) -> str:
+    """Jeton de session opérateur. Avec ``call``, il ne vaut QUE pour cet
+    indicatif : le compte d'un autre opérateur ne peut pas être emprunté."""
     ts = str(int(time.time()) if now is None else int(now))
-    return f"{ts}.{_op_sig(ts)}"
+    cs = (call or "").strip().upper()
+    return f"{ts}.{cs}.{_op_sig(ts, cs)}" if cs else f"{ts}.{_op_sig(ts)}"
 
 
-def verify_op_token(token: str | None) -> bool:
+def op_session(token: str | None) -> dict[str, str] | None:
+    """Contenu d'un jeton valide : {"call": indicatif} ("" pour le mot de passe commun)."""
     if not token or "." not in token:
-        return False
-    ts_str, sig = token.split(".", 1)
+        return None
+    parts = token.split(".")
+    if len(parts) == 2:
+        ts_str, sig, call = parts[0], parts[1], ""
+    elif len(parts) == 3:
+        ts_str, call, sig = parts
+    else:
+        return None
     try:
         ts = int(ts_str)
     except ValueError:
-        return False
+        return None
     if abs(int(time.time()) - ts) > OP_TOKEN_TTL:
-        return False
-    return hmac.compare_digest(_op_sig(ts_str), sig)
+        return None
+    if not hmac.compare_digest(_op_sig(ts_str, call), sig):
+        return None
+    return {"call": call}
+
+
+def verify_op_token(token: str | None) -> bool:
+    return op_session(token) is not None
+
+
+def session_operator(token: str | None) -> str:
+    """Indicatif du compte connecté ("" avec le mot de passe commun)."""
+    sess = op_session(token)
+    return sess["call"] if sess else ""
 
 
 def operator_authed(token: str | None) -> bool:
-    """True si le cookie opérateur est valide ET un mot de passe est configuré."""
-    return bool(operator_password()) and verify_op_token(token)
+    """Session opérateur valide : compte actif (mot de passe par opérateur) ou
+    mot de passe commun configuré."""
+    sess = op_session(token)
+    if sess is None:
+        return False
+    if per_operator_auth():
+        row = get_operator(sess["call"]) if sess["call"] else None
+        return bool(row and row.get("active") and row.get("status", "active") == "active"
+                    and row.get("password_hash"))
+    return bool(operator_password())
+
+
+# ── Comptes opérateurs (option : un mot de passe par opérateur) ────────────
+# Par défaut, tous les opérateurs partagent un mot de passe (operator_password).
+# Réglage « per_operator_auth » : chacun se connecte avec SON mot de passe, créé
+# à sa première connexion. Réglage « operator_approval » : un compte nouveau
+# attend l'accord d'un administrateur. Un opérateur déjà au roster (ajouté par
+# un admin) n'a rien à faire valider : il choisit son mot de passe et entre.
+
+PBKDF2_ROUNDS = 200_000
+
+
+def hash_password(password: str) -> str:
+    """Empreinte salée d'un mot de passe (jamais stocké en clair)."""
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)
+    return f"pbkdf2_sha256${PBKDF2_ROUNDS}${salt.hex()}${digest.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, rounds, salt_hex, digest_hex = (stored or "").split("$")
+        if algo != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt_hex), int(rounds))
+    except (ValueError, AttributeError):
+        return False
+    return hmac.compare_digest(digest.hex(), digest_hex)
+
+
+def per_operator_auth() -> bool:
+    """Un mot de passe par opérateur (sinon : mot de passe commun)."""
+    return get_flag("per_operator_auth", False)
+
+
+def operator_approval() -> bool:
+    """Les comptes créés à la volée attendent la validation d'un administrateur."""
+    return get_flag("operator_approval", False)
+
+
+def get_operator(call: str) -> dict[str, Any] | None:
+    init_db()
+    with conn() as c:
+        row = c.execute("SELECT * FROM operators WHERE callsign=?", ((call or "").strip().upper(),)).fetchone()
+    return dict(row) if row else None
+
+
+def operator_login(call: str, password: str) -> str:
+    """Connexion d'un opérateur avec SON mot de passe.
+
+    Renvoie ``invalid`` (indicatif incorrect), ``bad`` (mot de passe vide ou
+    faux), ``created`` (compte créé et actif), ``pending`` (compte à valider par
+    un administrateur), ``disabled`` (compte désactivé) ou ``ok``.
+    """
+    cs = (call or "").strip().upper()
+    if not valid_callsign(cs):
+        return "invalid"
+    if not password:
+        return "bad"
+    row = get_operator(cs)
+    if row is not None and row.get("password_hash"):
+        if not verify_password(password, row["password_hash"]):
+            return "bad"
+        if row.get("status") == "pending":
+            return "pending"
+        if not row.get("active"):
+            return "disabled"
+        return "ok"
+    # Première connexion : le mot de passe saisi devient celui du compte.
+    # Un indicatif inconnu attend l'accord d'un admin si la validation est active ;
+    # un opérateur déjà au roster a déjà été approuvé en y étant ajouté.
+    status = "pending" if (row is None and operator_approval()) else "active"
+    now = int(time.time())
+    with conn() as c:
+        c.execute(
+            "INSERT INTO operators(callsign, name, active, password_hash, is_admin, status, created_at) "
+            "VALUES (?, '', 1, ?, 0, ?, ?) "
+            "ON CONFLICT(callsign) DO UPDATE SET password_hash=excluded.password_hash, "
+            "status=excluded.status, active=1",
+            (cs, hash_password(password), status, now),
+        )
+    maybe_backup()
+    return "pending" if status == "pending" else "created"
+
+
+def set_operator_password_for(call: str, password: str) -> None:
+    """Mot de passe d'un opérateur, posé par un administrateur."""
+    cs = (call or "").strip().upper()
+    if not password:
+        raise ValueError(_("mot de passe vide"))
+    if get_operator(cs) is None:
+        raise ValueError(_("indicatif inconnu"))
+    with conn() as c:
+        c.execute("UPDATE operators SET password_hash=? WHERE callsign=?", (hash_password(password), cs))
+    maybe_backup()
+
+
+def clear_operator_password(call: str) -> None:
+    """Oubli de mot de passe : le compte en choisira un neuf à la prochaine connexion."""
+    with conn() as c:
+        c.execute("UPDATE operators SET password_hash='' WHERE callsign=?", ((call or "").strip().upper(),))
+    maybe_backup()
+
+
+def approve_operator(call: str) -> None:
+    with conn() as c:
+        c.execute("UPDATE operators SET status='active', active=1 WHERE callsign=?",
+                  ((call or "").strip().upper(),))
+    maybe_backup()
+
+
+def set_operator_admin(call: str, is_admin: bool) -> None:
+    """Droits d'administration (Réglages) d'un opérateur."""
+    cs = (call or "").strip().upper()
+    if get_operator(cs) is None:
+        raise ValueError(_("indicatif inconnu"))
+    with conn() as c:
+        c.execute("UPDATE operators SET is_admin=? WHERE callsign=?", (1 if is_admin else 0, cs))
+    maybe_backup()
+
+
+def set_operator_active(call: str, active: bool) -> None:
+    with conn() as c:
+        c.execute("UPDATE operators SET active=? WHERE callsign=?",
+                  (1 if active else 0, (call or "").strip().upper()))
+    maybe_backup()
+
+
+def operator_is_admin(call: str) -> bool:
+    row = get_operator(call)
+    return bool(row and row.get("is_admin") and row.get("active") and row.get("status", "active") == "active")
 
 
 def _seed_operators() -> list[str]:
@@ -444,6 +606,9 @@ def init_db() -> None:
                 callsign TEXT UNIQUE NOT NULL,
                 name TEXT DEFAULT '',
                 active INTEGER DEFAULT 1,
+                password_hash TEXT DEFAULT '',  -- option « un mot de passe par opérateur »
+                is_admin INTEGER DEFAULT 0,     -- accès aux Réglages avec son propre mot de passe
+                status TEXT DEFAULT 'active',   -- active / pending (validation par un admin)
                 created_at INTEGER
             );
             CREATE TABLE IF NOT EXISTS slots (
@@ -496,6 +661,12 @@ def init_db() -> None:
         cols = {row[1] for row in c.execute("PRAGMA table_info(contacts)").fetchall()}
         if "sat_name" not in cols:
             c.execute("ALTER TABLE contacts ADD COLUMN sat_name TEXT DEFAULT ''")
+        # Comptes opérateurs (mot de passe individuel, admin, validation).
+        ops_cols = {row[1] for row in c.execute("PRAGMA table_info(operators)").fetchall()}
+        for col, decl in (("password_hash", "TEXT DEFAULT ''"), ("is_admin", "INTEGER DEFAULT 0"),
+                          ("status", "TEXT DEFAULT 'active'")):
+            if col not in ops_cols:
+                c.execute(f"ALTER TABLE operators ADD COLUMN {col} {decl}")
         # Passage au multi-indicatif : copie intacte de la base AVANT de toucher
         # au schéma (premigration-*.sqlite, hors rotation des sauvegardes).
         missing = [
@@ -774,6 +945,30 @@ def past_slots(station: str | None = None) -> list[dict[str, Any]]:
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     done = [s for s in list_slots(station=station) if s["end_utc"] <= now]
     return sorted(done, key=lambda s: s["start_utc"], reverse=True)
+
+
+# Heure UTC d'un QSO (qso_date « AAAAMMJJ » + time_on « HHMM ») au format des
+# créneaux (« AAAA-MM-JJTHH:MM »), pour comparer les deux en SQL.
+_SQL_QSO_UTC = (
+    "substr(c.qso_date,1,4) || '-' || substr(c.qso_date,5,2) || '-' || substr(c.qso_date,7,2)"
+    " || 'T' || substr(c.time_on,1,2) || ':' || substr(c.time_on,3,2)"
+)
+
+
+def slot_qso_counts(station: str | None = None) -> dict[int, int]:
+    """QSO loggés par créneau : même opérateur, même bande, même mode, entre le
+    début et la fin du créneau. Renvoie {id du créneau: nombre de QSO}."""
+    init_db()
+    with conn() as c:
+        rows = c.execute(
+            "SELECT s.id AS sid, COUNT(c.id) AS n FROM slots s "
+            "LEFT JOIN contacts c ON c.station = s.station AND c.operator_call = s.operator_call "
+            f"  AND c.band = s.band AND c.mode = s.mode AND {_SQL_QSO_UTC} >= s.start_utc "
+            f"  AND {_SQL_QSO_UTC} < s.end_utc "
+            "WHERE s.station = ? GROUP BY s.id",
+            (_st(station),),
+        ).fetchall()
+    return {int(r["sid"]): int(r["n"]) for r in rows}
 
 
 def current_and_next_slot() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:

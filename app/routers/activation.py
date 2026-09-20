@@ -51,6 +51,22 @@ def _authed(request: Request) -> bool:
     return activation.operator_authed(request.cookies.get(activation.OP_COOKIE)) or is_private(request)
 
 
+def _session_op(request: Request) -> str:
+    """Indicatif du compte opérateur connecté ("" : mot de passe commun ou admin site)."""
+    token = request.cookies.get(activation.OP_COOKIE)
+    if not activation.operator_authed(token):
+        return ""
+    return activation.session_operator(token)
+
+
+def _is_admin(request: Request) -> bool:
+    """Admin site (mot de passe de config.yml) OU opérateur marqué administrateur."""
+    if is_private(request):
+        return True
+    op = _session_op(request)
+    return bool(op) and activation.operator_is_admin(op)
+
+
 def _guard(request: Request) -> Response | None:
     """None si l'accès est autorisé ; sinon une redirection vers le login opérateur."""
     if _authed(request):
@@ -68,7 +84,7 @@ def _require_admin(request: Request) -> Response | None:
 
     Les Réglages sont réservés à l'administrateur, pas aux opérateurs.
     """
-    if is_private(request):
+    if _is_admin(request):
         return None
     return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
 
@@ -90,8 +106,11 @@ def _ctx(request: Request, **extra: object) -> dict:
         "operators": activation.list_operators(),
         "bands": activation.BANDS,
         "modes": activation.MODES,
-        "is_admin": is_private(request),
+        "is_admin": _is_admin(request),
+        "site_admin": is_private(request),     # journal des visites : admin du site seul
+        "session_op": _session_op(request),
         "station": activation.current_station(),
+        "slot_qsos": activation.slot_qso_counts(),
     }
     mode = _tz_mode(request)
     ctx["tz_mode"] = mode
@@ -118,7 +137,8 @@ async def operator_login_page(request: Request, next: str = "/activation") -> Re
             "station": activation.current_station(),
             "next": _safe_next(next),
             "error": None,
-            "configured": bool(activation.operator_password()),
+            "configured": bool(activation.operator_password()) or activation.per_operator_auth(),
+            "per_operator": activation.per_operator_auth(),
             "last_call": "",
         },
     )
@@ -132,12 +152,21 @@ async def operator_login_submit(
     next: str = Form("/activation"),
 ) -> Response:
     target = _safe_next(next)
+    per_op = activation.per_operator_auth()
     expected = activation.operator_password()
     op = (callsign or "").strip().upper()
     blocked = security.login_blocked(visits.client_ip(request))
     error = None
     if blocked:
         error = _("Trop de tentatives échouées : réessaie dans 15 minutes.")
+    elif per_op:
+        # Compte créé à la première connexion ; validation éventuelle par un admin.
+        error = {
+            "invalid": _("Indicatif invalide"),
+            "bad": _("Mot de passe incorrect"),
+            "pending": _("Compte en attente de validation par un administrateur."),
+            "disabled": _("Compte désactivé : voir un administrateur."),
+        }.get(activation.operator_login(op, password))
     elif not activation.valid_callsign(op):
         error = _("Indicatif invalide")
     elif not expected:
@@ -148,14 +177,16 @@ async def operator_login_submit(
     if not blocked:
         visits.record_auth(request, "operator", op, error is None)
     if error is None:
-        # L'indicatif rejoint le roster et devient l'opérateur courant.
-        try:
-            activation.add_operator(op)
-        except ValueError:
-            pass
+        # Mot de passe commun : l'indicatif rejoint le roster (en mode comptes,
+        # operator_login l'a déjà fait, avec son mot de passe).
+        if not per_op:
+            try:
+                activation.add_operator(op)
+            except ValueError:
+                pass
         resp = RedirectResponse(target, status_code=303)
         resp.set_cookie(
-            activation.OP_COOKIE, activation.make_op_token(),
+            activation.OP_COOKIE, activation.make_op_token(op if per_op else ""),
             httponly=True, samesite="lax", max_age=activation.OP_TOKEN_TTL, path="/activation",
             secure=security.is_https(request),
         )
@@ -176,7 +207,8 @@ async def operator_login_submit(
             "station": activation.current_station(),
             "next": target,
             "error": error,
-            "configured": bool(expected),
+            "configured": bool(expected) or per_op,
+            "per_operator": per_op,
             "last_call": op,
         },
         status_code=429 if blocked else 401,
@@ -300,6 +332,11 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             show_contacts=activation.show_contacts(),
             show_map_stats=activation.show_map_stats(),
             callbook=activation.callbook_progress(),
+            per_operator_auth=activation.per_operator_auth(),
+            operator_approval=activation.operator_approval(),
+            accounts=activation.list_operators(active_only=False),
+            au_flash=request.query_params.get("au"),
+            ac_flash=request.query_params.get("ac"),
             qrz_account=activation.qrz_account(),
             qz_flash=request.query_params.get("qz"),
             scoring=activation.get_scoring(),
@@ -343,6 +380,53 @@ async def change_flags(
     activation.set_flag("show_contacts", bool(show_contacts))
     activation.set_flag("show_map_stats", bool(show_map_stats))
     return RedirectResponse("/activation/settings?fl=ok", status_code=303)
+
+
+@router.post("/settings/auth")
+async def change_auth_mode(
+    request: Request, per_operator: str = Form(""), approval: str = Form(""),
+) -> Response:
+    """Mot de passe commun ou un mot de passe par opérateur (+ validation)."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    activation.set_flag("per_operator_auth", bool(per_operator))
+    activation.set_flag("operator_approval", bool(approval))
+    return RedirectResponse("/activation/settings?au=ok#comptes", status_code=303)
+
+
+@router.post("/settings/operators/{call}")
+async def manage_operator(
+    request: Request, call: str, action: str = Form(""), password: str = Form(""),
+) -> Response:
+    """Gestion d'un compte opérateur (admin) : validation, droits, mot de passe."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    cs = (call or "").strip().upper()
+    me = _session_op(request)
+    flash = "ok"
+    try:
+        if action == "approve":
+            activation.approve_operator(cs)
+        elif action in ("admin", "unadmin"):
+            # Un administrateur ne peut pas se retirer ses propres droits par mégarde.
+            if action == "unadmin" and cs == me:
+                flash = "self"
+            else:
+                activation.set_operator_admin(cs, action == "admin")
+        elif action in ("enable", "disable"):
+            if action == "disable" and cs == me:
+                flash = "self"
+            else:
+                activation.set_operator_active(cs, action == "enable")
+        elif action == "password":
+            activation.set_operator_password_for(cs, password)
+        elif action == "forget":
+            activation.clear_operator_password(cs)
+        else:
+            flash = "unknown"
+    except ValueError:
+        flash = "error"
+    return RedirectResponse(f"/activation/settings?ac={flash}#comptes", status_code=303)
 
 
 @router.post("/settings/qrz")
@@ -987,6 +1071,7 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
             "slots": activation.future_slots(cs),
             "live": activation.live_slots(cs),
             "past": activation.past_slots(cs),
+            "slot_qsos": activation.slot_qso_counts(cs),
             "recent": activation.list_contacts(limit=50, station=cs),
             "search": search,
             "search_call": call.strip().upper(),

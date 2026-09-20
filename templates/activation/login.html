@@ -17,13 +17,13 @@
           <input type="text" name="callsign" value="{{ last_call|default('') }}" required autofocus
                  autocapitalize="characters" autocomplete="username" placeholder="F4XXX">
         </label>
-        <label>{{ _("Mot de passe opérateurs") }}
+        <label>{% if per_operator %}{{ _("Votre mot de passe") }}{% else %}{{ _("Mot de passe opérateurs") }}{% endif %}
           <input type="password" name="password" required autocomplete="current-password">
         </label>
         <input type="hidden" name="next" value="{{ next }}">
         <button type="submit">{{ _("Entrer") }}</button>
       </form>
-      <p class="act-muted">{{ _("Votre indicatif sera ajouté à la liste des opérateurs. Le mot de passe est commun aux opérateurs autorisés à activer {call}.", call=callsign) }}</p>
+      <p class="act-muted">{% if per_operator %}{{ _("Première connexion : indiquez votre indicatif et choisissez votre mot de passe, le compte est créé aussitôt.") }}{% else %}{{ _("Votre indicatif sera ajouté à la liste des opérateurs. Le mot de passe est commun aux opérateurs autorisés à activer {call}.", call=callsign) }}{% endif %}</p>
     </div>
   </div>
 </section>

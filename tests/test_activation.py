@@ -1351,3 +1351,164 @@ def test_language_switch_cookie_and_fallbacks() -> None:
     r = TestClient(app).post("/activation/login", data={"callsign": "!!", "password": "x"},
                              headers={"Accept-Language": "en"})
     assert "Invalid callsign" in r.text
+
+
+# ── Comptes opérateurs (mot de passe par opérateur) ────────────────────────
+
+
+def _op_client() -> TestClient:
+    return TestClient(app, follow_redirects=False)
+
+
+def _login(client: TestClient, call: str, password: str):
+    return client.post("/activation/login", data={"callsign": call, "password": password})
+
+
+def test_password_hashing_never_stores_clear_text() -> None:
+    h = activation.hash_password("s3cret")
+    assert "s3cret" not in h and h.startswith("pbkdf2_sha256$")
+    assert activation.verify_password("s3cret", h) and not activation.verify_password("s3cre", h)
+    assert not activation.verify_password("s3cret", "") and not activation.verify_password("s3cret", "bidon")
+
+
+def test_per_operator_account_is_created_at_first_login() -> None:
+    activation.set_flag("per_operator_auth", True)
+    client = _op_client()
+    r = _login(client, "f5abc", "motdepasse")
+    assert r.status_code == 303
+    acc = activation.get_operator("F5ABC")
+    assert acc["status"] == "active" and acc["active"] == 1 and acc["is_admin"] == 0
+    assert acc["password_hash"] and "motdepasse" not in acc["password_hash"]
+    assert client.get("/activation").status_code == 200          # session ouverte
+    # Mot de passe faux, puis bon : le compte reste celui créé.
+    other = _op_client()
+    bad = _login(other, "F5ABC", "autre")
+    assert bad.status_code == 401 and "Mot de passe incorrect" in bad.text
+    assert other.get("/activation").status_code == 303
+    assert _login(other, "F5ABC", "motdepasse").status_code == 303
+    assert other.get("/activation").status_code == 200
+
+
+def test_new_account_waits_for_approval_when_enabled() -> None:
+    activation.set_flag("per_operator_auth", True)
+    activation.set_flag("operator_approval", True)
+    client = _op_client()
+    r = _login(client, "F5NEW", "pw")
+    assert r.status_code == 401 and "en attente de validation" in r.text
+    assert activation.get_operator("F5NEW")["status"] == "pending"
+    assert client.get("/activation").status_code == 303          # pas de session
+    # Le même mot de passe reste refusé tant que l'admin n'a pas validé.
+    assert _login(client, "F5NEW", "pw").status_code == 401
+    activation.approve_operator("F5NEW")
+    assert _login(client, "F5NEW", "pw").status_code == 303
+    assert client.get("/activation").status_code == 200
+
+
+def test_roster_operator_sets_password_without_approval() -> None:
+    """Ajouté par un admin : déjà approuvé, il choisit juste son mot de passe."""
+    activation.set_flag("per_operator_auth", True)
+    activation.set_flag("operator_approval", True)
+    activation.add_operator("F5ROS", "Jean")
+    assert _login(_op_client(), "F5ROS", "pw").status_code == 303
+    acc = activation.get_operator("F5ROS")
+    assert acc["status"] == "active" and acc["name"] == "Jean"
+
+
+def test_operator_admin_reaches_settings_but_not_site_stats(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("per_operator_auth", True)
+    op = _op_client()
+    _login(op, "F5OP", "pw")
+    assert op.get("/activation/settings").status_code == 303     # simple opérateur
+    activation.set_operator_admin("F5OP", True)
+    page = op.get("/activation/settings")
+    assert page.status_code == 200 and "Comptes opérateurs" in page.text
+    # Encart réservé à l'admin principal (journal des visites du site, ou des
+    # connexions dans l'application autonome) : invisible pour un admin du club.
+    site_page = _private_client().get("/activation/settings").text
+    reserved = [t for t in ("Fréquentation du site", "Connexions") if t in site_page]
+    assert reserved, "encart réservé à l'admin introuvable"
+    for title in reserved:
+        assert title not in page.text
+    # Il peut gérer les comptes…
+    assert op.post("/activation/settings/operators/F5ABC", data={"action": "admin"}).status_code == 303
+    # …mais pas se retirer ses propres droits.
+    r = op.post("/activation/settings/operators/F5OP", data={"action": "unadmin"})
+    assert r.headers["location"].endswith("ac=self#comptes")
+    assert activation.operator_is_admin("F5OP")
+
+
+def test_disabled_account_loses_its_session() -> None:
+    activation.set_flag("per_operator_auth", True)
+    client = _op_client()
+    _login(client, "F5OFF", "pw")
+    assert client.get("/activation").status_code == 200
+    activation.set_operator_active("F5OFF", False)
+    assert client.get("/activation").status_code == 303          # session invalidée
+    assert _login(client, "F5OFF", "pw").status_code == 401      # et connexion refusée
+    activation.set_operator_active("F5OFF", True)
+    assert _login(client, "F5OFF", "pw").status_code == 303
+
+
+def test_session_token_is_bound_to_its_callsign() -> None:
+    activation.set_flag("per_operator_auth", True)
+    _login(_op_client(), "F5BOB", "pw")
+    # Jeton du mot de passe commun (sans indicatif) : refusé en mode comptes.
+    shared = TestClient(app, follow_redirects=False)
+    shared.cookies.set(activation.OP_COOKIE, activation.make_op_token())
+    assert shared.get("/activation").status_code == 303
+    # Jeton d'un compte inexistant, ou signature d'un autre indicatif : refusés.
+    forged = TestClient(app, follow_redirects=False)
+    forged.cookies.set(activation.OP_COOKIE, activation.make_op_token("F5GHOST"))
+    assert forged.get("/activation").status_code == 303
+    token = activation.make_op_token("F5BOB")
+    assert activation.session_operator(token) == "F5BOB"
+    assert activation.op_session(token.replace("F5BOB", "F5EVE")) is None
+
+
+def test_admin_resets_and_clears_operator_password() -> None:
+    activation.set_flag("per_operator_auth", True)
+    _login(_op_client(), "F5RST", "ancien")
+    activation.set_operator_password_for("F5RST", "nouveau")
+    assert _login(_op_client(), "F5RST", "ancien").status_code == 401
+    assert _login(_op_client(), "F5RST", "nouveau").status_code == 303
+    activation.clear_operator_password("F5RST")                  # oubli : nouveau choix libre
+    assert _login(_op_client(), "F5RST", "tout-neuf").status_code == 303
+    with pytest.raises(ValueError):
+        activation.set_operator_password_for("F5RST", "")
+    with pytest.raises(ValueError):
+        activation.set_operator_admin("F5NOPE", True)
+
+
+def test_shared_password_mode_is_unchanged() -> None:
+    activation.set_operator_password("commun")
+    client = _op_client()
+    assert _login(client, "F5CLA", "commun").status_code == 303
+    assert client.get("/activation").status_code == 200
+    assert "F5CLA" in {o["callsign"] for o in activation.list_operators()}
+    assert not activation.get_operator("F5CLA")["password_hash"]
+
+
+def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
+    sid = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
+    other = activation.add_slot("F5RRO", "2026-09-07T10:00", "2026-09-07T12:00", "40M", "CW")
+    activation.add_operator("F5RRO")
+    def qso(call, op="F4IOZ", band="20M", mode="SSB", time_on="1030"):
+        activation.add_contact(call=call, band=band, mode=mode, operator_call=op,
+                               qso_date="20260907", time_on=time_on)
+    qso("DL1ABC"); qso("DL2ABC", time_on="1159")
+    qso("DL3ABC", time_on="1200")          # après la fin
+    qso("DL4ABC", time_on="0959")          # avant le début
+    qso("DL5ABC", band="40M")              # autre bande
+    qso("DL6ABC", mode="CW")               # autre mode
+    qso("DL7ABC", op="F5RRO")              # autre opérateur
+    qso("DL8ABC", op="F5RRO", band="40M", mode="CW")
+    counts = activation.slot_qso_counts()
+    assert counts[sid] == 2 and counts[other] == 1
+    admin = _private_client()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(auth_mod, "auth_password", lambda: "secret")
+        planning = admin.get("/activation/planning").text
+    assert ">2</td>" in planning or ">2<" in planning
+    _public()
+    assert "2 QSO" in TestClient(app).get("/tm25test").text
