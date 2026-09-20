@@ -2015,3 +2015,80 @@ def test_rate_panel_is_shown_on_the_log_page(monkeypatch) -> None:
 
 def test_rate_panel_needs_the_operator_area() -> None:
     assert TestClient(app, follow_redirects=False).get("/activation/rate").status_code == 303
+
+
+# ── Spots : la station entendue, pas le spotteur ───────────────────────────
+
+
+class _FakeResponse:
+    def __init__(self, payload=None, text: str = "") -> None:
+        self._payload, self.text = payload, text
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def test_dxwatch_asks_for_the_spotted_station(monkeypatch) -> None:
+    """Le filtre est cdx (le DX) : cde donnerait les spots ENVOYÉS par l'indicatif,
+    ce qu'une station spéciale ne fait jamais — le panneau restait vide."""
+    from app import dx_spots
+
+    seen = {}
+
+    def fake_get(url, params=None, **_kw):
+        seen.update(params or {})
+        # [spotteur, fréquence, DX, commentaire, horodatage, âge en secondes, …]
+        return _FakeResponse({"s": {
+            "1": ["ON4ZD", 7188, "TM25TEST", "SES last hours", "1705z 20 Sep", 300, 12, 0],
+            "2": ["TM25TEST", 14074, "DL1ABC", "spot envoyé par nous", "1706z 20 Sep", 240, 22, 0],
+        }})
+
+    monkeypatch.setattr(dx_spots.httpx, "get", fake_get)
+    dx_spots.clear_cache()
+    spots = dx_spots.recent_spots("TM25TEST", force=True)
+    assert seen.get("cdx") == "TM25TEST" and "cde" not in seen
+    assert len(spots) == 1                      # le spot que NOUS avons envoyé ne compte pas
+    spot = spots[0]
+    assert spot["dx"] == "TM25TEST" and spot["spotter"] == "ON4ZD"
+    assert spot["freq_khz"] == 7188 and spot["band"] == "40M"
+    assert spot["age_min"] == 5 and spot["comment"] == "SES last hours"
+    dx_spots.clear_cache()
+
+
+def test_old_spots_are_dropped(monkeypatch) -> None:
+    from app import dx_spots
+
+    def fake_get(url, params=None, **_kw):
+        return _FakeResponse({"s": {
+            "1": ["ON4ZD", 7188, "TM25TEST", "hier", "1705z 19 Sep", 30 * 3600, 12, 0],
+        }})
+
+    monkeypatch.setattr(dx_spots.httpx, "get", fake_get)
+    dx_spots.clear_cache()
+    assert dx_spots.recent_spots("TM25TEST", force=True) == []   # « suis-je spotté ? » = maintenant
+    dx_spots.clear_cache()
+
+
+def test_hamqth_fallback_reads_its_own_format(monkeypatch) -> None:
+    from app import dx_spots
+
+    when = (datetime.now(timezone.utc) - timedelta(minutes=7)).strftime("%H%M %Y-%m-%d")
+    lignes = "\n".join([
+        f"TM25TEST^7188.0^ON4ZD^SES last hours^{when}^L^^EU^40M^France^42",
+        f"DL1ABC^14074.0^TM25TEST^spot envoyé par nous^{when}^^^EU^20M^Germany^7",
+    ])
+
+    def fake_get(url, params=None, **_kw):
+        if "dxwatch" in url:
+            raise OSError("dxwatch indisponible")
+        return _FakeResponse(text=lignes)
+
+    monkeypatch.setattr(dx_spots.httpx, "get", fake_get)
+    dx_spots.clear_cache()
+    spots = dx_spots.recent_spots("TM25TEST", force=True)
+    assert len(spots) == 1 and spots[0]["spotter"] == "ON4ZD"
+    assert spots[0]["age_min"] in (6, 7, 8) and spots[0]["band"] == "40M"
+    dx_spots.clear_cache()
