@@ -26,7 +26,7 @@ VERSION="$(cat "$SRC_DIR/VERSION")"
 MARKER=".tm-activation"
 STATE="install.env"
 CODE_ITEMS=(app templates static tests deploy docs requirements.txt requirements-dev.txt pytest.ini
-            VERSION BUILD_INFO README.md LICENSE config.yml.example install.sh)
+            VERSION BUILD_INFO README.md README.en.md LICENSE config.yml.example install.sh)
 BOXES=(freebox livebox sfr bbox autre)
 
 RE_CALL='^[A-Z0-9]{3,10}(/[A-Z0-9]{1,4})?$'
@@ -54,7 +54,80 @@ CALLSIGN="" LABEL="" GRID="" PUBLIC="0" CLUB_CALLSIGN="" CLUB_NAME="" CLUB_CITY=
 BASE_URL="" OPERATORS="" ADMIN_PASSWORD="" OPERATOR_PASSWORD="" QRZ_USER="" QRZ_PASSWORD="" TRUSTED_PROXIES=""
 MDNS_NAME="$(hostname 2>/dev/null | tr '[:upper:]' '[:lower:]')"   # adresse <nom>.local
 
+# ── Langue de l'interface ───────────────────────────────────────────────────
+# Les textes sont écrits en français dans le script ; deploy/lang/<code>.sh
+# donne leur traduction (MSG["texte français"]="texte traduit"). Un texte sans
+# traduction reste en français. Choix : --lang / TM_LANG / install.env, sinon
+# première question. Les valeurs variables passent par {1}, {2}…
+UI_LANG="${TM_LANG:-}" CLI_LANG="" PREV_UI_LANG=""
+declare -A MSG=()
+
+t() {  # t "texte français" [valeur de {1}, de {2}…]
+  # Les espaces d'alignement en tête ne font pas partie de la clé.
+  local raw="$1" lead m i=1 a
+  shift
+  lead="${raw%%[! ]*}"
+  m="${raw#"$lead"}"
+  m="${MSG[$m]:-$m}"
+  for a in "$@"; do m="${m//\{$i\}/$a}"; i=$((i + 1)); done
+  printf '%s' "$lead$m"
+}
+
+load_lang() {
+  MSG=()
+  if [[ -n $UI_LANG && $UI_LANG != fr && -f $SRC_DIR/deploy/lang/$UI_LANG.sh ]]; then
+    # shellcheck disable=SC1090
+    source "$SRC_DIR/deploy/lang/$UI_LANG.sh"
+  fi
+}
+
+ask_lang() {  # première question, avant tout le reste (rien n'est traduit encore)
+  local choice
+  if [[ -n $UI_LANG ]]; then load_lang; return 0; fi
+  if [[ $INTERACTIVE != yes ]]; then UI_LANG="fr"; return 0; fi
+  echo
+  say "  1) Français"
+  say "  2) English"
+  read -r -p "  Langue / Language [1] : " choice || true
+  case "${choice,,}" in 2|en|english|e) UI_LANG="en" ;; *) UI_LANG="fr" ;; esac
+  load_lang
+}
+
 usage() {
+  if [[ $UI_LANG == en ]]; then
+    cat <<EOF
+TM Activation $VERSION — guided install / update
+
+Usage: sudo ./install.sh [options]
+
+No option: guided install (questions, then a summary before anything is changed).
+
+Mode:
+  --lan               local network (Raspberry Pi, radio club, portable):
+                      listens on port 80, address http://<hostname>.local
+  --domain DOMAIN     Internet: nginx installed and configured for DOMAIN
+  --email EMAIL       with --domain: Let's Encrypt HTTPS certificate
+  --box NAME          your Internet router (${BOXES[*]}): tailored help
+  --tunnel            Internet through Cloudflare Tunnel (with --domain): no port
+                      opened on the router, HTTPS provided by Cloudflare
+  --tunnel-name NAME  Cloudflare tunnel name (default: from the domain)
+  --manual            advanced: listens on 127.0.0.1:8000, reverse proxy is up to you
+
+Other options:
+  --check             check the installation (nothing is changed)
+  --dir DIR           installation folder             (default: /opt/tm-activation)
+  --user USER         system account of the service   (default: tmact)
+  --service NAME      systemd service name            (default: tm-activation)
+  --host IP           listen address                  (default: depends on mode)
+  --port PORT         listen port                     (default: depends on mode)
+  --python BIN        Python interpreter >= 3.11      (default: python3)
+  --lang fr|en        language of this installer      (default: asked)
+  --no-systemd        no service (install without root, for a try or development)
+  --non-interactive   no question: values read from the TM_* variables (see README)
+  -h, --help          this help
+EOF
+    return 0
+  fi
   cat <<EOF
 TM Activation $VERSION — installation guidée / mise à jour
 
@@ -81,6 +154,7 @@ Autres options :
   --host IP           adresse d'écoute                (défaut selon le mode)
   --port PORT         port d'écoute                   (défaut selon le mode)
   --python BIN        interpréteur Python ≥ 3.11      (défaut : python3)
+  --lang fr|en        langue de cet installeur        (défaut : demandée)
   --no-systemd        pas de service (installation sans root, essai, développement)
   --non-interactive   aucune question : valeurs lues dans les variables TM_* (voir README)
   -h, --help          cette aide
@@ -89,41 +163,47 @@ EOF
 
 # ── Affichage et saisie ─────────────────────────────────────────────────────
 
-die()   { echo "ERREUR : $*" >&2; exit 1; }
-warn()  { echo "  ATTENTION : $*" >&2; }
-info()  { echo "==> $*"; }
-title() { echo; echo "── $* ──"; }
+die()   { echo "$(t "ERREUR :") $(t "$*")" >&2; exit 1; }
+warn()  { echo "  $(t "ATTENTION :") $(t "$*")" >&2; }
+info()  { echo "==> $(t "$*")"; }
+title() { echo; echo "── $(t "$*") ──"; }
+say()   { echo "  $(t "$@")"; }   # ligne de texte courante (2 espaces d'indentation)
 line() {  # libellé aligné sur 24 caractères (accents comptés comme une lettre)
-  local LC_ALL=C.UTF-8 pad
-  pad=$((24 - ${#1}))
+  local LC_ALL=C.UTF-8 pad lbl
+  lbl="$(t "$1")"
+  pad=$((24 - ${#lbl}))
   if (( pad < 1 )); then pad=1; fi
-  printf '  %s%*s %s\n' "$1" "$pad" "" "$2"
+  printf '  %s%*s %s\n' "$lbl" "$pad" "" "$2"
 }
 
 ask() {  # ask VAR "Question" [défaut]
-  local __var=$1 __q=$2 __def=${3:-} __ans
+  local __var=$1 __q __def=${3:-} __ans
+  __q="$(t "$2")"
   read -r -p "  $__q${__def:+ [$__def]} : " __ans || true
   printf -v "$__var" '%s' "${__ans:-$__def}"
 }
 ask_secret() {  # ask_secret VAR "Question"
-  local __var=$1 __q=$2 __ans
+  local __var=$1 __q __ans
+  __q="$(t "$2")"
   read -r -s -p "  $__q : " __ans || true; echo
   printf -v "$__var" '%s' "$__ans"
 }
 ask_password() {  # ask_password VAR "Question" : saisi deux fois, vide autorisé
-  local __var=$1 __q=$2 __a __b
+  local __var=$1 __q __a __b
+  __q="$(t "$2")"
   while :; do
     read -r -s -p "  $__q : " __a || true; echo
     if [[ -z $__a ]]; then printf -v "$__var" '%s' ""; return 0; fi
-    read -r -s -p "  Confirmer : " __b || true; echo
+    read -r -s -p "  $(t "Confirmer") : " __b || true; echo
     if [[ $__a == "$__b" ]]; then printf -v "$__var" '%s' "$__a"; return 0; fi
-    echo "  Les deux saisies diffèrent, recommencez."
+    say "Les deux saisies diffèrent, recommencez."
   done
 }
 confirm() {  # confirm "Question" [o|n] → 0 si oui
   local __ans __def=${2:-o} __hint="O/n"
-  if [[ $__def == n ]]; then __hint="o/N"; fi
-  read -r -p "  $1 [$__hint] : " __ans || true
+  if [[ $UI_LANG == en ]]; then __hint="Y/n"; fi
+  if [[ $__def == n ]]; then __hint="${__hint,,}"; __hint="${__hint^^n}"; fi
+  read -r -p "  $(t "$1") [$__hint] : " __ans || true
   __ans="${__ans:-$__def}"
   [[ ${__ans,,} == o* || ${__ans,,} == y* ]]
 }
@@ -132,19 +212,20 @@ pause() {  # pause ["message"]
   # comme un début de citation.
   local __ans __msg="Entrée quand c'est fait…"
   if [[ $# -gt 0 ]]; then __msg=$1; fi
-  read -r -p "  $__msg " __ans || true
+  read -r -p "  $(t "$__msg") " __ans || true
 }
 menu() {  # menu VAR "Question" défaut "choix 1" "choix 2"… → VAR = numéro choisi
-  local __var=$1 __q=$2 __def=$3 __i=1 __opt __ans
+  local __var=$1 __q __def=$3 __i=1 __opt __ans
+  __q="$(t "$2")"
   shift 3
-  for __opt in "$@"; do echo "    $__i) $__opt"; __i=$((__i + 1)); done
+  for __opt in "$@"; do echo "    $__i) $(t "$__opt")"; __i=$((__i + 1)); done
   while :; do
     read -r -p "  $__q [$__def] : " __ans || true
     __ans="${__ans:-$__def}"
     if [[ $__ans =~ ^[0-9]+$ ]] && (( __ans >= 1 && __ans <= $# )); then
       printf -v "$__var" '%s' "$__ans"; return 0
     fi
-    echo "  Choix invalide."
+    say "Choix invalide."
   done
 }
 in_list() { local x=$1 y; shift; for y in "$@"; do if [[ $x == "$y" ]]; then return 0; fi; done; return 1; }
@@ -173,12 +254,12 @@ dns_ok() {  # le domaine pointe vers l'adresse publique, sans AAAA
 }
 dns_explain() {
   if [[ -z $NC_DNS_A ]]; then
-    echo "  $DOMAIN n'existe pas encore dans le DNS (création récente ? faute de frappe ?)."
+    say "{1} n'existe pas encore dans le DNS (création récente ? faute de frappe ?)." "$DOMAIN"
   elif [[ -n $NC_PUBLIC_IP && ",$NC_DNS_A," != *",$NC_PUBLIC_IP,"* ]]; then
-    echo "  $DOMAIN pointe vers $NC_DNS_A au lieu de $NC_PUBLIC_IP."
+    say "{1} pointe vers {2} au lieu de {3}." "$DOMAIN" "$NC_DNS_A" "$NC_PUBLIC_IP"
   fi
   if [[ -n $NC_DNS_AAAA ]]; then
-    echo "  Enregistrement AAAA (IPv6) présent : $NC_DNS_AAAA — à supprimer."
+    say "Enregistrement AAAA (IPv6) présent : {1} — à supprimer." "$NC_DNS_AAAA"
   fi
   return 0
 }
@@ -196,48 +277,84 @@ box_url() {
     freebox) echo "http://mafreebox.freebox.fr" ;;
     livebox|sfr) echo "http://192.168.1.1" ;;
     bbox) echo "https://mabbox.bytel.fr" ;;
-    *) echo "adresse indiquée sous la box" ;;
+    *) t "adresse indiquée sous la box"; echo ;;
   esac
 }
 help_dhcp() {
-  local mac="${NC_MAC:-<adresse MAC du Pi>}" ip="${NC_LOCAL_IP:-<adresse du Pi>}"
+  local mac="${NC_MAC:-$(t "<adresse MAC du Pi>")}" ip="${NC_LOCAL_IP:-$(t "<adresse du Pi>")}"
   case "$BOX" in
-    freebox) cat <<EOF
+    freebox)
+      if [[ $UI_LANG == en ]]; then cat <<EOF
+  Freebox OS -> Paramètres de la Freebox -> mode avancé -> DHCP -> tab
+  « Baux statiques » -> « Ajouter un bail DHCP statique » (the Freebox
+  interface is in French):
+      MAC address : $mac
+      IP address  : $ip
+      Comment     : TM Activation
+EOF
+      else cat <<EOF
   Freebox OS → Paramètres de la Freebox → mode avancé → DHCP → onglet
   « Baux statiques » → « Ajouter un bail DHCP statique » :
       Adresse MAC : $mac
       Adresse IP  : $ip
       Commentaire : TM Activation
 EOF
-    ;;
-    livebox) echo "  $(box_url) → Paramètres avancés → Réseau → DHCP → bail statique : $mac → $ip" ;;
-    sfr) echo "  $(box_url) → Réseau v4 → DHCP → attribution statique : $mac → $ip" ;;
-    bbox) echo "  $(box_url) → rubrique DHCP → adresse réservée : $mac → $ip" ;;
-    *) echo "  Interface de la box → DHCP → bail statique (réservation) : $mac → $ip" ;;
+      fi ;;
+    livebox) say "{1} → Paramètres avancés → Réseau → DHCP → bail statique : {2} → {3}" "$(box_url)" "$mac" "$ip" ;;
+    sfr) say "{1} → Réseau v4 → DHCP → attribution statique : {2} → {3}" "$(box_url)" "$mac" "$ip" ;;
+    bbox) say "{1} → rubrique DHCP → adresse réservée : {2} → {3}" "$(box_url)" "$mac" "$ip" ;;
+    *) say "Interface de la box → DHCP → bail statique (réservation) : {1} → {2}" "$mac" "$ip" ;;
   esac
 }
 help_ipv4() {
   case "$BOX" in
-    freebox) cat <<EOF
+    freebox)
+      if [[ $UI_LANG == en ]]; then cat <<EOF
+  Free sometimes shares one IPv4 address between several subscribers: ports 80
+  and 443 are then unreachable. To check: your Free account area -> Ma Freebox
+  -> « Demander une adresse IP fixe V4 full-stack ». The page says whether you
+  already have one; otherwise ask for it (free of charge), wait for the
+  confirmation, then restart the Freebox.
+EOF
+      else cat <<EOF
   Free partage parfois une même adresse IPv4 entre plusieurs abonnés : les
   ports 80 et 443 sont alors inaccessibles. Pour vérifier : espace abonné Free
   → Ma Freebox → « Demander une adresse IP fixe V4 full-stack ». La page
   indique si c'est déjà le cas ; sinon, faites la demande (gratuite), attendez
   la confirmation, puis redémarrez la Freebox.
 EOF
-    ;;
-    *) cat <<EOF
+      fi ;;
+    *)
+      if [[ $UI_LANG == en ]]; then cat <<EOF
+  Compare with the IPv4 address shown in your $(box_label) interface: they must
+  be identical. If not, the address is shared between several subscribers: ask
+  your provider for a dedicated public IPv4 address.
+EOF
+      else cat <<EOF
   Comparez avec l'adresse IPv4 affichée dans l'interface de la $(box_label) :
   elle doit être identique. Sinon, l'adresse est partagée entre plusieurs
   abonnés : demandez à l'opérateur une adresse IPv4 publique dédiée.
 EOF
-    ;;
+      fi ;;
   esac
 }
 help_ports() {
-  local ip="${NC_LOCAL_IP:-<adresse du Pi>}"
+  local ip="${NC_LOCAL_IP:-$(t "<adresse du Pi>")}"
   case "$BOX" in
-    freebox) cat <<EOF
+    freebox)
+      if [[ $UI_LANG == en ]]; then cat <<EOF
+  Freebox OS -> Paramètres de la Freebox -> mode avancé -> Gestion des ports
+  -> « Ajouter une redirection », twice (the Freebox interface is in French):
+
+      Destination IP      Protocol    Start port      End port      Destination port
+      $(printf '%-19s' "$ip") TCP         80              80            80
+      $(printf '%-19s' "$ip") TCP         443             443           443
+
+  Leave « IP source » on « Toutes ». If the Freebox refuses port 443 (already
+  used by remote access to Freebox OS): Paramètres de la Freebox -> Accès à
+  distance -> change the HTTPS port of Freebox OS, then start again.
+EOF
+      else cat <<EOF
   Freebox OS → Paramètres de la Freebox → mode avancé → Gestion des ports
   → « Ajouter une redirection », deux fois :
 
@@ -249,13 +366,13 @@ help_ports() {
   (déjà pris par l'accès distant à Freebox OS) : Paramètres de la Freebox →
   Accès à distance → changez le port HTTPS de Freebox OS, puis recommencez.
 EOF
-    ;;
-    livebox) echo "  $(box_url) → Paramètres avancés → Réseau → NAT/PAT : TCP 80 → $ip:80 et TCP 443 → $ip:443" ;;
-    sfr) echo "  $(box_url) → Réseau v4 → NAT : TCP 80 → $ip:80 et TCP 443 → $ip:443" ;;
-    bbox) echo "  $(box_url) → NAT/PAT (redirection de ports) : TCP 80 → $ip:80 et TCP 443 → $ip:443" ;;
-    *) echo "  Interface de la box → redirection de ports (NAT/PAT) : TCP 80 → $ip:80 et TCP 443 → $ip:443" ;;
+      fi ;;
+    livebox) say "{1} → Paramètres avancés → Réseau → NAT/PAT : TCP 80 → {2}:80 et TCP 443 → {2}:443" "$(box_url)" "$ip" ;;
+    sfr) say "{1} → Réseau v4 → NAT : TCP 80 → {2}:80 et TCP 443 → {2}:443" "$(box_url)" "$ip" ;;
+    bbox) say "{1} → NAT/PAT (redirection de ports) : TCP 80 → {2}:80 et TCP 443 → {2}:443" "$(box_url)" "$ip" ;;
+    *) say "Interface de la box → redirection de ports (NAT/PAT) : TCP 80 → {1}:80 et TCP 443 → {1}:443" "$ip" ;;
   esac
-  echo "  Ne redirigez aucun autre port (surtout pas 22/SSH) et n'utilisez pas la DMZ."
+  say "Ne redirigez aucun autre port (surtout pas 22/SSH) et n'utilisez pas la DMZ."
 }
 
 # ── Contexte ────────────────────────────────────────────────────────────────
@@ -282,14 +399,15 @@ parse_args() {
       --python) PYTHON="${2:?}"; shift 2 ;;
       --no-systemd) USE_SYSTEMD="no"; shift ;;
       --non-interactive) INTERACTIVE="no"; shift ;;
+      --lang) CLI_LANG="${2:?--lang demande fr ou en}"; shift 2 ;;
       -h|--help) usage; exit 0 ;;
-      *) usage >&2; die "option inconnue : $1" ;;
+      *) usage >&2; die "$(t "option inconnue : {1}" "$1")" ;;
     esac
   done
   CLI_DOMAIN="${CLI_DOMAIN,,}"
   CLI_BOX="${CLI_BOX,,}"
   if [[ -n $CLI_BOX ]] && ! in_list "$CLI_BOX" "${BOXES[@]}"; then
-    die "box inconnue : $CLI_BOX (au choix : ${BOXES[*]})"
+    die "$(t "box inconnue : {1} (au choix : {2})" "$CLI_BOX" "${BOXES[*]}")"
   fi
 }
 
@@ -310,21 +428,21 @@ resolve_context() {
   DIR="${CLI_DIR:-/opt/tm-activation}"
   DIR="${DIR%/}"
   [[ $DIR == /* ]] || DIR="$(pwd)/$DIR"
-  [[ $DIR != "" && $DIR != "/" ]] || die "dossier d'installation invalide : '$DIR'"
+  [[ $DIR != "" && $DIR != "/" ]] || die "$(t "dossier d'installation invalide : {1}" "$DIR")"
   case "$DIR" in /bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var)
-    die "refus d'installer directement dans $DIR (choisir un sous-dossier, ex. /opt/tm-activation)" ;;
+    die "$(t "refus d'installer directement dans {1} (choisir un sous-dossier, ex. /opt/tm-activation)" "$DIR")" ;;
   esac
   if [[ -f $DIR/$MARKER ]]; then UPGRADE=1; fi
   # Garde-fou : ne jamais écraser un dossier qui n'est pas une installation TM Activation.
   if [[ $CHECK == 0 && $UPGRADE == 0 && -d $DIR && -n "$(ls -A "$DIR" 2>/dev/null)" ]]; then
-    die "$DIR existe, n'est pas vide et n'est pas une installation TM Activation"
+    die "$(t "{1} existe, n'est pas vide et n'est pas une installation TM Activation" "$DIR")"
   fi
 
   # Réglages de l'installation précédente (clé=valeur, lus sans exécution).
   if [[ -f $DIR/$STATE ]]; then
     while IFS='=' read -r key value; do
       case "$key" in
-        MODE|HOST|PORT|SVC_USER|SERVICE|DOMAIN|BOX|EMAIL|TUNNEL_NAME) printf -v "PREV_$key" '%s' "$value" ;;
+        MODE|HOST|PORT|SVC_USER|SERVICE|DOMAIN|BOX|EMAIL|TUNNEL_NAME|UI_LANG) printf -v "PREV_$key" '%s' "$value" ;;
       esac
     done < "$DIR/$STATE"
   fi
@@ -336,6 +454,8 @@ resolve_context() {
   BOX="${CLI_BOX:-$PREV_BOX}"
   EMAIL="${CLI_EMAIL:-$PREV_EMAIL}"
   TUNNEL_NAME="${CLI_TUNNEL_NAME:-$PREV_TUNNEL_NAME}"
+  UI_LANG="${CLI_LANG:-${UI_LANG:-$PREV_UI_LANG}}"
+  if [[ -n $UI_LANG ]] && ! in_list "$UI_LANG" fr en; then die "$(t "langue inconnue : {1} (fr ou en)" "$UI_LANG")"; fi
   return 0
 }
 
@@ -347,7 +467,7 @@ resolve_ports() {
     # interfaces garde l'accès direct depuis le réseau local.
     tunnel) def_host="0.0.0.0"; def_port="8000" ;;
     internet|manual) def_host="127.0.0.1"; def_port="8000" ;;
-    *) die "mode inconnu : $MODE" ;;
+    *) die "$(t "mode inconnu : {1}" "$MODE")" ;;
   esac
   HOST="${CLI_HOST:-${PREV_HOST:-$def_host}}"
   PORT="${CLI_PORT:-${PREV_PORT:-$def_port}}"
@@ -359,24 +479,24 @@ resolve_ports() {
 }
 
 validate() {
-  if ! [[ $PORT =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then die "port invalide : $PORT"; fi
+  if ! [[ $PORT =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then die "$(t "port invalide : {1}" "$PORT")"; fi
   if (( PORT < 1024 )) && [[ $USE_SYSTEMD != yes ]]; then
-    die "port $PORT (< 1024) : seulement avec le service systemd (root) ; sinon --port 8000"
+    die "$(t "port {1} (< 1024) : seulement avec le service systemd (root) ; sinon --port 8000" "$PORT")"
   fi
-  [[ $SERVICE =~ ^[a-zA-Z0-9_.-]+$ ]] || die "nom de service invalide : $SERVICE"
-  [[ $SVC_USER =~ ^[a-z_][a-z0-9_-]*$ ]] || die "nom de compte invalide : $SVC_USER"
+  [[ $SERVICE =~ ^[a-zA-Z0-9_.-]+$ ]] || die "$(t "nom de service invalide : {1}" "$SERVICE")"
+  [[ $SVC_USER =~ ^[a-z_][a-z0-9_-]*$ ]] || die "$(t "nom de compte invalide : {1}" "$SVC_USER")"
   if [[ $MODE == internet || $MODE == tunnel ]]; then
-    [[ $DOMAIN =~ $RE_DOMAIN ]] || die "nom de domaine invalide : '$DOMAIN'"
+    [[ $DOMAIN =~ $RE_DOMAIN ]] || die "$(t "nom de domaine invalide : {1}" "$DOMAIN")"
   fi
   if [[ $MODE == internet ]]; then
     [[ $USE_SYSTEMD == yes ]] || die "le mode Internet (nginx) demande root et systemd"
   fi
   if [[ $MODE == tunnel ]]; then
     [[ $USE_SYSTEMD == yes ]] || die "le mode Cloudflare Tunnel demande root et systemd"
-    [[ $TUNNEL_NAME == "" || $TUNNEL_NAME =~ ^[a-zA-Z0-9_-]+$ ]] || die "nom de tunnel invalide : $TUNNEL_NAME"
+    [[ $TUNNEL_NAME == "" || $TUNNEL_NAME =~ ^[a-zA-Z0-9_-]+$ ]] || die "$(t "nom de tunnel invalide : {1}" "$TUNNEL_NAME")"
   fi
   if [[ -n $EMAIL ]]; then
-    [[ $EMAIL =~ $RE_EMAIL ]] || die "e-mail invalide : $EMAIL"
+    [[ $EMAIL =~ $RE_EMAIL ]] || die "$(t "e-mail invalide : {1}" "$EMAIL")"
     [[ $MODE == internet ]] || die "--email ne sert qu'avec --domain"
   fi
   return 0
@@ -385,6 +505,19 @@ validate() {
 # ── Questions (rien n'est modifié avant le récapitulatif) ──────────────────
 
 welcome() {
+  if [[ $UI_LANG == en ]]; then
+    cat <<EOF
+
+  TM Activation $VERSION — guided install
+
+  Special callsign management: operator schedule, QSO log, ADIF and a public
+  page for hunters.
+
+  A few questions first: nothing is changed before the summary.
+  Enter = the value shown in brackets. Ctrl+C to give up.
+EOF
+    return 0
+  fi
   cat <<EOF
 
   TM Activation $VERSION — installation guidée
@@ -400,22 +533,22 @@ EOF
 ask_mode() {
   local choice
   title "Utilisation"
-  echo "  Comment TM Activation sera-t-il utilisé ?"
+  say "Comment TM Activation sera-t-il utilisé ?"
   menu choice "Choix" 2 \
-    "Réseau local : Pi ou PC au radio-club, en portable… (http://$MDNS_NAME.local)" \
+    "$(t "Réseau local : Pi ou PC au radio-club, en portable… ({1})" "http://$MDNS_NAME.local")" \
     "Internet par votre box : nom de domaine, ports 80 et 443 ouverts, HTTPS Let's Encrypt" \
     "Internet par Cloudflare Tunnel : aucun port ouvert, marche aussi en 4G ou IPv4 partagée" \
     "Avancé : écoute sur 127.0.0.1:8000, reverse proxy à votre charge"
   case "$choice" in 1) MODE="lan" ;; 2) MODE="internet" ;; 3) MODE="tunnel" ;; *) MODE="manual" ;; esac
   if [[ $MODE == internet || $MODE == tunnel ]]; then
     echo
-    echo "  Le nom de domaine doit vous appartenir : celui du club, ou un nom acheté"
-    echo "  chez un registrar (OVH, Gandi, Ionos…). Exemple : tm.mon-club.fr"
+    say "Le nom de domaine doit vous appartenir : celui du club, ou un nom acheté"
+    say "chez un registrar (OVH, Gandi, Ionos…). Exemple : tm.mon-club.fr"
     while :; do
       ask DOMAIN "Nom de domaine" "$DOMAIN"
       DOMAIN="${DOMAIN,,}"
       if [[ $DOMAIN =~ $RE_DOMAIN ]]; then break; fi
-      echo "  Nom de domaine invalide."
+      say "Nom de domaine invalide."
     done
   fi
   if [[ $MODE == internet ]]; then ask_box_email; fi
@@ -429,17 +562,17 @@ ask_box_email() {
       if [[ ${BOXES[$i]} == "$BOX" ]]; then def=$((i + 1)); fi
     done
     echo
-    echo "  Quelle box relie le Pi à Internet ? (pour afficher les bons réglages)"
+    say "Quelle box relie le Pi à Internet ? (pour afficher les bons réglages)"
     menu choice "Choix" "$def" "Freebox" "Livebox (Orange)" "SFR Box" "Bbox (Bouygues)" "Autre"
     BOX="${BOXES[$((choice - 1))]}"
   fi
   if [[ -z $EMAIL ]]; then
     echo
-    echo "  Adresse e-mail pour le certificat HTTPS Let's Encrypt (avis d'expiration)."
+    say "Adresse e-mail pour le certificat HTTPS Let's Encrypt (avis d'expiration)."
     while :; do
       ask EMAIL "E-mail (vide = HTTPS plus tard)" ""
       if [[ -z $EMAIL || $EMAIL =~ $RE_EMAIL ]]; then break; fi
-      echo "  E-mail invalide."
+      say "E-mail invalide."
     done
   fi
   ASKED=1
@@ -468,14 +601,14 @@ collect_config() {
       ask CALLSIGN "Indicatif spécial à activer (ex. TM50ABC)" "$CALLSIGN"
       CALLSIGN="${CALLSIGN^^}"
       if [[ $CALLSIGN =~ $RE_CALL && $CALLSIGN =~ [0-9] ]]; then break; fi
-      echo "  Indicatif invalide."
+      say "Indicatif invalide."
     done
     ask LABEL "Libellé de l'activation (ex. 50 ans du radio-club)" "$LABEL"
     while :; do
       ask GRID "Locator de la station (4, 6 ou 8 caractères, facultatif)" "$GRID"
       GRID="${GRID^^}"
       if [[ -z $GRID || $GRID =~ $RE_GRID ]]; then break; fi
-      echo "  Locator invalide."
+      say "Locator invalide."
     done
 
     title "Radio-club (facultatif, affiché sur les pages)"
@@ -487,13 +620,13 @@ collect_config() {
     title "Accès"
     ask BASE_URL "Adresse de ce site" "$BASE_URL"
     ask OPERATORS "Opérateurs de départ, séparés par des virgules (facultatif)" "$OPERATORS"
-    echo "  Administrateur : Réglages du site (indicatifs, mot de passe opérateurs, sauvegardes)."
+    say "Administrateur : Réglages du site (indicatifs, mot de passe opérateurs, sauvegardes)."
     ask_password ADMIN_PASSWORD "Mot de passe administrateur (vide = généré)"
-    echo "  Opérateurs : un mot de passe commun ; chacun se connecte avec son indicatif."
+    say "Opérateurs : un mot de passe commun ; chacun se connecte avec son indicatif."
     ask_password OPERATOR_PASSWORD "Mot de passe opérateurs (vide = plus tard, dans les Réglages)"
 
     title "QRZ.com (facultatif)"
-    echo "  Avec un abonnement XML, nom, locator et pays des stations contactées sont complétés."
+    say "Avec un abonnement XML, nom, locator et pays des stations contactées sont complétés."
     ask QRZ_USER "Identifiant QRZ (vide = sans QRZ)" "$QRZ_USER"
     if [[ -n $QRZ_USER ]]; then ask_secret QRZ_PASSWORD "Mot de passe QRZ"; fi
     if [[ $MODE == manual && $HOST != 127.0.0.1 && $HOST != localhost && -z $TRUSTED_PROXIES ]]; then
@@ -503,17 +636,17 @@ collect_config() {
 
   CALLSIGN="${CALLSIGN^^}"; GRID="${GRID^^}"; CLUB_CALLSIGN="${CLUB_CALLSIGN^^}"
   [[ $CALLSIGN =~ $RE_CALL && $CALLSIGN =~ [0-9] ]] || die "indicatif spécial invalide ou absent (TM_CALLSIGN)"
-  [[ -z $GRID || $GRID =~ $RE_GRID ]] || die "locator invalide : $GRID"
+  [[ -z $GRID || $GRID =~ $RE_GRID ]] || die "$(t "locator invalide : {1}" "$GRID")"
   if [[ -n $TRUSTED_PROXIES ]]; then TRUSTED_PROXIES="127.0.0.1 ::1 $TRUSTED_PROXIES"; fi
   return 0
 }
 
 mode_label() {
   case "$MODE" in
-    lan) echo "réseau local — http://$MDNS_NAME.local$PORT_SUFFIX/" ;;
-    internet) echo "Internet par la box — https://$DOMAIN/" ;;
-    tunnel) echo "Internet par Cloudflare Tunnel — https://$DOMAIN/" ;;
-    *) echo "avancé — http://$HOST:$PORT/ (reverse proxy à votre charge)" ;;
+    lan) t "réseau local — {1}" "http://$MDNS_NAME.local$PORT_SUFFIX/"; echo ;;
+    internet) t "Internet par la box — {1}" "https://$DOMAIN/"; echo ;;
+    tunnel) t "Internet par Cloudflare Tunnel — {1}" "https://$DOMAIN/"; echo ;;
+    *) t "avancé — {1} (reverse proxy à votre charge)" "http://$HOST:$PORT/"; echo ;;
   esac
 }
 
@@ -525,9 +658,9 @@ recap() {
   case "$MODE" in
     internet)
       line "Box" "$(box_label)"
-      if [[ -n $EMAIL ]]; then line "Certificat HTTPS" "$EMAIL"; else line "Certificat HTTPS" "plus tard (pas d'e-mail)"; fi ;;
+      if [[ -n $EMAIL ]]; then line "Certificat HTTPS" "$EMAIL"; else line "Certificat HTTPS" "$(t "plus tard (pas d'e-mail)")"; fi ;;
     tunnel)
-      line "Accès Internet" "Cloudflare Tunnel (aucun port ouvert sur la box)"
+      line "Accès Internet" "$(t "Cloudflare Tunnel (aucun port ouvert sur la box)")"
       line "Nom du tunnel" "$(tunnel_name)" ;;
   esac
   if [[ $FIRST_CONFIG == 1 ]]; then
@@ -535,14 +668,14 @@ recap() {
     line "Locator" "${GRID:-—}"
     line "Radio-club" "$club"
     line "Opérateurs de départ" "${OPERATORS:-—}"
-    if [[ -n $ADMIN_PASSWORD ]]; then line "Mot de passe admin" "saisi"; else line "Mot de passe admin" "généré (affiché à la fin)"; fi
-    if [[ -n $OPERATOR_PASSWORD ]]; then line "Mot de passe opérateurs" "saisi"; else line "Mot de passe opérateurs" "à définir dans les Réglages"; fi
+    if [[ -n $ADMIN_PASSWORD ]]; then line "Mot de passe admin" "$(t "saisi")"; else line "Mot de passe admin" "$(t "généré (affiché à la fin)")"; fi
+    if [[ -n $OPERATOR_PASSWORD ]]; then line "Mot de passe opérateurs" "$(t "saisi")"; else line "Mot de passe opérateurs" "$(t "à définir dans les Réglages")"; fi
     line "QRZ.com" "${QRZ_USER:-non}"
   fi
   line "Dossier" "$DIR (service $SERVICE)"
   echo
   if ! confirm "Lancer l'installation ?" o; then
-    echo "  Rien n'a été modifié."
+    say "Rien n'a été modifié."
     exit 0
   fi
 }
@@ -571,26 +704,26 @@ install_packages() {
   fi
   if (( ${#pkgs[@]} )); then
     if [[ $IS_ROOT == 1 ]] && command -v apt-get >/dev/null; then
-      info "Installation des paquets système : ${pkgs[*]}"
+      info "$(t "Installation des paquets système : {1}" "${pkgs[*]}")"
       export DEBIAN_FRONTEND=noninteractive
       apt-get update -qq
       apt-get install -y -qq --no-install-recommends "${pkgs[@]}" >/dev/null
     else
-      die "paquets manquants : ${pkgs[*]} (sudo apt install ${pkgs[*]})"
+      die "$(t "paquets manquants : {1} (sudo apt install {1})" "${pkgs[*]}")"
     fi
   fi
 }
 
 check_python() {
-  command -v "$PYTHON" >/dev/null || die "$PYTHON introuvable"
+  command -v "$PYTHON" >/dev/null || die "$(t "{1} introuvable" "$PYTHON")"
   "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' \
-    || die "Python ≥ 3.11 requis ($("$PYTHON" -V 2>&1)) : Debian 12 / Raspberry Pi OS Bookworm ou plus récent"
+    || die "$(t "Python ≥ 3.11 requis ({1}) : Debian 12 / Raspberry Pi OS Bookworm ou plus récent" "$("$PYTHON" -V 2>&1)")"
   "$PYTHON" -c 'import venv, ensurepip' 2>/dev/null || die "module venv absent (apt install python3-venv)"
 }
 
 create_account() {
   if [[ $USE_SYSTEMD == yes ]] && ! id -u "$SVC_USER" >/dev/null 2>&1; then
-    info "Création du compte système $SVC_USER"
+    info "$(t "Création du compte système {1}" "$SVC_USER")"
     useradd --system --home-dir "$DIR" --no-create-home --shell /usr/sbin/nologin "$SVC_USER"
   fi
 }
@@ -607,7 +740,7 @@ src, dst = sqlite3.connect(sys.argv[1]), sqlite3.connect(sys.argv[2])
 src.backup(dst)  # copie cohérente même si le service écrit en même temps
 dst.close(); src.close()
 PY
-    info "Base sauvegardée : var/backups/preupgrade-$stamp.sqlite"
+    info "$(t "Base sauvegardée : var/backups/preupgrade-{1}.sqlite" "$stamp")"
   fi
   if [[ "$SRC_DIR" != "$DIR" ]]; then
     info "Copie du code"
@@ -620,8 +753,9 @@ PY
   fi
   echo "$VERSION" > "$DIR/$MARKER"
   chmod 755 "$DIR/install.sh"
-  printf 'MODE=%s\nHOST=%s\nPORT=%s\nSVC_USER=%s\nSERVICE=%s\nDOMAIN=%s\nBOX=%s\nEMAIL=%s\nTUNNEL_NAME=%s\n' \
-    "$MODE" "$HOST" "$PORT" "$SVC_USER" "$SERVICE" "$DOMAIN" "$BOX" "$EMAIL" "$TUNNEL_NAME" > "$DIR/$STATE"
+  printf 'MODE=%s\nHOST=%s\nPORT=%s\nSVC_USER=%s\nSERVICE=%s\nDOMAIN=%s\nBOX=%s\nEMAIL=%s\nTUNNEL_NAME=%s\nUI_LANG=%s\n' \
+    "$MODE" "$HOST" "$PORT" "$SVC_USER" "$SERVICE" "$DOMAIN" "$BOX" "$EMAIL" "$TUNNEL_NAME" "${UI_LANG:-fr}" \
+    > "$DIR/$STATE"
 }
 
 install_venv() {
@@ -688,8 +822,7 @@ install_service() {
   # Port pris par autre chose que ce service (ex. nginx après un passage Internet → réseau local).
   if command -v ss >/dev/null && [[ -n "$(ss -Hltn "sport = :$PORT" 2>/dev/null)" ]] \
      && ! { systemctl is-active --quiet "$SERVICE" && [[ $OLD_PORT == "$PORT" ]]; }; then
-    die "le port $PORT est déjà utilisé par un autre programme (sudo ss -ltnp 'sport = :$PORT') ;" \
-        "si c'est nginx devenu inutile : sudo systemctl disable --now nginx — sinon choisir --port"
+    die "$(t "le port {1} est déjà utilisé par un autre programme (sudo ss -ltnp 'sport = :{1}') ; si c'est nginx devenu inutile : sudo systemctl disable --now nginx — sinon choisir --port" "$PORT")"
   fi
   if (( PORT < 1024 )); then caps="CAP_NET_BIND_SERVICE"; fi
   case "$DIR" in /home/*|/root/*) protect_home="read-only" ;; esac
@@ -700,38 +833,38 @@ install_service() {
   systemctl daemon-reload
   systemctl enable --quiet "$SERVICE"
   systemctl restart "$SERVICE"
-  info "Service $SERVICE (re)démarré, vérification…"
-  health || die "le service ne répond pas sur $HOST:$PORT — voir : journalctl -u $SERVICE -n 50"
+  info "$(t "Service {1} (re)démarré, vérification…" "$SERVICE")"
+  health || die "$(t "le service ne répond pas sur {1}:{2} — voir : journalctl -u {3} -n 50" "$HOST" "$PORT" "$SERVICE")"
   info "Le service répond"
 }
 
 # ── Mode Internet : box, DNS, nginx, HTTPS ──────────────────────────────────
 
-guide_step() { echo; echo "  [$1/4] $2"; echo "  ──────────────────────────────────────────"; }
+guide_step() { echo; echo "  [$1/4] $(t "$2")"; echo "  ──────────────────────────────────────────"; }
 
 network_guide() {
   local choice
-  title "Réglage de la $(box_label) et du nom de domaine"
-  echo "  Quatre réglages, à faire une seule fois. Ouvrez l'interface de la"
-  echo "  $(box_label) dans un navigateur : $(box_url)"
-  echo "  (les intitulés peuvent varier un peu selon la version de la box)."
+  title "$(t "Réglage de la {1} et du nom de domaine" "$(box_label)")"
+  say "Quatre réglages, à faire une seule fois. Ouvrez l'interface de la"
+  say "{1} dans un navigateur : {2}" "$(box_label)" "$(box_url)"
+  say "(les intitulés peuvent varier un peu selon la version de la box)."
 
   guide_step 1 "Adresse fixe du Pi sur le réseau local"
   netcheck local
   if [[ -n $NC_LOCAL_IP ]]; then
-    echo "  Ce Pi : adresse $NC_LOCAL_IP, carte réseau ${NC_IFACE:-?}, adresse MAC ${NC_MAC:-?}."
+    say "Ce Pi : adresse {1}, carte réseau {2}, adresse MAC {3}." "$NC_LOCAL_IP" "${NC_IFACE:-?}" "${NC_MAC:-?}"
     if [[ $NC_IFACE == wlan* ]]; then warn "le Pi passe par le Wi-Fi : le câble Ethernet est plus fiable."; fi
   else
     warn "adresse locale introuvable : le câble réseau est-il branché ?"
   fi
-  echo "  Réservez cette adresse, pour que la box la donne toujours au Pi :"
+  say "Réservez cette adresse, pour que la box la donne toujours au Pi :"
   help_dhcp
   pause
 
   guide_step 2 "Adresse IPv4 publique de la connexion"
   netcheck public
   if [[ -n $NC_PUBLIC_IP ]]; then
-    echo "  Adresse publique vue d'Internet : $NC_PUBLIC_IP"
+    say "Adresse publique vue d'Internet : {1}" "$NC_PUBLIC_IP"
   else
     warn "Internet est injoignable depuis le Pi."
   fi
@@ -740,24 +873,24 @@ network_guide() {
   if ! confirm "La $(box_label) a-t-elle une adresse IPv4 à elle (full-stack) ?" o; then
     SHARED_IP=1
     warn "sans adresse IPv4 dédiée, les chasseurs ne pourront pas joindre le Pi."
-    echo "  L'installation se termine ; une fois l'adresse obtenue, relancez : sudo ./install.sh"
+    say "L'installation se termine ; une fois l'adresse obtenue, relancez : sudo ./install.sh"
     return 0
   fi
 
   guide_step 3 "Nom de domaine"
-  echo "  Dans la zone DNS de votre domaine (chez le registrar : OVH, Gandi, Ionos…),"
-  echo "  créez UN enregistrement :"
+  say "Dans la zone DNS de votre domaine (chez le registrar : OVH, Gandi, Ionos…),"
+  say "créez UN enregistrement :"
   echo
   printf '      %-32s A   %s\n' "$DOMAIN." "${NC_PUBLIC_IP:-<adresse publique>}"
   echo
-  echo "  et aucun enregistrement AAAA (IPv6) pour ce nom."
+  say "et aucun enregistrement AAAA (IPv6) pour ce nom."
   if [[ $BOX == freebox ]]; then
-    echo "  L'adresse full-stack de Free est fixe : cet enregistrement ne changera plus."
+    say "L'adresse full-stack de Free est fixe : cet enregistrement ne changera plus."
   fi
   while :; do
     pause "Entrée pour vérifier le DNS…"
     netcheck dns "$DOMAIN"
-    if dns_ok; then info "DNS correct : $DOMAIN → $NC_DNS_A"; break; fi
+    if dns_ok; then info "$(t "DNS correct : {1} → {2}" "$DOMAIN" "$NC_DNS_A")"; break; fi
     dns_explain
     menu choice "Choix" 1 "Réessayer (la propagation prend de quelques minutes à une heure)" "Continuer quand même"
     if [[ $choice == 2 ]]; then break; fi
@@ -766,7 +899,7 @@ network_guide() {
   guide_step 4 "Redirection des ports 80 et 443 vers le Pi"
   help_ports
   pause
-  info "Réglages de la $(box_label) terminés"
+  info "$(t "Réglages de la {1} terminés" "$(box_label)")"
 }
 
 setup_nginx() {
@@ -778,12 +911,12 @@ setup_nginx() {
   fi
   # Jamais réécrite ensuite : certbot y ajoute le bloc HTTPS.
   if [[ -f $conf ]]; then
-    info "Configuration nginx existante conservée : $conf"
+    info "$(t "Configuration nginx existante conservée : {1}" "$conf")"
   else
     sed -e "s|tm\.mon-club\.fr|$DOMAIN|g" -e "s|nom-machine\.local|$MDNS_NAME.local|g" \
         -e "s|127\.0\.0\.1:8000|127.0.0.1:$PORT|g" "$DIR/deploy/nginx.conf.example" > "$conf"
     if [[ -d /etc/nginx/sites-enabled ]]; then ln -sf "$conf" "/etc/nginx/sites-enabled/$SERVICE"; fi
-    info "Configuration nginx créée : $conf"
+    info "$(t "Configuration nginx créée : {1}" "$conf")"
   fi
   nginx -t -q || die "configuration nginx invalide (sudo nginx -t)"
   systemctl enable --quiet --now nginx
@@ -793,19 +926,19 @@ setup_nginx() {
 explain_certbot() {  # explain_certbot "sortie de certbot"
   local out=$1 detail
   detail="$(grep -m1 -E 'Detail:' <<<"$out" | sed -E 's/^[[:space:]]*Detail:[[:space:]]*//' || true)"
-  echo "  Let's Encrypt n'a pas pu valider $DOMAIN."
-  if [[ -n $detail ]]; then echo "  Motif : $detail"; fi
+  say "Let's Encrypt n'a pas pu valider {1}." "$DOMAIN"
+  if [[ -n $detail ]]; then say "Motif : {1}" "$detail"; fi
   if [[ $out == *"too many"* || $out == *rateLimited* || $out == *"rate limit"* ]]; then
-    echo "  → Trop d'essais récents : attendez une heure avant de réessayer."
+    say "→ Trop d'essais récents : attendez une heure avant de réessayer."
   elif [[ $out == *NXDOMAIN* || $out == *"DNS problem"* || $out == *"no valid A records"* ]]; then
-    echo "  → Le nom $DOMAIN n'est pas (encore) dans le DNS : voir l'étape « Nom de domaine »."
+    say "→ Le nom {1} n'est pas (encore) dans le DNS : voir l'étape « Nom de domaine »." "$DOMAIN"
   elif [[ $detail =~ [0-9a-fA-F]{1,4}:[0-9a-fA-F]{0,4}: ]]; then
-    echo "  → Let's Encrypt passe par l'IPv6 : supprimez l'enregistrement AAAA de $DOMAIN."
+    say "→ Let's Encrypt passe par l'IPv6 : supprimez l'enregistrement AAAA de {1}." "$DOMAIN"
   elif [[ $out == *"Timeout during connect"* || $out == *"timed out"* || $out == *Timeout* ]]; then
-    echo "  → Port 80 injoignable depuis Internet : redirection de ports de la $(box_label),"
-    echo "    ou adresse IPv4 partagée."
+    say "→ Port 80 injoignable depuis Internet : redirection de ports de la {1}," "$(box_label)"
+    say "  ou adresse IPv4 partagée."
   elif [[ $out == *"Connection refused"* ]]; then
-    echo "  → Port 80 fermé : la redirection pointe-t-elle bien vers ce Pi (${NC_LOCAL_IP:-son adresse}) ?"
+    say "→ Port 80 fermé : la redirection pointe-t-elle bien vers ce Pi ({1}) ?" "${NC_LOCAL_IP:-$(t "son adresse")}"
   else
     tail -n 8 <<<"$out" | sed 's/^/    /'
   fi
@@ -814,7 +947,7 @@ explain_certbot() {  # explain_certbot "sortie de certbot"
 
 setup_https() {
   local out
-  if [[ -d /etc/letsencrypt/live/$DOMAIN ]]; then info "Certificat HTTPS déjà présent pour $DOMAIN"; return 0; fi
+  if [[ -d /etc/letsencrypt/live/$DOMAIN ]]; then info "$(t "Certificat HTTPS déjà présent pour {1}" "$DOMAIN")"; return 0; fi
   if [[ -z $EMAIL ]]; then return 0; fi
   if [[ $SHARED_IP == 1 ]]; then return 0; fi
   while :; do
@@ -822,7 +955,7 @@ setup_https() {
     if out="$(certbot certonly --nginx --dry-run --non-interactive --agree-tos -m "$EMAIL" -d "$DOMAIN" 2>&1)"; then
       info "Essai réussi : demande du certificat"
       if out="$(certbot --nginx --non-interactive --agree-tos -m "$EMAIL" -d "$DOMAIN" --redirect 2>&1)"; then
-        info "HTTPS activé pour $DOMAIN (renouvellement automatique)"
+        info "$(t "HTTPS activé pour {1} (renouvellement automatique)" "$DOMAIN")"
       else
         warn "le certificat n'a pas pu être installé :"
         tail -n 8 <<<"$out" | sed 's/^/    /'
@@ -843,7 +976,7 @@ check_clock() {
   if in_container; then return 0; fi
   if [[ $USE_SYSTEMD == yes ]] && command -v timedatectl >/dev/null \
      && [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" != yes ]]; then
-    warn "l'horloge n'est pas synchronisée (NTP). Heure du système : $(date -u '+%d/%m/%Y %H:%M') UTC."
+    warn "$(t "l'horloge n'est pas synchronisée (NTP). Heure du système : {1} UTC." "$(date -u '+%d/%m/%Y %H:%M')")"
     warn "les heures des QSO en dépendent : voir « Heure du Raspberry Pi » dans le README."
   fi
   return 0
@@ -853,7 +986,7 @@ summary() {
   local ip has_cert=0
   if [[ $MODE == internet && -d /etc/letsencrypt/live/$DOMAIN ]]; then has_cert=1; fi
   echo
-  echo "TM Activation $VERSION installé dans $DIR (mode $MODE)"
+  echo "$(t "TM Activation {1} installé dans {2} (mode {3})" "$VERSION" "$DIR" "$MODE")"
   case "$MODE" in
     lan)
       line "Adresse" "http://$MDNS_NAME.local$PORT_SUFFIX/"
@@ -862,56 +995,56 @@ summary() {
       done ;;
     internet)
       if [[ $has_cert == 1 ]]; then line "Adresse publique" "https://$DOMAIN/"
-      else line "Adresse publique" "http://$DOMAIN/  (HTTPS pas encore actif)"; fi
+      else line "Adresse publique" "$(t "http://{1}/  (HTTPS pas encore actif)" "$DOMAIN")"; fi
       line "Réseau local" "http://$MDNS_NAME.local/" ;;
     tunnel)
       line "Adresse publique" "https://$DOMAIN/  (Cloudflare Tunnel)"
       line "Réseau local" "http://$MDNS_NAME.local$PORT_SUFFIX/"
       line "Tunnel" "systemctl status cloudflared" ;;
     *)
-      line "Écoute" "http://$HOST:$PORT/  (derrière votre reverse proxy : deploy/nginx.conf.example)" ;;
+      line "Écoute" "$(t "http://{1}:{2}/  (derrière votre reverse proxy : deploy/nginx.conf.example)" "$HOST" "$PORT")" ;;
   esac
   if [[ $USE_SYSTEMD == yes ]]; then
     line "Service" "systemctl status $SERVICE · journalctl -u $SERVICE -f"
   else
     line "Lancement" "cd $DIR && TM_CONFIG=$DIR/config.yml .venv/bin/uvicorn app.main:app --host $HOST --port $PORT"
   fi
-  line "Pages publiques" "/activations et /<indicatif en minuscules>"
-  line "Opérateurs" "/activation/login (indicatif + mot de passe commun)"
-  line "Administration" "/login → Réglages"
+  line "Pages publiques" "$(t "/activations et /<indicatif en minuscules>")"
+  line "Opérateurs" "$(t "/activation/login (indicatif + mot de passe commun)")"
+  line "Administration" "$(t "/login → Réglages")"
   if [[ -n $GENERATED_ADMIN_PW ]]; then
     echo
-    echo "  Mot de passe administrateur généré : $GENERATED_ADMIN_PW"
-    echo "  (à noter ; il reste lisible dans $DIR/config.yml, clé auth.password)"
+    say "Mot de passe administrateur généré : {1}" "$GENERATED_ADMIN_PW"
+    say "(à noter ; il reste lisible dans {1}/config.yml, clé auth.password)" "$DIR"
   fi
-  line "Données" "$DIR/var/ (sauvegardes automatiques : var/backups/)"
+  line "Données" "$(t "{1}/var/ (sauvegardes automatiques : var/backups/)" "$DIR")"
   line "Diagnostic" "sudo $DIR/install.sh --check"
   if [[ -x /usr/local/sbin/tm-activation-update ]]; then
-    line "Mise à jour" "/usr/local/sbin/tm-activation-update (root ; dernière version GitHub, réglages repris)"
+    line "Mise à jour" "$(t "/usr/local/sbin/tm-activation-update (root ; dernière version GitHub, réglages repris)")"
   else
     local tm_dir=""
     if [[ $DIR != /opt/tm-activation ]]; then tm_dir="TM_DIR=$DIR "; fi
-    line "Mise à jour" "sudo ${tm_dir}bash $DIR/deploy/update-from-github.sh (dernière version GitHub)"
+    line "Mise à jour" "$(t "sudo {1}bash {2}/deploy/update-from-github.sh (dernière version GitHub)" "$tm_dir" "$DIR")"
   fi
   if [[ $MODE == tunnel ]]; then
     echo
     if [[ $TUNNEL_READY == 0 ]]; then
-      echo "  À faire : confier $DOMAIN à Cloudflare, puis relancer sudo ./install.sh."
+      say "À faire : confier {1} à Cloudflare, puis relancer sudo ./install.sh." "$DOMAIN"
     else
-      echo "  Test final : ouvrez https://$DOMAIN/ depuis un téléphone en 4G, Wi-Fi coupé."
-      echo "  Le Pi peut changer de lieu ou de connexion : il n'y a rien à refaire."
+      say "Test final : ouvrez https://{1}/ depuis un téléphone en 4G, Wi-Fi coupé." "$DOMAIN"
+      say "Le Pi peut changer de lieu ou de connexion : il n'y a rien à refaire."
     fi
   fi
   if [[ $MODE == internet ]]; then
     echo
     if [[ $has_cert == 1 ]]; then
-      echo "  Test final : ouvrez https://$DOMAIN/ depuis un téléphone en 4G, Wi-Fi coupé."
+      say "Test final : ouvrez https://{1}/ depuis un téléphone en 4G, Wi-Fi coupé." "$DOMAIN"
     elif [[ $SHARED_IP == 1 ]]; then
-      echo "  À faire : obtenir une adresse IPv4 dédiée, puis relancer sudo ./install.sh."
+      say "À faire : obtenir une adresse IPv4 dédiée, puis relancer sudo ./install.sh."
     elif [[ -z $EMAIL ]]; then
-      echo "  HTTPS : relancez sudo ./install.sh --email vous@exemple.fr (ou sudo certbot --nginx -d $DOMAIN)."
+      say "HTTPS : relancez sudo ./install.sh --email vous@exemple.fr (ou sudo certbot --nginx -d {1})." "$DOMAIN"
     else
-      echo "  HTTPS : corrigez le point signalé, puis relancez sudo ./install.sh (le guide reprend)."
+      say "HTTPS : corrigez le point signalé, puis relancez sudo ./install.sh (le guide reprend)."
     fi
   fi
   return 0
@@ -927,10 +1060,10 @@ install_cloudflared() {
   local arch url tmp
   if command -v cloudflared >/dev/null; then return 0; fi
   arch="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
-  case "$arch" in arm64|armhf|amd64|386) ;; *) die "cloudflared n'existe pas pour l'architecture $arch" ;; esac
+  case "$arch" in arm64|armhf|amd64|386) ;; *) die "$(t "cloudflared n'existe pas pour l'architecture {1}" "$arch")" ;; esac
   url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$arch.deb"
   tmp="$(mktemp -d)"
-  info "Téléchargement de cloudflared ($arch)"
+  info "$(t "Téléchargement de cloudflared ({1})" "$arch")"
   "$PYTHON" - "$url" "$tmp/cloudflared.deb" <<'PY' || die "téléchargement de cloudflared impossible"
 import sys, urllib.request
 urllib.request.urlretrieve(sys.argv[1], sys.argv[2])
@@ -941,7 +1074,21 @@ PY
 
 tunnel_guide() {
   title "Cloudflare Tunnel"
-  cat <<EOF
+  if [[ $UI_LANG == en ]]; then
+    cat <<EOF
+  The Pi opens an OUTGOING connection to Cloudflare: no port is opened on the
+  router, the public IP address no longer matters (shared IPv4, 4G, phone
+  hotspot) and HTTPS is handled by Cloudflare. If you move the Pi elsewhere,
+  there is nothing to redo.
+
+  Two conditions, on https://dash.cloudflare.com (free account):
+    1. the domain must be managed by Cloudflare (« Add a site », then change
+       the DNS servers at your registrar: from a few minutes to a few hours);
+    2. you must be logged in to that account on the device where you will open
+       the authorisation link shown in a moment.
+EOF
+  else
+    cat <<EOF
   Le Pi ouvre une connexion SORTANTE vers Cloudflare : aucun port n'est ouvert
   sur la box, l'adresse IP publique n'a plus d'importance (IPv4 partagée, 4G,
   partage de connexion) et le HTTPS est assuré par Cloudflare. En changeant de
@@ -954,10 +1101,11 @@ tunnel_guide() {
     2. être connecté à ce compte sur l'appareil où vous ouvrirez le lien
        d'autorisation affiché tout à l'heure.
 EOF
+  fi
   if ! confirm "Le domaine de $DOMAIN est-il déjà géré par Cloudflare ?" o; then
     TUNNEL_READY=0
     warn "à faire d'abord sur dash.cloudflare.com, puis relancez : sudo ./install.sh"
-    echo "  L'installation se termine ; l'application restera joignable en réseau local."
+    say "L'installation se termine ; l'application restera joignable en réseau local."
   fi
   return 0
 }
@@ -980,24 +1128,24 @@ setup_tunnel() {
   install_cloudflared
   if [[ ! -f $CF_LOGIN_DIR/cert.pem ]]; then
     title "Autorisation Cloudflare"
-    echo "  cloudflared affiche un lien : ouvrez-le sur un appareil connecté à votre"
-    echo "  compte Cloudflare, puis choisissez le domaine. Le Pi attend."
+    say "cloudflared affiche un lien : ouvrez-le sur un appareil connecté à votre"
+    say "compte Cloudflare, puis choisissez le domaine. Le Pi attend."
     cloudflared tunnel login || die "autorisation Cloudflare abandonnée"
   fi
   uuid="$(cf_tunnel_uuid "$name")"
   if [[ -z $uuid ]]; then
-    info "Création du tunnel $name"
+    info "$(t "Création du tunnel {1}" "$name")"
     cloudflared tunnel create "$name" >/dev/null || die "création du tunnel impossible"
     uuid="$(cf_tunnel_uuid "$name")"
   fi
-  [[ -n $uuid ]] || die "tunnel $name introuvable après création"
+  [[ -n $uuid ]] || die "$(t "tunnel {1} introuvable après création" "$name")"
   mkdir -p "$CF_CONF_DIR"
   cred="$CF_CONF_DIR/$uuid.json"
   if [[ -f $CF_LOGIN_DIR/$uuid.json ]]; then
     cp "$CF_LOGIN_DIR/$uuid.json" "$cred"
     chmod 600 "$cred"
   fi
-  [[ -f $cred ]] || die "identifiants du tunnel introuvables ($CF_LOGIN_DIR/$uuid.json)"
+  [[ -f $cred ]] || die "$(t "identifiants du tunnel introuvables ({1})" "$CF_LOGIN_DIR/$uuid.json")"
   cat > "$conf" <<EOF
 # Tunnel Cloudflare de TM Activation — généré par install.sh
 tunnel: $uuid
@@ -1009,9 +1157,9 @@ ingress:
 EOF
   cloudflared tunnel --config "$conf" ingress validate || die "configuration cloudflared invalide"
   if cloudflared tunnel route dns "$name" "$DOMAIN" >/dev/null 2>&1; then
-    info "Nom $DOMAIN routé vers le tunnel"
+    info "$(t "Nom {1} routé vers le tunnel" "$DOMAIN")"
   else
-    warn "route DNS non créée : elle existe déjà, ou $DOMAIN n'est pas géré par ce compte Cloudflare."
+    warn "$(t "route DNS non créée : elle existe déjà, ou {1} n'est pas géré par ce compte Cloudflare." "$DOMAIN")"
   fi
   if [[ ! -f /etc/systemd/system/cloudflared.service ]]; then
     cloudflared service install >/dev/null 2>&1 || warn "service cloudflared à installer à la main"
@@ -1020,24 +1168,24 @@ EOF
   systemctl enable --quiet cloudflared 2>/dev/null || true
   systemctl restart cloudflared
   TUNNEL_NAME="$name"
-  info "Tunnel Cloudflare actif : https://$DOMAIN/"
+  info "$(t "Tunnel Cloudflare actif : {1}" "https://$DOMAIN/")"
 }
 
 # ── Diagnostic (--check) ────────────────────────────────────────────────────
 
 run_check() {
   local problems=0 state
-  echo "TM Activation — diagnostic de $DIR"
-  line "Version" "$(cat "$DIR/$MARKER") (mode $MODE)"
+  echo "$(t "TM Activation — diagnostic de {1}" "$DIR")"
+  line "Version" "$(t "{1} (mode {2})" "$(cat "$DIR/$MARKER")" "$MODE")"
   if command -v systemctl >/dev/null && [[ -f /etc/systemd/system/$SERVICE.service ]]; then
     state="$(systemctl is-active "$SERVICE" 2>/dev/null || true)"
-    line "Service $SERVICE" "$state"
+    line "$(t "Service {1}" "$SERVICE")" "$state"
     if [[ $state != active ]]; then problems=$((problems + 1)); fi
   fi
   if [[ -x $VPY ]] && health; then
-    line "Application" "répond sur $HOST:$PORT"
+    line "Application" "$(t "répond sur {1}:{2}" "$HOST" "$PORT")"
   else
-    line "Application" "NE RÉPOND PAS sur $HOST:$PORT"
+    line "Application" "$(t "NE RÉPOND PAS sur {1}:{2}" "$HOST" "$PORT")"
     problems=$((problems + 1))
   fi
   netcheck local
@@ -1047,73 +1195,73 @@ run_check() {
       line "Adresse" "http://$MDNS_NAME.local$PORT_SUFFIX/" ;;
     internet)
       netcheck public
-      line "IPv4 publique" "${NC_PUBLIC_IP:-injoignable}${NC_PUBLIC_KIND:+ ($NC_PUBLIC_KIND)}"
+      line "IPv4 publique" "${NC_PUBLIC_IP:-$(t "injoignable")}${NC_PUBLIC_KIND:+ ($NC_PUBLIC_KIND)}"
       if [[ -z $NC_PUBLIC_IP || $NC_PUBLIC_KIND == cgnat ]]; then problems=$((problems + 1)); fi
       netcheck dns "$DOMAIN"
       if dns_ok; then
-        line "DNS $DOMAIN" "OK → $NC_DNS_A"
+        line "$(t "DNS {1}" "$DOMAIN")" "OK → $NC_DNS_A"
       else
-        line "DNS $DOMAIN" "À CORRIGER"
+        line "$(t "DNS {1}" "$DOMAIN")" "$(t "À CORRIGER")"
         dns_explain
         problems=$((problems + 1))
       fi
       netcheck cert "$DOMAIN"
       if [[ $NC_CERT == ok ]]; then
-        line "Certificat HTTPS" "valide, expire dans $NC_CERT_DAYS jours"
+        line "Certificat HTTPS" "$(t "valide, expire dans {1} jours" "$NC_CERT_DAYS")"
       else
-        line "Certificat HTTPS" "absent ou invalide${NC_CERT_ERROR:+ ($NC_CERT_ERROR)}"
+        line "Certificat HTTPS" "$(t "absent ou invalide")${NC_CERT_ERROR:+ ($NC_CERT_ERROR)}"
         problems=$((problems + 1))
       fi
       if [[ $IS_ROOT == 1 ]] && command -v nginx >/dev/null; then
-        if nginx -t -q 2>/dev/null; then line "nginx" "configuration valide"
-        else line "nginx" "CONFIGURATION INVALIDE (sudo nginx -t)"; problems=$((problems + 1)); fi
+        if nginx -t -q 2>/dev/null; then line "nginx" "$(t "configuration valide")"
+        else line "nginx" "$(t "CONFIGURATION INVALIDE (sudo nginx -t)")"; problems=$((problems + 1)); fi
       fi
       echo
-      echo "  $(box_label) : les ports TCP 80 et 443 doivent être redirigés vers ${NC_LOCAL_IP:-ce Pi}."
-      echo "  Pi déplacé sur une autre connexion ? Refaites le bail DHCP et la redirection de"
-      echo "  ports sur la nouvelle box, et mettez l'enregistrement DNS à la nouvelle adresse." ;;
+      say "{1} : les ports TCP 80 et 443 doivent être redirigés vers {2}." "$(box_label)" "${NC_LOCAL_IP:-$(t "ce Pi")}"
+      say "Pi déplacé sur une autre connexion ? Refaites le bail DHCP et la redirection de"
+      say "ports sur la nouvelle box, et mettez l'enregistrement DNS à la nouvelle adresse." ;;
     tunnel)
       state="$(systemctl is-active cloudflared 2>/dev/null || true)"
       line "Service cloudflared" "$state"
       if [[ $state != active ]]; then problems=$((problems + 1)); fi
       if [[ -f $CF_CONF_DIR/config.yml ]] && command -v cloudflared >/dev/null \
          && cloudflared tunnel --config "$CF_CONF_DIR/config.yml" ingress validate >/dev/null 2>&1; then
-        line "Configuration tunnel" "valide (→ 127.0.0.1:$PORT)"
+        line "Configuration tunnel" "$(t "valide (→ 127.0.0.1:{1})" "$PORT")"
       else
-        line "Configuration tunnel" "ABSENTE OU INVALIDE ($CF_CONF_DIR/config.yml)"
+        line "Configuration tunnel" "$(t "ABSENTE OU INVALIDE ({1})" "$CF_CONF_DIR/config.yml")"
         problems=$((problems + 1))
       fi
       netcheck dns "$DOMAIN"
       if [[ -n $NC_DNS_A ]]; then
-        line "DNS $DOMAIN" "→ $NC_DNS_A (Cloudflare)"
+        line "$(t "DNS {1}" "$DOMAIN")" "$(t "→ {1} (Cloudflare)" "$NC_DNS_A")"
       else
-        line "DNS $DOMAIN" "NE RÉPOND PAS"
+        line "$(t "DNS {1}" "$DOMAIN")" "$(t "NE RÉPOND PAS")"
         problems=$((problems + 1))
       fi
       netcheck cert "$DOMAIN" "$DOMAIN"
       if [[ $NC_CERT == ok ]]; then
-        line "HTTPS $DOMAIN" "valide, expire dans $NC_CERT_DAYS jours"
+        line "$(t "HTTPS {1}" "$DOMAIN")" "$(t "valide, expire dans {1} jours" "$NC_CERT_DAYS")"
       else
-        line "HTTPS $DOMAIN" "injoignable ou invalide${NC_CERT_ERROR:+ ($NC_CERT_ERROR)}"
+        line "$(t "HTTPS {1}" "$DOMAIN")" "$(t "injoignable ou invalide")${NC_CERT_ERROR:+ ($NC_CERT_ERROR)}"
         problems=$((problems + 1))
       fi
       line "Réseau local" "http://$MDNS_NAME.local$PORT_SUFFIX/"
       echo
-      echo "  Le tunnel sort du Pi : aucun port à ouvrir, même sur une autre connexion." ;;
+      say "Le tunnel sort du Pi : aucun port à ouvrir, même sur une autre connexion." ;;
   esac
   if in_container; then
-    line "Horloge" "celle de l'hôte (conteneur)"
+    line "Horloge" "$(t "celle de l'hôte (conteneur)")"
   elif command -v timedatectl >/dev/null; then
     if [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" == yes ]]; then
-      line "Horloge" "synchronisée"
+      line "Horloge" "$(t "synchronisée")"
     else
-      line "Horloge" "NON SYNCHRONISÉE ($(date -u '+%d/%m/%Y %H:%M') UTC)"
+      line "Horloge" "$(t "NON SYNCHRONISÉE ({1} UTC)" "$(date -u '+%d/%m/%Y %H:%M')")"
       problems=$((problems + 1))
     fi
   fi
   echo
-  if (( problems > 0 )); then echo "  $problems point(s) à corriger."; return 1; fi
-  echo "  Tout est en ordre."
+  if (( problems > 0 )); then say "{1} point(s) à corriger." "$problems"; return 1; fi
+  say "Tout est en ordre."
 }
 
 # ── Programme principal ─────────────────────────────────────────────────────
@@ -1121,8 +1269,9 @@ run_check() {
 main() {
   parse_args "$@"
   resolve_context
+  ask_lang
   if [[ $CHECK == 1 ]]; then
-    [[ -f $DIR/$MARKER ]] || die "aucune installation TM Activation dans $DIR (option --dir ?)"
+    [[ -f $DIR/$MARKER ]] || die "$(t "aucune installation TM Activation dans {1} (option --dir ?)" "$DIR")"
     MODE="${MODE:-manual}"
     resolve_ports
     VPY="$DIR/.venv/bin/python"
@@ -1143,9 +1292,9 @@ main() {
   if [[ $INTERACTIVE == yes && ( $ASKED == 1 || $FIRST_CONFIG == 1 ) ]]; then recap; fi
 
   if [[ $UPGRADE == 1 ]]; then
-    info "Mise à jour de $DIR vers la version $VERSION (était : $(cat "$DIR/$MARKER")) — mode $MODE"
+    info "$(t "Mise à jour de {1} vers la version {2} (était : {3}) — mode {4}" "$DIR" "$VERSION" "$(cat "$DIR/$MARKER")" "$MODE")"
   else
-    info "Installation de TM Activation $VERSION dans $DIR — mode $MODE"
+    info "$(t "Installation de TM Activation {1} dans {2} — mode {3}" "$VERSION" "$DIR" "$MODE")"
   fi
   install_packages
   check_python

@@ -1,3 +1,5 @@
+*English version: [README.en.md](README.en.md)*
+
 # TM Activation
 
 Application web pour gérer l'activation d'**indicatifs spéciaux** radioamateur
@@ -15,15 +17,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.3.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.3.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.3.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -45,7 +47,9 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.3.
   précédents restent consultables (`/activations`).
 - **Français / English** : chaque page s'affiche dans la langue du navigateur
   (anglais pour les chasseurs étrangers), avec un bouton **FR | EN** dans le
-  bandeau ; le choix est mémorisé. Traductions : `app/locales/en.json`.
+  bandeau ; le choix est mémorisé. L'installeur pose la question au démarrage
+  (ou `--lang en`). Traductions : `app/locales/en.json` pour les pages,
+  `deploy/lang/en.sh` pour l'installeur.
 - **Sauvegardes automatiques** de la base (au démarrage et après chaque
   modification), téléchargeables depuis les Réglages.
 - **Sécurité** : blocage des essais de mots de passe et des robots scanneurs,
@@ -97,22 +101,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.3.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.4.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.3.0.tar.gz
-   cd tm-activation-1.3.0
+   tar xzf tm-activation-1.4.0.tar.gz
+   cd tm-activation-1.4.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.3.0.zip
-   cd tm-activation-1.3.0
+   unzip tm-activation-1.4.0.zip
+   cd tm-activation-1.4.0
    sudo bash install.sh --lan
    ```
 
@@ -193,8 +197,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.3.0.tar.gz
-cd tm-activation-1.3.0
+tar xzf tm-activation-1.4.0.tar.gz
+cd tm-activation-1.4.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -375,7 +379,6 @@ sudo userdel tmact
 
 ## Limites connues
 
-- Interface en français uniquement.
 - Heure locale : fuseau Europe/Paris (identique à celui de la Belgique, du
   Luxembourg et de la Suisse). L'heure UTC est toujours disponible via le
   sélecteur « Heure », et le stockage se fait en UTC.

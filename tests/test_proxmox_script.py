@@ -161,7 +161,9 @@ def proxmox(tmp_path, request):
     for name, body in fakes.items():
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
-    return {"PATH": f"{bin_dir}:{os.environ['PATH']}", "CALLS": str(tmp_path / "calls"), "TERM": "dumb"}
+    # TM_LANG : la question de langue est passée (testée séparément).
+    return {"PATH": f"{bin_dir}:{os.environ['PATH']}", "CALLS": str(tmp_path / "calls"), "TERM": "dumb",
+            "TM_LANG": "fr"}
 
 
 def lxc(env: dict[str, str], answers: list[str], **extra: str) -> subprocess.CompletedProcess:
@@ -239,3 +241,16 @@ def test_scripts_are_valid_bash() -> None:
     for script in (LXC, UPDATE):
         r = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
         assert r.returncode == 0, r.stderr
+
+
+def test_lxc_asks_the_language_and_speaks_english(tmp_path, proxmox) -> None:
+    """Sans TM_LANG : première question « Langue / Language », puis tout en anglais."""
+    env = {k: v for k, v in proxmox.items() if k != "TM_LANG"}
+    r = lxc(env, ["2", *CT_DEFAULTS, "", "", "pw", "pw", "2", "", ""])
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "1) Français" in r.stdout and "2) English" in r.stdout   # le prompt read -p est muet hors terminal
+    # Les questions (read -p) sont muettes hors terminal : on contrôle les lignes affichées.
+    for expected in ("Summary", "Container 102 created.", "Packages installed.",
+                     "TM Activation installed in container 102", "Delete the test container"):
+        assert expected in r.stdout, expected
+    assert "Récapitulatif" not in r.stdout and "Disque" not in r.stdout
