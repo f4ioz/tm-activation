@@ -897,7 +897,7 @@ async def spots_panel(request: Request) -> Response:
     if (g := _guard(request)) is not None:
         return g
     call = activation.callsign()
-    found = await run_in_threadpool(dx_spots.recent_spots, call, 5)
+    found = await run_in_threadpool(dx_spots.recent_spots, call, 3)   # panneau compact
     return templates.TemplateResponse(
         request,
         "activation/partials/spots.html",

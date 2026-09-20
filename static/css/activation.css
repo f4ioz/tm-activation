@@ -278,7 +278,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
   font-family: var(--font-mono, monospace); font-size: 0.95rem;
 }
 .act-call, .act-form input[name="call"] { text-transform: uppercase; }
-.act-form button, .act-op-select button {
+.act-form button, .act-op-select form button {
   align-self: flex-start; cursor: pointer;
   background: var(--accent); color: var(--bg);
   border: none; border-radius: 3px; padding: 0.55rem 1.1rem;
@@ -291,7 +291,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 /* Carte « Opérateur au micro » : sélecteur à gauche, jauges de cadence à droite. */
 .act-op-select { flex-direction: row; flex-wrap: wrap; align-items: flex-start;
   justify-content: space-between; gap: 0.8rem; }
-.act-op-select > form, .act-op-select > .act-warn { flex: 1 1 14rem; }
+.act-op-select > .act-op-left { flex: 1 1 18rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .act-op-select > #act-rate { flex: 1 1 22rem; }
 .act-utc-hint { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
 
@@ -514,23 +514,25 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-block-hint { margin: 0.2rem 0 0; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
 .act-block-hint.is-blocked { color: var(--red, #c0392b); font-weight: 600; }
 
-/* Spots DX de l'indicatif activé (page de log, rafraîchi chaque minute). */
-.act-spots-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+/* Spots DX de l'indicatif activé : à gauche de la cadence, compact, une ligne
+   par spot. Rafraîchi chaque minute ; absent s'il n'y a rien (ou pas de réseau). */
+.act-spots { border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem; }
+.act-spots-list { list-style: none; margin: 0.25rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .act-spots-list li {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-  padding: 0.3rem 0.5rem; border-left: 3px solid var(--accent); border-radius: 3px;
-  font-family: var(--font-mono, monospace); font-size: 0.85rem;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem;
+  font-family: var(--font-mono, monospace); font-size: 0.75rem;
 }
 .act-spot-freq {
   font-family: inherit; font-size: inherit; font-weight: 600; color: var(--accent);
   background: none; border: 1px dashed var(--border); border-radius: 3px;
-  padding: 0.1rem 0.4rem; cursor: pointer;
+  padding: 0 0.3rem; cursor: pointer;
 }
 .act-spot-freq:hover { border-style: solid; border-color: var(--accent); }
-.act-spot-band { border: 1px solid var(--border); border-radius: 3px; padding: 0 0.35rem; }
+.act-spot-band { border: 1px solid var(--border); border-radius: 3px; padding: 0 0.3rem; }
 .act-spot-age { color: var(--text-muted); }
 .act-spot-age.is-fresh { color: var(--green, #2ecc71); }
-.act-spot-comment { font-style: italic; color: var(--text-muted); }
+.act-spot-comment { font-style: italic; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12rem; }
 
 /* Pays (entités DXCC) contactés, mis à jour à chaque QSO enregistré. */
 .act-dxcc { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }

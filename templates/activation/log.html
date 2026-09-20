@@ -50,9 +50,8 @@
 </div>
 {% endif %}
 
-<div id="act-spots" hx-get="/activation/spots" hx-trigger="load, every 60s" hx-swap="innerHTML"></div>
-
 <div class="act-card act-op-select">
+  <div class="act-op-left">
   <form method="post" action="/activation/whoami" class="act-inline">
     <label>{{ _("Opérateur au micro") }}
       <select name="operator" onchange="this.form.submit()">
@@ -64,12 +63,13 @@
     <noscript><button type="submit">OK</button></noscript>
   </form>
   {% if not current_op %}<p class="act-warn">{{ _("Sélectionne ton indicatif avant de logger.") }}</p>{% endif %}
+  <div id="act-spots" hx-get="/activation/spots" hx-trigger="load, every 60s" hx-swap="innerHTML"></div>
+  </div>
   <div id="act-rate" hx-get="/activation/rate" hx-trigger="load, every 30s, act-qso from:body" hx-swap="innerHTML"></div>
 </div>
 
 <div class="act-log-cols">
 <div class="act-card">
-  <h2>{{ _("Nouveau contact") }} <span class="act-utc-hint">{{ _("(« Maintenant » coché : heure prise à la validation)") }}</span></h2>
   <form class="act-form act-log-form"
         hx-post="/activation/contacts"
         hx-target="#act-log-result"
@@ -90,7 +90,8 @@
     <div class="act-row">
       <div class="act-when">
         <label>{{ _("Date et heure ({tz})", tz=tz_label) }} <input type="datetime-local" name="when" value="{{ now_input }}" data-tz="{{ tz_mode }}"></label>
-        <label class="act-check"><input type="checkbox" id="act-now-toggle" name="now" value="1" checked> {{ _("Maintenant") }}</label>
+        <label class="act-check"><input type="checkbox" id="act-now-toggle" name="now" value="1" checked> {{ _("Maintenant") }}
+          <span class="act-utc-hint">{{ _("(heure prise à la validation)") }}</span></label>
       </div>
       <label>{{ _("Bande") }} <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
       <label>{{ _("Mode") }} <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>

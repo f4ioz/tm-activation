@@ -1945,9 +1945,10 @@ def test_spots_panel_lists_the_spots(monkeypatch) -> None:
         ],
     )
     page = _private_client().get("/activation/spots").text
-    assert "14190.0 kHz" in page and "K4NYX" in page and "20M" in page
+    assert "14190.0" in page and "K4NYX" in page and "20M" in page
     assert "loud in FL" in page and "il y a 3 min" in page
     assert "actUseSpot('14.190', '20M')" in page      # clic → fréquence reprise dans le formulaire
+    assert "act-card" not in page                     # panneau intégré à la carte de l'opérateur
 
 
 def test_spots_needs_the_operator_area() -> None:

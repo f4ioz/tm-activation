@@ -1,17 +1,17 @@
-{# Panneau « suis-je spotté ? » — vide (donc invisible) sans spot ni Internet. #}
+{# Panneau « suis-je spotté ? », à gauche de la cadence dans la carte de
+   l'opérateur. Vide (donc invisible) sans spot ni Internet. #}
 {% if spots %}
-<div class="act-card act-spots">
-  <div class="act-log-head">
-    <h2>{{ _("📡 Spotté sur le réseau DX") }} <span class="act-count">{{ spots|length }}</span></h2>
-    <span class="act-muted">{{ _("dxwatch.com · actualisé chaque minute") }}</span>
+<div class="act-spots" title="{{ _("dxwatch.com · actualisé chaque minute") }}">
+  <div class="act-rate-head">
+    <span>{{ _("📡 Spotté") }} <b class="act-count">{{ spots|length }}</b></span>
   </div>
   <ul class="act-spots-list">
     {% for s in spots %}
       <li>
         <button type="button" class="act-spot-freq" onclick="if(window.actUseSpot)window.actUseSpot('{{ '%.3f'|format(s.freq_khz / 1000.0) }}', '{{ s.band }}')"
-                title="{{ _("Reprendre cette fréquence dans le formulaire") }}">{{ '%.1f'|format(s.freq_khz) }} kHz</button>
+                title="{{ _("Reprendre cette fréquence dans le formulaire") }}">{{ '%.1f'|format(s.freq_khz) }}</button>
         {% if s.band %}<span class="act-spot-band">{{ s.band }}</span>{% endif %}
-        <span class="act-muted">{{ _("par") }} <b class="act-call">{{ s.spotter }}</b></span>
+        <b class="act-call">{{ s.spotter }}</b>
         {% if s.age_min is not none %}
           <span class="act-spot-age{% if s.age_min <= 15 %} is-fresh{% endif %}">
             {%- if s.age_min < 60 %}{{ _("il y a {n} min", n=s.age_min) }}{% else %}{{ _("il y a {n} h", n=(s.age_min // 60)) }}{% endif -%}
