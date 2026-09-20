@@ -1941,7 +1941,7 @@ def test_spots_panel_lists_the_spots(monkeypatch) -> None:
         spots, "recent_spots",
         lambda call, limit=5, force=False: [
             {"dx": call, "freq_khz": 14190.0, "spotter": "K4NYX", "comment": "loud in FL",
-             "when": "1433z 20 Sep", "age_min": 3, "band": "20M"}
+             "when": "1433z 20 Sep", "age_min": 3, "band": "20M", "mode": "PHONE"}
         ],
     )
     client = _private_client()
@@ -1950,9 +1950,41 @@ def test_spots_panel_lists_the_spots(monkeypatch) -> None:
     assert "actUseSpot('14.190', '20M')" in page      # clic → fréquence reprise dans le formulaire
     assert "act-card" not in page                     # panneau intégré à la carte de l'opérateur
     assert "loud in FL" not in page                   # le commentaire n'est plus affiché
-    # Le panneau ne montre que la bande travaillée.
+    # Le panneau ne montre que la bande et le type de trafic en cours.
     assert "14190.0" in client.get("/activation/spots?band=20M").text
     assert client.get("/activation/spots?band=40M").text.strip() == ""
+    assert "14190.0" in client.get("/activation/spots?band=20M&mode=SSB").text
+    assert client.get("/activation/spots?band=20M&mode=CW").text.strip() == ""
+    assert client.get("/activation/spots?band=20M&mode=FT8").text.strip() == ""
+
+
+def test_spot_of_unknown_mode_is_kept(monkeypatch) -> None:
+    """Mieux vaut montrer un spot au mode indéterminé que laisser croire que
+    personne ne nous entend."""
+    from app import dx_spots as spots
+
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    monkeypatch.setattr(spots, "recent_spots", lambda call, limit=5, force=False: [
+        {"dx": call, "freq_khz": 14190.0, "spotter": "K4NYX", "comment": "", "when": "",
+         "age_min": 2, "band": "20M", "mode": ""}])
+    assert "K4NYX" in _private_client().get("/activation/spots?band=20M&mode=CW").text
+
+
+def test_spot_mode_from_the_comment_then_the_band_plan() -> None:
+    from app import dx_spots
+
+    assert dx_spots.mode_family(7005) == "CW"           # bas de bande
+    assert dx_spots.mode_family(7044) == "DIGI"         # segment numérique
+    assert dx_spots.mode_family(7188) == "PHONE"
+    assert dx_spots.mode_family(7188, "FT8 -06db") == "DIGI"    # le commentaire prime
+    assert dx_spots.mode_family(14250, "SES special call") == "PHONE"
+    assert dx_spots.mode_family(50313) == "DIGI" and dx_spots.mode_family(144174) == "DIGI"
+    assert dx_spots.mode_family(3600) == "PHONE" and dx_spots.mode_family(7040) == "DIGI"
+    assert dx_spots.mode_family(12345) == ""            # hors bande amateur
+    familles = {m: dx_spots.family_of_mode(m) for m in activation.MODES}
+    assert familles == {"SSB": "PHONE", "FM": "PHONE", "AM": "PHONE", "CW": "CW",
+                        "FT8": "DIGI", "FT4": "DIGI", "RTTY": "DIGI", "PSK31": "DIGI",
+                        "SSTV": "DIGI", "DIGI": "DIGI"}
 
 
 def test_spots_needs_the_operator_area() -> None:

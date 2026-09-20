@@ -49,15 +49,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.18.2.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.18.2.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.19.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.19.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.18.2.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.19.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -102,10 +102,13 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.18
     gauche et les derniers QSO à droite, visibles pendant qu'on logue ; la page
     est resserrée pour qu'une dizaine de lignes tiennent sans défiler.
   - **Suis-je spotté ?** : les trois derniers spots DX de l'indicatif **sur la
-    bande travaillée** (DXWatch, puis HamQTH en secours) s'affichent à côté des
-    jauges, avec la fréquence, le spotteur et l'ancienneté ; un clic sur la
-    fréquence la reprend dans le formulaire. Changer de bande change les spots.
-    Sans Internet, le panneau disparaît, sans erreur.
+    bande et le type de trafic en cours** (DXWatch, puis HamQTH en secours)
+    s'affichent à côté des jauges, avec la fréquence, le spotteur et
+    l'ancienneté ; un clic sur la fréquence la reprend dans le formulaire.
+    Changer de bande ou de mode change les spots : le cluster ne donne pas le
+    mode, il est lu dans le commentaire du spot (« CQ LSB », « FT8 -06db »)
+    puis, à défaut, dans le plan de bande. Sans Internet, le panneau disparaît,
+    sans erreur.
   - **Pays contactés** : les drapeaux des entités DXCC déjà travaillées
     s'ajoutent à chaque QSO enregistré, le plus récent en tête (déduits du
     préfixe de l'indicatif, vignettes servies par l'application : aucun accès
@@ -183,22 +186,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.18.2.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.19.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.18.2.tar.gz
-   cd tm-activation-1.18.2
+   tar xzf tm-activation-1.19.0.tar.gz
+   cd tm-activation-1.19.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.18.2.zip
-   cd tm-activation-1.18.2
+   unzip tm-activation-1.19.0.zip
+   cd tm-activation-1.19.0
    sudo bash install.sh --lan
    ```
 
@@ -285,8 +288,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.18.2.tar.gz
-cd tm-activation-1.18.2
+tar xzf tm-activation-1.19.0.tar.gz
+cd tm-activation-1.19.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

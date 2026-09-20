@@ -48,6 +48,56 @@ def band_of(freq_khz: float) -> str:
     return ""
 
 
+# ── Mode d'un spot ─────────────────────────────────────────────────────────
+# Le cluster ne donne pas le mode : il se lit dans le commentaire (« CQ LSB »,
+# « FT8 -06db ») et, à défaut, dans le plan de bande. On ne retient que la
+# grande famille — télégraphie, phonie, numérique —, seule utile pour savoir
+# si un spot concerne le trafic en cours.
+
+CW, PHONE, DIGI = "CW", "PHONE", "DIGI"
+
+# bande → (fin de la portion télégraphie, fin de la portion numérique) en kHz ;
+# au-dessus, c'est de la phonie (IARU région 1).
+SEGMENTS = {
+    "160M": (1838, 1843), "80M": (3570, 3600), "60M": (5354, 5366),
+    "40M": (7040, 7050), "30M": (10130, 10150), "20M": (14070, 14112),
+    "17M": (18095, 18111), "15M": (21070, 21151), "12M": (24915, 24931),
+    "10M": (28070, 28320), "6M": (50100, 50400), "4M": (70100, 70200),
+    "2M": (144110, 144180), "70CM": (432100, 432200), "23CM": (1296100, 1296200),
+}
+_WORDS = {
+    CW: ("CW",),
+    DIGI: ("FT8", "FT4", "RTTY", "PSK", "PSK31", "JS8", "JT65", "JT9", "MFSK", "OLIVIA",
+           "SSTV", "DIGI", "DATA", "FST4", "Q65", "WSPR", "PACKET", "HELL"),
+    PHONE: ("SSB", "LSB", "USB", "FM", "AM", "PHONE", "FONE", "VOICE", "PHONIE"),
+}
+_RE_WORD = re.compile(r"[A-Z0-9]+")
+# Mode choisi dans le log → famille correspondante.
+MODE_FAMILY = {"CW": CW, "SSB": PHONE, "LSB": PHONE, "USB": PHONE, "FM": PHONE, "AM": PHONE,
+               "FT8": DIGI, "FT4": DIGI, "RTTY": DIGI, "PSK31": DIGI, "PSK": DIGI,
+               "SSTV": DIGI, "DIGI": DIGI, "JS8": DIGI}
+
+
+def family_of_mode(mode: str) -> str:
+    """Mode du log (« SSB », « FT8 ») → famille (« PHONE », « DIGI »). '' si inconnu."""
+    return MODE_FAMILY.get((mode or "").strip().upper(), "")
+
+
+def mode_family(freq_khz: float, comment: str = "") -> str:
+    """Famille de modes d'un spot, d'après son commentaire puis le plan de bande."""
+    words = set(_RE_WORD.findall((comment or "").upper()))
+    for family in (DIGI, CW, PHONE):        # « FT8 CW skimmer » : le numérique l'emporte
+        if words & set(_WORDS[family]):
+            return family
+    limits = SEGMENTS.get(band_of(freq_khz))
+    if not limits:
+        return ""
+    cw_end, digi_end = limits            # bornes exclues : 7040 = début RTTY, 3600 = début phonie
+    if freq_khz < cw_end:
+        return CW
+    return DIGI if freq_khz < digi_end else PHONE
+
+
 def _age_minutes(when: str) -> int | None:
     """« 1433z 20 Sep » → âge en minutes (None si illisible)."""
     match = _RE_WHEN.match((when or "").strip())
@@ -94,7 +144,8 @@ def _from_dxwatch(call: str, limit: int) -> list[dict[str, Any]]:
             continue
         spots.append({"dx": call, "freq_khz": freq, "spotter": (row[0] or "").strip().upper(),
                       "comment": _clean(row[3]), "when": row[4],
-                      "age_min": _age_of(row), "band": band_of(freq)})
+                      "age_min": _age_of(row), "band": band_of(freq),
+                      "mode": mode_family(freq, row[3])})
     return spots
 
 
@@ -135,7 +186,8 @@ def _from_hamqth(call: str, limit: int) -> list[dict[str, Any]]:
             continue
         spots.append({"dx": call, "freq_khz": freq, "spotter": parts[2].strip().upper(),
                       "comment": _clean(parts[3]), "when": parts[4].strip(),
-                      "age_min": _age_hamqth(parts[4]), "band": band_of(freq)})
+                      "age_min": _age_hamqth(parts[4]), "band": band_of(freq),
+                      "mode": mode_family(freq, parts[3])})
     return spots[:limit]
 
 
