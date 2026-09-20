@@ -4,6 +4,25 @@
   <p class="act-alert act-alert-dupe">{{ _("⚑ Doublon : {call} déjà loggé sur cette bande/mode (QSO tout de même enregistré).", call=last_call) }}</p>
 {% endif %}
 
+{% set ents = entities|default([]) %}
+{% if ents %}
+<div class="act-card act-entities">
+  <div class="act-log-head">
+    <h2>{{ _("Pays contactés") }} <span class="act-count">{{ ents|length }}</span></h2>
+    <span class="act-muted">{{ _("le plus récent en premier") }}</span>
+  </div>
+  <ul class="act-dxcc">
+    {% for e in ents %}
+      <li class="act-dxcc-item{% if loop.first %} is-last{% endif %}" title="{{ e.name }} ({{ e.iso }}) — {{ _("{n} QSO", n=e.n) }}">
+        <span class="act-dxcc-flag">{{ e.flag }}</span>
+        <span class="act-dxcc-name">{{ e.name }}</span>
+        <span class="act-dxcc-n">{{ e.n }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <div class="act-card">
   <div class="act-log-head">
     <h2>{{ _("Contacts") }} <span class="act-count">{{ stats.total }}</span></h2>

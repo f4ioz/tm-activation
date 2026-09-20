@@ -508,3 +508,38 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 /* Bande/mode réservés par un autre opérateur : blocage signalé à la saisie. */
 .act-block-hint { margin: 0.2rem 0 0; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
 .act-block-hint.is-blocked { color: var(--red, #c0392b); font-weight: 600; }
+
+/* Spots DX de l'indicatif activé (page de log, rafraîchi chaque minute). */
+.act-spots-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.act-spots-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.5rem; border-left: 3px solid var(--accent); border-radius: 3px;
+  font-family: var(--font-mono, monospace); font-size: 0.85rem;
+}
+.act-spot-freq {
+  font-family: inherit; font-size: inherit; font-weight: 600; color: var(--accent);
+  background: none; border: 1px dashed var(--border); border-radius: 3px;
+  padding: 0.1rem 0.4rem; cursor: pointer;
+}
+.act-spot-freq:hover { border-style: solid; border-color: var(--accent); }
+.act-spot-band { border: 1px solid var(--border); border-radius: 3px; padding: 0 0.35rem; }
+.act-spot-age { color: var(--text-muted); }
+.act-spot-age.is-fresh { color: var(--green, #2ecc71); }
+.act-spot-comment { font-style: italic; color: var(--text-muted); }
+
+/* Pays (entités DXCC) contactés, mis à jour à chaque QSO enregistré. */
+.act-dxcc { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.act-dxcc-item {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 999px;
+  font-family: var(--font-mono, monospace); font-size: 0.8rem;
+}
+.act-dxcc-item.is-last { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Police emoji explicite : certains systèmes ne la prennent pas par défaut. */
+.act-dxcc-flag { font-size: 1.05rem; line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; }
+.act-dxcc-name { color: var(--text-muted); }
+.act-dxcc-n { color: var(--accent); font-weight: 600; }
+@media (max-width: 640px) {
+  .act-dxcc-name { display: none; }   /* écran étroit : drapeau + compteur suffisent */
+}

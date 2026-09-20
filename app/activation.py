@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Iterator
 from zoneinfo import ZoneInfo
 
-from app import auth as _auth
+from app import auth as _auth, dxcc_flags
 from app.config import activation_config, qrz_config
 from app.i18n import N_, _
 from app.qrz_xml import QrzXmlClient, get_shared_client
@@ -1401,6 +1401,40 @@ def stats(station: str | None = None) -> dict[str, Any]:
             ).fetchall()
         ]
     return {"total": int(total), "by_band": by_band, "by_mode": by_mode, "by_op": by_op}
+
+
+def worked_entities(station: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+    """Entités DXCC contactées, la plus récemment travaillée en tête.
+
+    Le drapeau vient du préfixe de l'indicatif (aucun réseau nécessaire) ; le
+    nom du pays vient du callbook QRZ quand il est connu, sinon de la table des
+    préfixes. Les indicatifs dont l'entité est inconnue sont ignorés.
+    """
+    init_db()
+    st = (_st(station),)
+    with conn() as c:
+        rows = c.execute(
+            "SELECT call, COUNT(*) AS n, MAX(qso_date || time_on) AS last FROM contacts "
+            "WHERE station=? GROUP BY call", st
+        ).fetchall()
+        known = {r["call"]: (r["dxcc_name"] or r["country"] or "").strip()
+                 for r in c.execute("SELECT call, dxcc_name, country FROM callbook").fetchall()}
+    seen: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        iso, name = dxcc_flags.entity_for_call(row["call"])
+        if not iso:
+            continue
+        item = seen.setdefault(iso, {"iso": iso, "flag": dxcc_flags.flag(iso), "name": name,
+                                     "n": 0, "last": "", "calls": 0, "from_qrz": False})
+        item["n"] += int(row["n"])
+        item["calls"] += 1
+        item["last"] = max(item["last"], row["last"] or "")
+        # Un nom venu de QRZ est plus précis que celui de la table des préfixes.
+        qrz_name = known.get(row["call"], "")
+        if qrz_name and not item["from_qrz"]:
+            item["name"], item["from_qrz"] = qrz_name, True
+    out = sorted(seen.values(), key=lambda e: e["last"], reverse=True)
+    return out[:limit] if limit else out
 
 
 # ── Callbook QRZ (nom / locator / DXCC des indicatifs contactés) ───────────

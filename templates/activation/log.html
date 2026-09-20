@@ -48,6 +48,8 @@
 </div>
 {% endif %}
 
+<div id="act-spots" hx-get="/activation/spots" hx-trigger="load, every 60s" hx-swap="innerHTML"></div>
+
 <div class="act-card act-op-select">
   <form method="post" action="/activation/whoami" class="act-inline">
     <label>{{ _("Opérateur au micro") }}
@@ -307,6 +309,19 @@
     syncNow();
   }
   applyPrefs();
+
+  // Clic sur un spot : fréquence (MHz) et bande reprises dans le formulaire.
+  var freqInput = form.querySelector('input[name=freq]');
+  window.actUseSpot = function (mhz, band) {
+    if (freqInput) freqInput.value = mhz;
+    if (band && Array.prototype.some.call(bandSel.options, function (o) { return o.value === band; })) {
+      bandSel.value = band;
+      saveKeep();
+      showWorked();
+      checkSlot();
+    }
+    callInput.focus();
+  };
 
   // Après un QSO loggé (formulaire remis à zéro par htmx).
   window.actAfterLog = function () {

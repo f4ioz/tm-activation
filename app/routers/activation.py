@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 
 from starlette.convertors import Convertor, register_url_convertor
 
-from app import activation, i18n, security, visits
+from app import activation, dx_spots, i18n, security, visits
 from app.auth import is_private
 from app.config import club_config
 from app.i18n import _
@@ -818,6 +818,7 @@ async def log_page(request: Request) -> Response:
             upcoming=activation.future_slots()[:3],
             contacts=activation.list_contacts(limit=100),
             stats=activation.stats(),
+            entities=activation.worked_entities(),
             now_input=activation.now_input(_tz_mode(request)),
         ),
     )
@@ -870,6 +871,24 @@ async def slot_conflict_route(request: Request, band: str = "", mode: str = "") 
         {"blocked": True, "operator": slot["operator_call"], "band": slot["band"], "mode": slot["mode"],
          "until": end.strftime("%H:%M") if end else slot["end_utc"],
          "tz": activation.tz_label(_tz_mode(request))},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/spots", response_class=HTMLResponse)
+async def spots_panel(request: Request) -> Response:
+    """Panneau « suis-je spotté ? » du log (rafraîchi par htmx, jamais bloquant).
+
+    Sans Internet, la liste revient vide et le panneau reste simplement absent.
+    """
+    if (g := _guard(request)) is not None:
+        return g
+    call = activation.callsign()
+    found = await run_in_threadpool(dx_spots.recent_spots, call, 5)
+    return templates.TemplateResponse(
+        request,
+        "activation/partials/spots.html",
+        {"call": call, "spots": found},
         headers={"Cache-Control": "no-store"},
     )
 
@@ -936,6 +955,7 @@ async def create_contact(
         {
             "contacts": activation.list_contacts(limit=100),
             "stats": activation.stats(),
+            "entities": activation.worked_entities(),
             "dupe": dupe,
             "error": error,
             "last_call": (call or "").strip().upper(),
@@ -954,6 +974,7 @@ async def remove_contact(request: Request, contact_id: int) -> Response:
         {
             "contacts": activation.list_contacts(limit=100),
             "stats": activation.stats(),
+            "entities": activation.worked_entities(),
             "dupe": False,
             "error": None,
             "last_call": "",

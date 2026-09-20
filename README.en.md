@@ -15,7 +15,9 @@ from a phone or a PC, while hunters follow the activation live on a public page.
 - **Shared schedule**: who is on air, when, on which band and mode, with an
   overlap warning, countdowns and the QSO count of each slot.
 - **Multi-operator QSO log**: quick entry, "now" time, duplicates flagged as
-  soon as the callsign is typed, QRZ lookup, satellite mode.
+  soon as the callsign is typed, QRZ lookup, satellite mode, a **DX spot panel**
+  ("am I being spotted?") and the **flags of the countries worked**, added as the
+  QSOs come in.
 - **ADIF**: import with a preview, full or selective export, ready for
   TQSL / LoTW.
 - **Public page** for hunters: current and upcoming activations, contacts map,
@@ -42,15 +44,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.0.tar.gz
 ```
 
 ## Features
@@ -85,6 +87,13 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13
     already in the log (with the bands/modes and the date of the last QSO), or a
     **duplicate** on the chosen band and mode; QSOs made under another club
     callsign are reported separately.
+  - **Am I being spotted?**: the latest DX spots for the callsign (DXWatch, with
+    HamQTH as a fallback) are shown above the form, with the frequency, the
+    spotter, the age and the comment; clicking the frequency copies it into the
+    form. With no Internet the panel simply disappears, with no error.
+  - **Countries worked**: the flags of the DXCC entities already worked are added
+    with every QSO logged, most recent first (derived from the prefix: no network
+    access needed).
   - **ADIF**: two-stage import (preview of new QSOs, duplicates and invalid
     lines, then confirmation) and full or selective export, ready to sign with
     TQSL for LoTW. CSV export.
@@ -151,22 +160,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.13.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.14.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.13.0.tar.gz
-   cd tm-activation-1.13.0
+   tar xzf tm-activation-1.14.0.tar.gz
+   cd tm-activation-1.14.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.13.0.zip
-   cd tm-activation-1.13.0
+   unzip tm-activation-1.14.0.zip
+   cd tm-activation-1.14.0
    sudo bash install.sh --lan
    ```
 
@@ -244,8 +253,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.13.0.tar.gz
-cd tm-activation-1.13.0
+tar xzf tm-activation-1.14.0.tar.gz
+cd tm-activation-1.14.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

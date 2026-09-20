@@ -1806,3 +1806,109 @@ def test_slot_lock_can_be_switched_off(monkeypatch) -> None:
 def test_slot_conflict_route_needs_the_operator_area() -> None:
     assert TestClient(app, follow_redirects=False).get(
         "/activation/slot-conflict?band=20M&mode=SSB").status_code == 303
+
+
+# ── Spots DX et drapeaux des pays contactés ────────────────────────────────
+
+
+def test_flag_for_call_reads_the_prefix() -> None:
+    from app import dxcc_flags
+
+    assert dxcc_flags.flag_for_call("F4IOZ") == ("🇫🇷", "France")
+    assert dxcc_flags.flag_for_call("TM25TEST")[1] == "France"
+    assert dxcc_flags.flag_for_call("EA8XX")[1] == "Canary Islands"   # préfixe long d'abord
+    assert dxcc_flags.flag_for_call("GM4ABC")[1] == "Scotland"
+    assert dxcc_flags.flag_for_call("F4IOZ/P")[0] == "🇫🇷"            # suffixe portable ignoré
+    assert dxcc_flags.flag_for_call("F/DL1ABC")[1] == "France"        # préfixe portable = pays d'émission
+    assert dxcc_flags.flag_for_call("XYZZY") == ("", "")              # inconnu : pas de drapeau
+
+
+def test_worked_entities_lists_countries_most_recent_first() -> None:
+    assert activation.worked_entities() == []
+    for call, date, t in (("DL1ABC", "20260101", "1200"), ("DL2ABC", "20260101", "1300"),
+                          ("VE1ZZ", "20260102", "0900"), ("XYZZY9", "20260103", "1000")):
+        activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date=date, time_on=t)
+    ents = activation.worked_entities()
+    assert [e["iso"] for e in ents] == ["CA", "DE"]      # XYZZY9 : entité inconnue, ignorée
+    assert ents[0]["flag"] == "🇨🇦" and ents[0]["n"] == 1
+    assert ents[1]["n"] == 2 and ents[1]["calls"] == 2   # deux indicatifs allemands
+    assert activation.worked_entities(limit=1) == [ents[0]]
+
+
+def test_log_page_shows_the_worked_country_flags(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    admin = _private_client()
+    page = admin.get("/activation/log").text
+    assert "Pays contactés" not in page                  # aucun QSO : pas d'encart
+    r = admin.post("/activation/contacts",
+                   data={"call": "DL1ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
+    assert "Pays contactés" in r.text and "🇩🇪" in r.text and "Germany" in r.text
+
+
+def test_spots_panel_survives_a_network_outage(monkeypatch) -> None:
+    """Sans Internet, le panneau est simplement vide : la page de log reste utilisable."""
+    from app import dx_spots as spots
+
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    spots.clear_cache()
+
+    def boom(*_a, **_k):
+        raise OSError("pas de réseau")
+
+    monkeypatch.setattr(spots.httpx, "get", boom)
+    assert spots.recent_spots("TM25TEST", force=True) == []
+    r = _private_client().get("/activation/spots")
+    assert r.status_code == 200 and r.text.strip() == ""
+
+
+def test_spots_panel_lists_the_spots(monkeypatch) -> None:
+    from app import dx_spots as spots
+
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    monkeypatch.setattr(
+        spots, "recent_spots",
+        lambda call, limit=5, force=False: [
+            {"dx": call, "freq_khz": 14190.0, "spotter": "K4NYX", "comment": "loud in FL",
+             "when": "1433z 20 Sep", "age_min": 3, "band": "20M"}
+        ],
+    )
+    page = _private_client().get("/activation/spots").text
+    assert "14190.0 kHz" in page and "K4NYX" in page and "20M" in page
+    assert "loud in FL" in page and "il y a 3 min" in page
+    assert "actUseSpot('14.190', '20M')" in page      # clic → fréquence reprise dans le formulaire
+
+
+def test_spots_needs_the_operator_area() -> None:
+    assert TestClient(app, follow_redirects=False).get("/activation/spots").status_code == 303
+
+
+def test_spot_band_and_age(monkeypatch) -> None:
+    from app import dx_spots as spots
+
+    assert spots.band_of(14190.0) == "20M" and spots.band_of(144300.0) == "2M"
+    assert spots.band_of(12345.0) == ""
+    now = datetime.now(timezone.utc)
+    stamp = (now - timedelta(minutes=7)).strftime("%H%Mz %d %b")
+    assert spots._age_minutes(stamp) in (6, 7, 8)
+    assert spots._age_minutes("n'importe quoi") is None
+
+
+def test_spots_are_cached_between_calls(monkeypatch) -> None:
+    from app import dx_spots as spots
+
+    spots.clear_cache()
+    calls = []
+
+    def fake(call, limit):
+        calls.append(call)
+        return [{"dx": call, "freq_khz": 14190.0, "spotter": "K4NYX", "comment": "",
+                 "when": "", "age_min": None, "band": "20M"}]
+
+    monkeypatch.setattr(spots, "_from_dxwatch", fake)
+    spots.recent_spots("TM25TEST")
+    spots.recent_spots("TM25TEST")
+    assert calls == ["TM25TEST"]                 # deuxième appel servi par le cache
+    spots.recent_spots("TM25TEST", force=True)
+    assert calls == ["TM25TEST", "TM25TEST"]
+    spots.clear_cache()
