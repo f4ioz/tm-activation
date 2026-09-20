@@ -186,7 +186,7 @@ async def operator_login_submit(
     if not blocked:
         visits.record_auth(request, "operator", op, error is None)
     if error is None:
-        # Mot de passe commun : l'indicatif rejoint le roster (en mode comptes,
+        # Mot de passe commun : l'indicatif rejoint la liste (en mode comptes,
         # operator_login l'a déjà fait, avec son mot de passe).
         if not per_op:
             try:

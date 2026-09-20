@@ -6,7 +6,7 @@ chaque refresh Wavelog, on ne veut surtout pas y mêler le log d'activation.
 
 Tables (créneaux et QSO portent l'indicatif spécial : colonne ``station``) :
 - ``stations``  : indicatifs spéciaux du club, un seul « en cours » à la fois ;
-- ``operators`` : roster des opérateurs autorisés à émettre sous l'indicatif ;
+- ``operators`` : liste des opérateurs autorisés à émettre sous l'indicatif ;
 - ``slots``     : créneaux réservés (qui / quand / bande / mode) ;
 - ``contacts``  : QSO loggés (indicatifs contactés) ;
 - ``callbook``  : cache des fiches QRZ des indicatifs contactés (nom, locator,
@@ -399,7 +399,7 @@ def operator_authed(token: str | None) -> bool:
 # Par défaut, tous les opérateurs partagent un mot de passe (operator_password).
 # Réglage « per_operator_auth » : chacun se connecte avec SON mot de passe, créé
 # à sa première connexion. Réglage « operator_approval » : un compte nouveau
-# attend l'accord d'un administrateur. Un opérateur déjà au roster (ajouté par
+# attend l'accord d'un administrateur. Un opérateur déjà dans la liste (ajouté par
 # un admin) n'a rien à faire valider : il choisit son mot de passe et entre.
 
 PBKDF2_ROUNDS = 200_000
@@ -523,7 +523,7 @@ def operator_login(call: str, password: str) -> str:
         return "weak"
     # Première connexion : le mot de passe saisi devient celui du compte.
     # Un indicatif inconnu attend l'accord d'un admin si la validation est active ;
-    # un opérateur déjà au roster a déjà été approuvé en y étant ajouté.
+    # un opérateur déjà dans la liste a déjà été approuvé en y étant ajouté.
     status = "pending" if (row is None and operator_approval()) else "active"
     now = int(time.time())
     with conn() as c:
@@ -746,7 +746,7 @@ def init_db() -> None:
         first = c.execute("SELECT callsign FROM stations ORDER BY id LIMIT 1").fetchone()[0]
         for table in ("slots", "contacts"):
             c.execute(f"UPDATE {table} SET station=? WHERE station IS NULL OR station=''", (first,))
-        # Seed du roster depuis la config au premier init (idempotent).
+        # Liste des opérateurs initialisée depuis la config au premier init (idempotent).
         for cs in _seed_operators():
             c.execute(
                 "INSERT OR IGNORE INTO operators(callsign, name, active, created_at) "
@@ -884,7 +884,7 @@ def list_operators(active_only: bool = True) -> list[dict[str, Any]]:
 
 def active_operators() -> list[str]:
     """Opérateurs qui utilisent RÉELLEMENT l'indicatif : présents dans un créneau
-    (passé / en cours / futur) ou dans un QSO loggé. Exclut le roster « dormant »."""
+    (passé / en cours / futur) ou dans un QSO loggé. Exclut les inscrits inactifs."""
     init_db()
     with conn() as c:
         st = (callsign(),)

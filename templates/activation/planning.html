@@ -48,9 +48,9 @@
     <form method="post" action="/activation/operators" class="act-form">
       <label>{{ _("Indicatif") }} <input type="text" name="callsign" required autocapitalize="characters" placeholder="F4XXX"></label>
       <label>{{ _("Nom") }} <input type="text" name="name" maxlength="60" placeholder="{{ _("Prénom (optionnel)") }}"></label>
-      <button type="submit">{{ _("Ajouter au roster") }}</button>
+      <button type="submit">{{ _("Ajouter à la liste") }}</button>
     </form>
-    <p class="act-muted">{{ _("{n} opérateur(s) au roster.", n=operators|length) }}</p>
+    <p class="act-muted">{{ _("{n} opérateur(s) enregistré(s).", n=operators|length) }}</p>
     <p class="act-muted">{{ _("Import d'un log ADIF : onglet") }} <a href="/activation/adif">ADIF</a>.</p>
   </div>
 </div>

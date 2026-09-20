@@ -91,7 +91,7 @@
         <label class="act-check"><input type="checkbox" name="approval" value="1"{% if operator_approval %} checked{% endif %}> {{ _("Valider les nouveaux comptes avant de les laisser loguer") }}</label>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
-      <p class="act-muted act-map-note">{{ _("Avec les comptes individuels, chaque opérateur crée son mot de passe à sa première connexion (son indicatif suffit). Un opérateur déjà au roster n'a pas besoin d'être validé : il a été ajouté par un administrateur.") }}</p>
+      <p class="act-muted act-map-note">{{ _("Avec les comptes individuels, chaque opérateur crée son mot de passe à sa première connexion (son indicatif suffit). Un opérateur déjà inscrit dans la liste des opérateurs n'a pas besoin d'être validé : il a été ajouté par un administrateur.") }}</p>
       <div class="act-scroll">
         <table class="act-table">
           <thead><tr><th>{{ _("Indicatif") }}</th><th>{{ _("Nom") }}</th><th>{{ _("État") }}</th><th>{{ _("Mot de passe") }}</th><th>{{ _("Administrateur") }}</th><th></th></tr></thead>
@@ -113,7 +113,7 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="act-muted">{{ _("Aucun opérateur au roster.") }}</td></tr>
+              <tr><td colspan="6" class="act-muted">{{ _("Aucun opérateur enregistré.") }}</td></tr>
             {% endfor %}
           </tbody>
         </table>

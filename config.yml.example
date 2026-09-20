@@ -48,6 +48,6 @@ activation:
   # Mot de passe commun des opérateurs (connexion sur /activation/login avec
   # leur indicatif). Modifiable ensuite dans les Réglages, qui priment.
   password: ""
-  operators: []             # roster initial, ex. ["F1ABC", "F4XYZ"]
+  operators: []             # liste des opérateurs au départ, ex. ["F1ABC", "F4XYZ"]
   qrz_enrich: true          # compléter les fiches QRZ en tâche de fond
   qrz_interval_seconds: 10  # 1 indicatif toutes les N secondes
