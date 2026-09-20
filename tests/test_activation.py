@@ -1748,3 +1748,61 @@ def test_log_page_shows_the_current_slots(monkeypatch) -> None:
     page = admin.get("/activation/log").text
     assert "Créneaux du moment" in page and "F5RRO" in page and "F4IOZ" in page
     assert "is-me" in page                      # l'opérateur connecté est mis en avant
+
+
+# ── Bande/mode réservés par un autre opérateur ─────────────────────────────
+
+
+def _now_slot(op: str, band: str, mode: str, start_min: int = -30, end_min: int = 60) -> int:
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M"
+    return activation.add_slot(op, (now + timedelta(minutes=start_min)).strftime(fmt),
+                               (now + timedelta(minutes=end_min)).strftime(fmt), band, mode)
+
+
+def test_blocking_slot_only_for_another_operator() -> None:
+    _now_slot("F5RRO", "20M", "SSB")
+    assert activation.blocking_slot("F4IOZ", "20M", "SSB")["operator_call"] == "F5RRO"
+    assert activation.blocking_slot("F5RRO", "20M", "SSB") is None      # son propre créneau
+    assert activation.blocking_slot("F4IOZ", "40M", "SSB") is None      # autre bande
+    assert activation.blocking_slot("F4IOZ", "20M", "CW") is None       # autre mode
+    # Hors de la tranche horaire, plus rien ne bloque.
+    later = (datetime.now(timezone.utc) + timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M")
+    assert activation.blocking_slot("F4IOZ", "20M", "SSB", later) is None
+
+
+def test_logging_is_refused_on_a_reserved_band_and_mode(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    _now_slot("F5RRO", "20M", "SSB")
+    admin = _private_client()
+    r = admin.post("/activation/contacts",
+                   data={"call": "DL1ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
+    assert r.status_code == 200 and "réservé par F5RRO" in r.text
+    assert activation.list_contacts() == []                  # rien n'est écrit
+    # Sur une autre bande, le QSO passe.
+    r = admin.post("/activation/contacts",
+                   data={"call": "DL1ABC", "band": "40M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
+    assert "réservé par" not in r.text and len(activation.list_contacts()) == 1
+    # L'opérateur qui a réservé loggue normalement sur son créneau.
+    r = admin.post("/activation/contacts",
+                   data={"call": "DL2ABC", "band": "20M", "mode": "SSB", "operator": "F5RRO", "now": "1"})
+    assert "réservé par" not in r.text and len(activation.list_contacts()) == 2
+
+
+def test_slot_lock_can_be_switched_off(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    _now_slot("F5RRO", "20M", "SSB")
+    activation.set_flag("slot_lock", False)
+    admin = _private_client()
+    r = admin.post("/activation/contacts",
+                   data={"call": "DL1ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
+    assert "réservé par" not in r.text and len(activation.list_contacts()) == 1
+    assert admin.get("/activation/slot-conflict?band=20M&mode=SSB").json() == {"blocked": False}
+    activation.set_flag("slot_lock", True)
+    d = admin.get("/activation/slot-conflict?band=20M&mode=SSB").json()
+    assert d["blocked"] and d["operator"] == "F5RRO" and d["band"] == "20M"
+
+
+def test_slot_conflict_route_needs_the_operator_area() -> None:
+    assert TestClient(app, follow_redirects=False).get(
+        "/activation/slot-conflict?band=20M&mode=SSB").status_code == 303

@@ -43,15 +43,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.11.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.11.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.11.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -78,6 +78,9 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.11
     réservé voit son créneau créé d'après ses QSO, et celui qui dépasse l'heure
     prévue voit le sien prolongé. La page de log affiche les **créneaux du
     moment**, celui de l'opérateur connecté mis en avant.
+  - **Pas deux stations à la fois** sur la même bande et le même mode : si un
+    autre opérateur a réservé, la saisie est signalée en rouge et le QSO est
+    refusé (réglage désactivable).
   - **Log QSO** rapide : heure « maintenant », détection des doublons, recherche
     QRZ (nom, locator, pays), mode satellite. Dès l'indicatif saisi, l'écran dit
     si la **station a déjà été contactée** : jamais vue, déjà au log (avec les
@@ -149,22 +152,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.11.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.12.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.11.0.tar.gz
-   cd tm-activation-1.11.0
+   tar xzf tm-activation-1.12.0.tar.gz
+   cd tm-activation-1.12.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.11.0.zip
-   cd tm-activation-1.11.0
+   unzip tm-activation-1.12.0.zip
+   cd tm-activation-1.12.0
    sudo bash install.sh --lan
    ```
 
@@ -245,8 +248,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.11.0.tar.gz
-cd tm-activation-1.11.0
+tar xzf tm-activation-1.12.0.tar.gz
+cd tm-activation-1.12.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

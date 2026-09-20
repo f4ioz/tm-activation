@@ -505,3 +505,6 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-slots-list li.act-slot-live { border-left-color: var(--green, #2ecc71); }
 .act-slots-list li.is-me { background: color-mix(in srgb, var(--accent) 12%, transparent); border-left-color: var(--accent); }
 .act-slot-auto { font-style: italic; }
+/* Bande/mode réservés par un autre opérateur : blocage signalé à la saisie. */
+.act-block-hint { margin: 0.2rem 0 0; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
+.act-block-hint.is-blocked { color: var(--red, #c0392b); font-weight: 600; }

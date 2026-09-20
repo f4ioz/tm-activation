@@ -145,6 +145,7 @@
       <p class="act-muted">{{ _("Contrôle ce qui est visible sur les pages publiques") }} ({{ _("ex.") }} <a href="/{{ station.slug }}">/{{ station.slug }}</a>).</p>
       <form method="post" action="/activation/settings/flags" class="act-form">
         <label class="act-check"><input type="checkbox" name="auto_slots" value="1"{% if auto_slots %} checked{% endif %}> {{ _("Créer et prolonger les créneaux d'après le log") }}</label>
+        <label class="act-check"><input type="checkbox" name="slot_lock" value="1"{% if slot_lock %} checked{% endif %}> {{ _("Interdire de loguer sur une bande et un mode réservés par un autre opérateur") }}</label>
         <label class="act-check"><input type="checkbox" name="show_contacts" value="1"{% if show_contacts %} checked{% endif %}> {{ _("Afficher la liste des contacts (« Derniers contacts »)") }}</label>
         <label class="act-check"><input type="checkbox" name="show_map_stats" value="1"{% if show_map_stats %} checked{% endif %}> {{ _("Afficher la carte, le tableau DXCC et le classement des chasseurs") }}</label>
         <button type="submit">{{ _("Enregistrer") }}</button>

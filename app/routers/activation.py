@@ -344,6 +344,7 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             show_contacts=activation.show_contacts(),
             show_map_stats=activation.show_map_stats(),
             auto_slots=activation.auto_slots(),
+            slot_lock=activation.slot_lock(),
             callbook=activation.callbook_progress(),
             per_operator_auth=activation.per_operator_auth(),
             operator_approval=activation.operator_approval(),
@@ -387,13 +388,14 @@ async def change_operator_password(
 @router.post("/settings/flags")
 async def change_flags(
     request: Request, show_contacts: str = Form(""), show_map_stats: str = Form(""),
-    auto_slots: str = Form(""),
+    auto_slots: str = Form(""), slot_lock: str = Form(""),
 ) -> Response:
     if (g := _require_admin(request)) is not None:
         return g
     activation.set_flag("show_contacts", bool(show_contacts))
     activation.set_flag("show_map_stats", bool(show_map_stats))
     activation.set_flag("auto_slots", bool(auto_slots))
+    activation.set_flag("slot_lock", bool(slot_lock))
     return RedirectResponse("/activation/settings?fl=ok", status_code=303)
 
 
@@ -855,6 +857,23 @@ async def worked_route(request: Request, call: str = "") -> Response:
     return JSONResponse(activation.worked_before(call), headers={"Cache-Control": "no-store"})
 
 
+@router.get("/slot-conflict")
+async def slot_conflict_route(request: Request, band: str = "", mode: str = "") -> Response:
+    """Bande/mode réservés par un autre opérateur en ce moment ? (avertissement live)"""
+    if (g := _guard(request)) is not None:
+        return g
+    slot = activation.blocking_slot(_current_op(request), band, mode) if activation.slot_lock() else None
+    if slot is None:
+        return JSONResponse({"blocked": False}, headers={"Cache-Control": "no-store"})
+    end = activation.disp(slot["end_utc"], _tz_mode(request))
+    return JSONResponse(
+        {"blocked": True, "operator": slot["operator_call"], "band": slot["band"], "mode": slot["mode"],
+         "until": end.strftime("%H:%M") if end else slot["end_utc"],
+         "tz": activation.tz_label(_tz_mode(request))},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.post("/contacts", response_class=HTMLResponse)
 async def create_contact(
     request: Request,
@@ -888,15 +907,29 @@ async def create_contact(
         parts = activation.utc_iso_to_parts(iso) if iso else None
         if parts:
             qso_date, time_on = parts
-    try:
-        activation.add_contact(
-            call=call, band=band, mode=mode, operator_call=op,
-            qso_date=qso_date, time_on=time_on,
-            freq_mhz=freq_mhz, rst_sent=rst_sent, rst_rcvd=rst_rcvd,
-            gridsquare=gridsquare, sat_name=sat_name, comment=comment,
-        )
-    except ValueError as exc:
-        error = str(exc)
+    # Bande et mode réservés par un autre opérateur à cet instant : on n'écrit
+    # rien (deux stations sous le même indicatif se brouilleraient).
+    blocking = None
+    if activation.slot_lock():
+        when_utc = (activation.parts_to_utc_iso(qso_date, time_on)
+                    if qso_date and time_on else None)
+        blocking = activation.blocking_slot(op, band, mode, when_utc)
+    if blocking is not None:
+        end = activation.disp(blocking["end_utc"], _tz_mode(request))
+        error = _("{band} {mode} est réservé par {call} jusqu'à {end} ({tz}) : QSO non enregistré.",
+                  band=blocking["band"], mode=blocking["mode"], call=blocking["operator_call"],
+                  end=end.strftime("%H:%M") if end else blocking["end_utc"],
+                  tz=activation.tz_label(_tz_mode(request)))
+    else:
+        try:
+            activation.add_contact(
+                call=call, band=band, mode=mode, operator_call=op,
+                qso_date=qso_date, time_on=time_on,
+                freq_mhz=freq_mhz, rst_sent=rst_sent, rst_rcvd=rst_rcvd,
+                gridsquare=gridsquare, sat_name=sat_name, comment=comment,
+            )
+        except ValueError as exc:
+            error = str(exc)
     return templates.TemplateResponse(
         request,
         "activation/partials/log_result.html",

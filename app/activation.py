@@ -849,6 +849,12 @@ def now_input(mode: str = "local") -> str:
     return datetime.now(tzinfo_for(mode)).strftime("%Y-%m-%dT%H:%M")
 
 
+def parts_to_utc_iso(qso_date: str, time_on: str) -> str | None:
+    """(qso_date « AAAAMMJJ », time_on « HHMM ») → « AAAA-MM-JJTHH:MM » UTC."""
+    minutes = _utc_minutes(qso_date, time_on)
+    return _minutes_to_iso(minutes) if minutes is not None else None
+
+
 def utc_iso_to_parts(utc_iso: str) -> tuple[str, str] | None:
     """ISO UTC 'YYYY-MM-DDTHH:MM' → (qso_date 'YYYYMMDD', time_on 'HHMM')."""
     try:
@@ -1092,6 +1098,26 @@ def log_sessions(station: str | None = None) -> list[dict[str, Any]]:
         sessions.append({"operator_call": op, "band": band, "mode": mode,
                          "first": start, "last": previous})
     return sorted(sessions, key=lambda s: s["first"])
+
+
+def slot_lock() -> bool:
+    """Interdire de loguer sur une bande/mode réservés par un autre opérateur
+    (réglage, activé par défaut) : deux stations ne peuvent pas émettre en même
+    temps sous le même indicatif, sur la même bande et le même mode."""
+    return get_flag("slot_lock", True)
+
+
+def blocking_slot(operator_call: str, band: str, mode: str, when_utc: str | None = None,
+                  station: str | None = None) -> dict[str, Any] | None:
+    """Créneau d'un AUTRE opérateur couvrant cette bande, ce mode et cet instant."""
+    cs = (operator_call or "").strip().upper()
+    moment = when_utc or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
+    for slot in list_slots(station=station):
+        if (slot["operator_call"] != cs and slot["band"] == (band or "").upper()
+                and slot["mode"] == (mode or "").upper()
+                and slot["start_utc"] <= moment < slot["end_utc"]):
+            return slot
+    return None
 
 
 def reconcile_slots_from_log(station: str | None = None) -> dict[str, int]:

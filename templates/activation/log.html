@@ -78,6 +78,7 @@
     <div class="act-toggles">
       <label class="act-check"><input type="checkbox" id="act-qrz-toggle" checked> {{ _("🔎 Recherche QRZ en quittant la case indicatif") }}</label>
     </div>
+    <p id="act-block-hint" class="act-block-hint" aria-live="polite"></p>
     <p id="act-worked-hint" class="act-worked-hint" aria-live="polite"></p>
     <p id="act-qrz-hint" class="act-qrz-hint" aria-live="polite"></p>
     <div class="act-row">
@@ -118,7 +119,8 @@
     fresh: {{ _("✓ Station jamais contactée")|tojson }},
     worked: {{ _("● Déjà contactée : {n} QSO ({pairs}) — dernier le {last}")|tojson }},
     dupe: {{ _("⚑ Déjà contactée sur {band} {mode} : ce QSO serait un doublon")|tojson }},
-    elsewhere: {{ _("contactée sous {station}")|tojson }}
+    elsewhere: {{ _("contactée sous {station}")|tojson }},
+    blocked: {{ _("⛔ {band} {mode} est réservé par {operator} jusqu'à {until} ({tz}) — changez de bande ou de mode")|tojson }}
   };
   function fill(tpl, values) {
     return tpl.replace(/\{(\w+)\}/g, function (_m, k) { return values[k]; });
@@ -246,6 +248,28 @@
   bandSel.addEventListener('change', showWorked);
   modeSel.addEventListener('change', showWorked);
 
+  // ── Bande/mode réservés par un autre opérateur : on prévient avant de loguer ──
+  var blockHint = document.getElementById('act-block-hint');
+  var submitBtn = form.querySelector('button[type=submit]');
+
+  function checkSlot() {
+    var url = '/activation/slot-conflict?band=' + encodeURIComponent(bandSel.value)
+            + '&mode=' + encodeURIComponent(modeSel.value);
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var on = !!(d && d.blocked);
+        blockHint.textContent = on ? fill(T.blocked, d) : '';
+        blockHint.classList.toggle('is-blocked', on);
+        if (submitBtn) submitBtn.disabled = on || !form.querySelector('input[name=operator]').value;
+      })
+      .catch(function () { blockHint.textContent = ''; });
+  }
+  bandSel.addEventListener('change', checkSlot);
+  modeSel.addEventListener('change', checkSlot);
+  setInterval(checkSlot, 60000);      // un créneau peut commencer pendant la saisie
+  checkSlot();
+
   callInput.addEventListener('change', lookup);
   callInput.addEventListener('blur', lookup);
   callInput.addEventListener('input', function () { if (!callInput.value) { show(''); lastCall = ''; } });
@@ -292,6 +316,7 @@
     resetWhen();
     show(''); lastCall = ''; autoGrid = '';
     workedData = null; workedCall = ''; showWorked();
+    checkSlot();
   };
 })();
 </script>
