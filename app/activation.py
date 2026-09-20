@@ -1057,6 +1057,39 @@ def is_dupe(call: str, band: str, mode: str) -> bool:
     return row is not None
 
 
+def worked_before(call: str, station: str | None = None) -> dict[str, Any]:
+    """Station déjà contactée ? (affiché pendant la saisie du log)
+
+    Pour l'indicatif en cours : nombre de QSO, couples bande/mode déjà faits et
+    date du dernier contact. Signale aussi les QSO faits sous les AUTRES
+    indicatifs spéciaux du club, qui ne sont pas des doublons.
+    """
+    cs = (call or "").strip().upper()
+    empty = {"call": cs, "worked": 0, "band_modes": [], "last": "", "elsewhere": []}
+    if not valid_callsign(cs):
+        return empty
+    init_db()
+    st = _st(station)
+    with conn() as c:
+        rows = [dict(r) for r in c.execute(
+            "SELECT band, mode, qso_date, time_on, operator_call FROM contacts "
+            "WHERE station=? AND call=? ORDER BY qso_date DESC, time_on DESC", (st, cs)).fetchall()]
+        others = [dict(r) for r in c.execute(
+            "SELECT station, COUNT(*) AS n FROM contacts WHERE station<>? AND call=? GROUP BY station "
+            "ORDER BY station", (st, cs)).fetchall()]
+    seen: list[str] = []
+    for r in rows:
+        pair = f"{r['band']} {r['mode']}".strip()
+        if pair and pair not in seen:
+            seen.append(pair)
+    last = ""
+    if rows:
+        d, t = rows[0]["qso_date"], rows[0]["time_on"]
+        last = f"{d[6:8]}/{d[4:6]}/{d[2:4]} {t[:2]}:{t[2:4]}" if len(d) == 8 and len(t) >= 4 else d
+    return {"call": cs, "worked": len(rows), "band_modes": seen, "last": last,
+            "elsewhere": [{"station": o["station"], "n": o["n"]} for o in others]}
+
+
 def add_contact(
     *,
     call: str,

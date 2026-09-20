@@ -49,6 +49,7 @@
     <div class="act-toggles">
       <label class="act-check"><input type="checkbox" id="act-qrz-toggle" checked> {{ _("🔎 Recherche QRZ en quittant la case indicatif") }}</label>
     </div>
+    <p id="act-worked-hint" class="act-worked-hint" aria-live="polite"></p>
     <p id="act-qrz-hint" class="act-qrz-hint" aria-live="polite"></p>
     <div class="act-row">
       <div class="act-when">
@@ -83,6 +84,16 @@
 (function () {
   var form = document.querySelector('.act-log-form');
   if (!form) return;
+  // Textes du script (traduits côté serveur).
+  var T = {
+    fresh: {{ _("✓ Station jamais contactée")|tojson }},
+    worked: {{ _("● Déjà contactée : {n} QSO ({pairs}) — dernier le {last}")|tojson }},
+    dupe: {{ _("⚑ Déjà contactée sur {band} {mode} : ce QSO serait un doublon")|tojson }},
+    elsewhere: {{ _("contactée sous {station}")|tojson }}
+  };
+  function fill(tpl, values) {
+    return tpl.replace(/\{(\w+)\}/g, function (_m, k) { return values[k]; });
+  }
   // Préférences mémorisées dans le navigateur (coches « Maintenant » / QRZ).
   function pref(key, def) {
     try { var v = localStorage.getItem(key); return v === null ? def : v === '1'; } catch (e) { return def; }
@@ -154,6 +165,58 @@
       })
       .catch(function () { show(''); });
   }
+  // ── Station déjà contactée ? (log local, indépendant de QRZ) ──────────
+  var workedHint = document.getElementById('act-worked-hint');
+  var bandSel = form.querySelector('select[name=band]');
+  var modeSel = form.querySelector('select[name=mode]');
+  var workedData = null, workedCall = '';
+
+  function showWorked() {
+    if (!workedData || !workedData.call) { workedHint.textContent = ''; workedHint.className = 'act-worked-hint'; return; }
+    var band = bandSel.value, mode = modeSel.value;
+    var pair = band + ' ' + mode;
+    var text, cls = 'act-worked-hint';
+    if (!workedData.worked) {
+      text = T.fresh;
+      cls += ' is-fresh';
+    } else if (workedData.band_modes.indexOf(pair) !== -1) {
+      text = fill(T.dupe, { band: band, mode: mode });
+      cls += ' is-dupe';
+    } else {
+      text = fill(T.worked, { n: workedData.worked, pairs: workedData.band_modes.join(', '),
+                              last: workedData.last });
+      cls += ' is-worked';
+    }
+    if (workedData.elsewhere && workedData.elsewhere.length) {
+      text += ' · ' + workedData.elsewhere.map(function (e) {
+        return fill(T.elsewhere, { station: e.station }) + ' (' + e.n + ')';
+      }).join(', ');
+    }
+    workedHint.textContent = text;
+    workedHint.className = cls;
+  }
+
+  function checkWorked() {
+    var call = (callInput.value || '').trim().toUpperCase();
+    if (call.length < 3) { workedData = null; workedCall = ''; showWorked(); return; }
+    if (call === workedCall) { showWorked(); return; }
+    workedCall = call;
+    fetch('/activation/worked?call=' + encodeURIComponent(call), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if ((callInput.value || '').trim().toUpperCase() !== call) return;   // indicatif changé
+        workedData = d;
+        showWorked();
+      })
+      .catch(function () { workedData = null; showWorked(); });
+  }
+
+  callInput.addEventListener('change', checkWorked);
+  callInput.addEventListener('blur', checkWorked);
+  callInput.addEventListener('input', function () { if (!callInput.value) { workedData = null; workedCall = ''; showWorked(); } });
+  bandSel.addEventListener('change', showWorked);
+  modeSel.addEventListener('change', showWorked);
+
   callInput.addEventListener('change', lookup);
   callInput.addEventListener('blur', lookup);
   callInput.addEventListener('input', function () { if (!callInput.value) { show(''); lastCall = ''; } });
@@ -199,6 +262,7 @@
     applyPrefs();
     resetWhen();
     show(''); lastCall = ''; autoGrid = '';
+    workedData = null; workedCall = ''; showWorked();
   };
 })();
 </script>

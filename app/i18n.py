@@ -193,6 +193,9 @@ def js_catalog() -> dict[str, str]:
 
 def install(env: Any) -> None:
     """Rend _(), la langue et les dates localisées disponibles dans les templates."""
+    # Textes traduits passés au JavaScript (|tojson) : accents gardés tels quels,
+    # la page est en UTF-8 (sinon « contactée » devient « contact\u00e9e »).
+    env.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
     env.globals.update(
         _=gettext,
         current_lang=current,

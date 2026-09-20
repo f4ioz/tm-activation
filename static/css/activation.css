@@ -444,3 +444,9 @@ a.act-station-card:hover { border-color: var(--accent); }
 .flatpickr-time input, .flatpickr-time .flatpickr-time-separator, .flatpickr-time .flatpickr-am-pm { color: var(--text); }
 .flatpickr-time input:hover, .flatpickr-time input:focus { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .flatpickr-innerContainer, .flatpickr-time { border-color: var(--border); }
+
+/* Indication « station déjà contactée ? » pendant la saisie du log. */
+.act-worked-hint { margin: 0.2rem 0 0; min-height: 1.1em; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
+.act-worked-hint.is-fresh { color: var(--green, #2ecc71); }
+.act-worked-hint.is-worked { color: var(--cyan); }
+.act-worked-hint.is-dupe { color: var(--warn, #e0a800); font-weight: 600; }

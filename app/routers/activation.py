@@ -842,6 +842,14 @@ async def qrz_lookup_route(request: Request, call: str = "") -> Response:
     )
 
 
+@router.get("/worked")
+async def worked_route(request: Request, call: str = "") -> Response:
+    """Station déjà contactée ? Interrogé pendant la saisie de l'indicatif."""
+    if (g := _guard(request)) is not None:
+        return g
+    return JSONResponse(activation.worked_before(call), headers={"Cache-Control": "no-store"})
+
+
 @router.post("/contacts", response_class=HTMLResponse)
 async def create_contact(
     request: Request,

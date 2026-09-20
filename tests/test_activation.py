@@ -1623,3 +1623,44 @@ def test_captcha_only_in_per_operator_mode() -> None:
     client = _op_client()
     r = client.post("/activation/login", data={"callsign": "F5CLA", "password": "commun"})
     assert r.status_code == 303 and client.get("/activation").status_code == 200
+
+
+# ── « Station déjà contactée ? » pendant la saisie du log ──────────────────
+
+
+def test_worked_before_reports_history_of_a_station() -> None:
+    assert activation.worked_before("DL1ABC") == {
+        "call": "DL1ABC", "worked": 0, "band_modes": [], "last": "", "elsewhere": []}
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                           qso_date="20260907", time_on="1030")
+    activation.add_contact(call="DL1ABC", band="40M", mode="CW", operator_call="F4IOZ",
+                           qso_date="20260908", time_on="0915")
+    activation.add_contact(call="DL1ABC", band="40M", mode="CW", operator_call="F5RRO",
+                           qso_date="20260908", time_on="0920")
+    w = activation.worked_before("dl1abc")
+    assert w["worked"] == 3 and w["last"] == "08/09/26 09:20"
+    assert sorted(w["band_modes"]) == ["20M SSB", "40M CW"] and w["elsewhere"] == []
+    # QSO sous un AUTRE indicatif du club : signalé à part (ce n'est pas un doublon).
+    activation.create_station("TM61TEST")
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                           qso_date="20260909", time_on="1000", station="TM61TEST")
+    w = activation.worked_before("DL1ABC")
+    assert w["worked"] == 3 and w["elsewhere"] == [{"station": "TM61TEST", "n": 1}]
+    assert activation.worked_before("!!")["worked"] == 0
+
+
+def test_worked_route_needs_the_operator_area(monkeypatch) -> None:
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    anon = TestClient(app, follow_redirects=False)
+    assert anon.get("/activation/worked?call=DL1ABC").status_code == 303
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    d = _private_client().get("/activation/worked?call=dl1abc").json()
+    assert d["call"] == "DL1ABC" and d["worked"] == 1 and d["band_modes"] == ["20M SSB"]
+
+
+def test_log_page_carries_the_worked_hint(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    page = _private_client().get("/activation/log").text
+    assert 'id="act-worked-hint"' in page and "/activation/worked?call=" in page
+    for text in ("Station jamais contactée", "Déjà contactée", "doublon"):
+        assert text in page, text
