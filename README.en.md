@@ -21,19 +21,22 @@ from a phone or a PC, while hunters follow the activation live on a public page.
 - **ADIF**: import with a preview, full or selective export, ready for
   TQSL / LoTW.
 - **Public page** for hunters: current and upcoming activations, contacts map,
-  DXCC table, points ranking and an "am I in the log?" search.
+  DXCC table with flags (no QRZ account needed), points ranking and an "am I in
+  the log?" search.
 - **Operator accounts**, your choice: one shared password, or one per operator
   with optional approval and several administrators.
 - **French and English**, picked by the visitor.
 
 It installs in a few minutes on a **Raspberry Pi**, a **Proxmox container** or a
 Linux server, and runs on its own — including on a local network with **no
-Internet** (libraries, fonts and calendar are bundled; only the map background
-and QRZ need a connection).
+Internet** (libraries, fonts, calendar and flags are bundled; only the map
+background, the QRZ lookups and the DX spots need a connection).
 
 | QSO log | Schedule |
 |---|---|
 | ![Logging a QSO](docs/images/log.png) | ![Slot schedule](docs/images/planning.png) |
+
+![DXCC worked and hunter ranking](docs/images/dxcc.png)
 
 ![Contacts map](docs/images/map.jpg)
 
@@ -44,15 +47,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.tar.gz
 ```
 
 ## Features
@@ -99,10 +102,12 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15
     lines, then confirmation) and full or selective export, ready to sign with
     TQSL for LoTW. CSV export.
 - **Public page** per callsign (`/tm50abc`): live and upcoming activations, map
-  of the stations worked, DXCC table **with flags** (the entity is derived from
-  the prefix, so the table is right even **without a QRZ account**), hunter
-  ranking (configurable points rule), "am I in the log?" search. The names of the stations worked are never
-  published.
+  of the stations worked, **DXCC table with flags**, hunter ranking
+  (configurable points rule), "am I in the log?" search. The DXCC entity is
+  derived from the callsign prefix, so the table and the flags are right from
+  the very first QSO, **even without a QRZ account** — QRZ, when configured,
+  refines the official name of the entity. The names of the stations worked are
+  never published.
 - **Several special callsigns**: only one "current" at a time, the previous ones
   remain available to view (`/activations`).
 - **Français / English**: every page is displayed in the browser's language
@@ -162,22 +167,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.15.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.15.1.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.15.0.tar.gz
-   cd tm-activation-1.15.0
+   tar xzf tm-activation-1.15.1.tar.gz
+   cd tm-activation-1.15.1
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.15.0.zip
-   cd tm-activation-1.15.0
+   unzip tm-activation-1.15.1.zip
+   cd tm-activation-1.15.1
    sudo bash install.sh --lan
    ```
 
@@ -211,7 +216,12 @@ application itself. Only the following are missing:
 - the OpenStreetMap **base map**: the stations are still placed, on an empty
   background;
 - the **QRZ lookups**: they are done automatically when Internet comes back,
-  for every callsign already logged.
+  for every callsign already logged;
+- the **DX spots**: the "am I being spotted?" panel simply disappears from the
+  log page.
+
+The **flags of the countries worked** need nothing at all: the DXCC entity is
+derived from the callsign prefix and the images are served by the application.
 
 ## Installation on Proxmox VE (LXC container)
 
@@ -255,8 +265,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.15.0.tar.gz
-cd tm-activation-1.15.0
+tar xzf tm-activation-1.15.1.tar.gz
+cd tm-activation-1.15.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

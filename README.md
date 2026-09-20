@@ -21,20 +21,23 @@ en direct sur une page publique.
 - **ADIF** : import avec aperçu, export complet ou d'une sélection, prêt pour
   TQSL / LoTW.
 - **Page publique** pour les chasseurs : activations en cours et à venir, carte
-  des contacts, tableau DXCC, classement aux points et recherche « suis-je dans
-  le log ? ».
+  des contacts, tableau DXCC avec les drapeaux (sans compte QRZ), classement aux
+  points et recherche « suis-je dans le log ? ».
 - **Comptes opérateurs** au choix : un mot de passe commun, ou un par opérateur
   avec validation facultative et plusieurs administrateurs.
 - **Français et anglais**, au choix du visiteur.
 
 Elle s'installe en quelques minutes sur un **Raspberry Pi**, un **conteneur
 Proxmox** ou un serveur Linux, et fonctionne de façon autonome — y compris sur
-un réseau local **sans Internet** (bibliothèques, polices et calendrier
-embarqués ; seuls le fond de carte et QRZ demandent une connexion).
+un réseau local **sans Internet** (bibliothèques, polices, calendrier et
+drapeaux embarqués ; seuls le fond de carte, la recherche QRZ et les spots DX
+demandent une connexion).
 
 | Log QSO | Planning |
 |---|---|
 | ![Saisie d'un QSO](docs/images/log.png) | ![Planning des créneaux](docs/images/planning.png) |
+
+![DXCC contactés et classement des chasseurs](docs/images/dxcc.png)
 
 ![Carte des contacts](docs/images/map.jpg)
 
@@ -45,15 +48,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.tar.gz
 ```
 
 ## Fonctionnalités
@@ -101,11 +104,12 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15
     lignes invalides, puis confirmation) et export complet ou d'une sélection,
     prêt à signer avec TQSL pour LoTW. Export CSV.
 - **Page publique** par indicatif (`/tm50abc`) : activations en direct et à
-  venir, carte des stations contactées, tableau DXCC **avec les drapeaux**
-  (l'entité est déduite du préfixe : le tableau est juste même **sans compte
-  QRZ**), classement des chasseurs
-  (règle de points réglable), recherche « suis-je dans le log ? ». Les noms des
-  stations contactées ne sont jamais publiés.
+  venir, carte des stations contactées, tableau **DXCC avec les drapeaux**,
+  classement des chasseurs (règle de points réglable), recherche « suis-je dans
+  le log ? ». L'entité DXCC est déduite du préfixe de l'indicatif : le tableau
+  et les drapeaux sont justes dès le premier QSO, **même sans compte QRZ** —
+  QRZ, quand il est configuré, précise le nom officiel de l'entité. Les noms
+  des stations contactées ne sont jamais publiés.
 - **Plusieurs indicatifs spéciaux** : un seul « en cours » à la fois, les
   précédents restent consultables (`/activations`).
 - **Français / English** : chaque page s'affiche dans la langue du navigateur
@@ -166,22 +170,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.15.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.15.1.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.15.0.tar.gz
-   cd tm-activation-1.15.0
+   tar xzf tm-activation-1.15.1.tar.gz
+   cd tm-activation-1.15.1
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.15.0.zip
-   cd tm-activation-1.15.0
+   unzip tm-activation-1.15.1.zip
+   cd tm-activation-1.15.1
    sudo bash install.sh --lan
    ```
 
@@ -217,7 +221,13 @@ fournies par l'application elle-même. Seuls manquent :
 - le **fond de carte** OpenStreetMap : les stations restent placées, sur fond
   vide ;
 - les **recherches QRZ** : elles se font automatiquement au retour d'Internet,
-  pour tous les indicatifs déjà loggés.
+  pour tous les indicatifs déjà loggés ;
+- les **spots DX** : le panneau « suis-je spotté ? » disparaît simplement de la
+  page de log.
+
+Les **drapeaux des pays contactés**, eux, ne demandent rien : l'entité DXCC est
+déduite du préfixe de l'indicatif et les vignettes sont servies par
+l'application.
 
 ## Installation sur Proxmox VE (conteneur LXC)
 
@@ -262,8 +272,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.15.0.tar.gz
-cd tm-activation-1.15.0
+tar xzf tm-activation-1.15.1.tar.gz
+cd tm-activation-1.15.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
