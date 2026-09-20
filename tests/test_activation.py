@@ -1503,6 +1503,7 @@ def test_shared_password_mode_is_unchanged() -> None:
 
 
 def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
+    activation.set_flag("auto_slots", False)     # on teste le comptage seul
     sid = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
     other = activation.add_slot("F5RRO", "2026-09-07T10:00", "2026-09-07T12:00", "40M", "CW")
     activation.add_operator("F5RRO")
@@ -1664,3 +1665,86 @@ def test_log_page_carries_the_worked_hint(monkeypatch) -> None:
     assert 'id="act-worked-hint"' in page and "/activation/worked?call=" in page
     for text in ("Station jamais contactée", "Déjà contactée", "doublon"):
         assert text in page, text
+
+
+# ── Créneaux déduits du log ────────────────────────────────────────────────
+
+
+def _qso_at(call: str, when: str, op: str = "F4IOZ", band: str = "20M", mode: str = "SSB") -> None:
+    """QSO à une heure UTC donnée (« AAAAMMJJ HHMM »)."""
+    date, time_on = when.split()
+    activation.add_contact(call=call, band=band, mode=mode, operator_call=op,
+                           qso_date=date, time_on=time_on)
+
+
+def test_forgotten_slot_is_created_from_the_log() -> None:
+    assert activation.list_slots() == []
+    _qso_at("DL1ABC", "20260907 1003")
+    _qso_at("DL2ABC", "20260907 1027")
+    slots = activation.list_slots()
+    assert len(slots) == 1
+    slot = slots[0]
+    # Calé sur le quart d'heure, opérateur, bande et mode repris du log.
+    assert (slot["start_utc"], slot["end_utc"]) == ("2026-09-07T10:00", "2026-09-07T10:30")
+    assert slot["operator_call"] == "F4IOZ" and slot["band"] == "20M" and slot["mode"] == "SSB"
+    assert slot["source"] == "log"
+
+
+def test_slot_is_extended_when_the_operator_runs_over() -> None:
+    sid = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
+    _qso_at("DL1ABC", "20260907 1130")
+    _qso_at("DL2ABC", "20260907 1242")            # bien après la fin prévue
+    slot = activation.get_slot(sid)
+    assert slot["end_utc"] == "2026-09-07T12:45" and slot["start_utc"] == "2026-09-07T10:00"
+    assert slot["source"] == "manual" and len(activation.list_slots()) == 1
+    # Un QSO avant l'heure prévue étire le début, sans jamais raccourcir.
+    _qso_at("DL3ABC", "20260907 0940")
+    slot = activation.get_slot(sid)
+    assert slot["start_utc"] == "2026-09-07T09:30" and slot["end_utc"] == "2026-09-07T12:45"
+
+
+def test_separate_sessions_make_separate_slots() -> None:
+    _qso_at("DL1ABC", "20260907 1000")
+    _qso_at("DL2ABC", "20260907 1020")            # même séance (< 30 min)
+    _qso_at("DL3ABC", "20260907 1400")            # séance du soir
+    _qso_at("DL4ABC", "20260907 1015", band="40M", mode="CW")   # autre bande/mode
+    _qso_at("DL5ABC", "20260907 1010", op="F5RRO")              # autre opérateur
+    slots = sorted(activation.list_slots(), key=lambda s: (s["operator_call"], s["band"], s["start_utc"]))
+    assert len(slots) == 4
+    assert [(s["operator_call"], s["band"], s["mode"], s["start_utc"]) for s in slots] == [
+        ("F4IOZ", "20M", "SSB", "2026-09-07T10:00"),
+        ("F4IOZ", "20M", "SSB", "2026-09-07T14:00"),
+        ("F4IOZ", "40M", "CW", "2026-09-07T10:15"),
+        ("F5RRO", "20M", "SSB", "2026-09-07T10:00"),
+    ]
+
+
+def test_auto_slots_can_be_switched_off(monkeypatch) -> None:
+    activation.set_flag("auto_slots", False)
+    _qso_at("DL1ABC", "20260907 1000")
+    assert activation.list_slots() == []
+    assert activation.reconcile_slots_from_log() == {"created": 0, "extended": 0}
+    activation.set_flag("auto_slots", True)
+    assert activation.reconcile_slots_from_log() == {"created": 1, "extended": 0}
+    # Le réglage est bien piloté depuis les Réglages (admin).
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    admin = _private_client()
+    admin.post("/activation/settings/flags", data={"show_contacts": "1"})
+    assert activation.auto_slots() is False
+    admin.post("/activation/settings/flags", data={"auto_slots": "1"})
+    assert activation.auto_slots() is True
+
+
+def test_log_page_shows_the_current_slots(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M"
+    activation.add_slot("F5RRO", (now - timedelta(minutes=20)).strftime(fmt),
+                        (now + timedelta(hours=1)).strftime(fmt), "20M", "SSB")
+    activation.add_slot("F4IOZ", (now + timedelta(hours=3)).strftime(fmt),
+                        (now + timedelta(hours=5)).strftime(fmt), "40M", "CW")
+    admin = _private_client()
+    admin.post("/activation/whoami", data={"operator": "F5RRO", "next": "/activation/log"})
+    page = admin.get("/activation/log").text
+    assert "Créneaux du moment" in page and "F5RRO" in page and "F4IOZ" in page
+    assert "is-me" in page                      # l'opérateur connecté est mis en avant

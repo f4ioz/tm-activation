@@ -676,6 +676,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS slots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 station TEXT DEFAULT '',
+                source TEXT DEFAULT 'manual',   -- « log » : déduit des QSO enregistrés
                 operator_call TEXT NOT NULL,
                 start_utc TEXT NOT NULL,
                 end_utc TEXT NOT NULL,
@@ -723,6 +724,8 @@ def init_db() -> None:
         cols = {row[1] for row in c.execute("PRAGMA table_info(contacts)").fetchall()}
         if "sat_name" not in cols:
             c.execute("ALTER TABLE contacts ADD COLUMN sat_name TEXT DEFAULT ''")
+        if "source" not in {row[1] for row in c.execute("PRAGMA table_info(slots)").fetchall()}:
+            c.execute("ALTER TABLE slots ADD COLUMN source TEXT DEFAULT 'manual'")
         # Comptes opérateurs (mot de passe individuel, admin, validation).
         ops_cols = {row[1] for row in c.execute("PRAGMA table_info(operators)").fetchall()}
         for col, decl in (("password_hash", "TEXT DEFAULT ''"), ("is_admin", "INTEGER DEFAULT 0"),
@@ -1033,6 +1036,106 @@ def slot_qso_counts(station: str | None = None) -> dict[int, int]:
     return {int(r["sid"]): int(r["n"]) for r in rows}
 
 
+# ── Créneaux déduits du log ────────────────────────────────────────────────
+# Un opérateur qui oublie de réserver, ou qui dépasse l'heure prévue, ne perd
+# rien : les QSO enregistrés font foi. On regroupe les QSO d'un même opérateur
+# sur une même bande et un même mode tant qu'ils sont espacés de moins de
+# SESSION_GAP_MIN, puis on crée le créneau manquant ou on étire celui qui
+# existe (jamais on ne le raccourcit : l'intention du planning est gardée).
+
+SESSION_GAP_MIN = 30          # au-delà, c'est une autre séance de trafic
+SLOT_ATTACH_MIN = 60          # séance rattachée à un créneau proche (dépassement)
+SLOT_ROUNDING_MIN = 15        # créneaux calés sur le quart d'heure
+
+
+def auto_slots() -> bool:
+    """Créer et ajuster les créneaux d'après le log (réglage, activé par défaut)."""
+    return get_flag("auto_slots", True)
+
+
+def _minutes_to_iso(minutes: int) -> str:
+    return datetime.fromtimestamp(minutes * 60, UTC).strftime("%Y-%m-%dT%H:%M")
+
+
+def _floor_to(minutes: int, step: int) -> int:
+    return minutes - (minutes % step)
+
+
+def _ceil_to(minutes: int, step: int) -> int:
+    return minutes if minutes % step == 0 else minutes + (step - minutes % step)
+
+
+def log_sessions(station: str | None = None) -> list[dict[str, Any]]:
+    """Séances de trafic lues dans le log : (opérateur, bande, mode, début, fin)."""
+    init_db()
+    with conn() as c:
+        rows = c.execute(
+            "SELECT operator_call, band, mode, qso_date, time_on FROM contacts WHERE station=?",
+            (_st(station),),
+        ).fetchall()
+    grouped: dict[tuple[str, str, str], list[int]] = {}
+    for r in rows:
+        minutes = _utc_minutes(r["qso_date"], r["time_on"])
+        if minutes is None or not r["operator_call"]:
+            continue
+        grouped.setdefault((r["operator_call"], r["band"], r["mode"]), []).append(minutes)
+    sessions = []
+    for (op, band, mode), times in grouped.items():
+        times.sort()
+        start = previous = times[0]
+        for minute in times[1:]:
+            if minute - previous > SESSION_GAP_MIN:
+                sessions.append({"operator_call": op, "band": band, "mode": mode,
+                                 "first": start, "last": previous})
+                start = minute
+            previous = minute
+        sessions.append({"operator_call": op, "band": band, "mode": mode,
+                         "first": start, "last": previous})
+    return sorted(sessions, key=lambda s: s["first"])
+
+
+def reconcile_slots_from_log(station: str | None = None) -> dict[str, int]:
+    """Crée les créneaux oubliés et étire ceux qui ont débordé. {créés, étirés}."""
+    if not auto_slots():
+        return {"created": 0, "extended": 0}
+    st = _st(station)
+    created = extended = 0
+    slots = list_slots(station=st)
+    for session in log_sessions(st):
+        start = _minutes_to_iso(_floor_to(session["first"], SLOT_ROUNDING_MIN))
+        end = _minutes_to_iso(_ceil_to(session["last"] + 1, SLOT_ROUNDING_MIN))
+        # Le créneau est rattaché s'il chevauche la séance ou s'en approche à
+        # moins de SLOT_ATTACH_MIN : trafiquer une heure après l'heure prévue
+        # prolonge le créneau réservé au lieu d'en créer un autre.
+        near_start = _minutes_to_iso(session["first"] - SLOT_ATTACH_MIN)
+        near_end = _minutes_to_iso(session["last"] + SLOT_ATTACH_MIN)
+        same = [s for s in slots
+                if s["operator_call"] == session["operator_call"] and s["band"] == session["band"]
+                and s["mode"] == session["mode"] and s["start_utc"] <= near_end and s["end_utc"] >= near_start]
+        if not same:
+            with conn() as c:
+                c.execute(
+                    "INSERT INTO slots(station, source, operator_call, start_utc, end_utc, band, mode, "
+                    "note, created_at) VALUES (?, 'log', ?, ?, ?, ?, ?, '', ?)",
+                    (st, session["operator_call"], start, end, session["band"], session["mode"],
+                     int(time.time())),
+                )
+            created += 1
+            slots = list_slots(station=st)
+            continue
+        slot = same[0]
+        new_start, new_end = min(slot["start_utc"], start), max(slot["end_utc"], end)
+        if (new_start, new_end) != (slot["start_utc"], slot["end_utc"]):
+            with conn() as c:
+                c.execute("UPDATE slots SET start_utc=?, end_utc=? WHERE id=?",
+                          (new_start, new_end, slot["id"]))
+            extended += 1
+            slots = list_slots(station=st)
+    if created or extended:
+        maybe_backup()
+    return {"created": created, "extended": extended}
+
+
 def current_and_next_slot() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     current = nxt = None
@@ -1132,6 +1235,8 @@ def add_contact(
             ),
         )
         new_id = int(cur.lastrowid)
+    # Le log fait foi : créneau oublié créé, créneau dépassé étiré.
+    reconcile_slots_from_log(station)
     maybe_backup()
     return new_id
 

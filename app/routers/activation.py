@@ -343,6 +343,7 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             op_configured=bool(activation.operator_password()),
             show_contacts=activation.show_contacts(),
             show_map_stats=activation.show_map_stats(),
+            auto_slots=activation.auto_slots(),
             callbook=activation.callbook_progress(),
             per_operator_auth=activation.per_operator_auth(),
             operator_approval=activation.operator_approval(),
@@ -386,11 +387,13 @@ async def change_operator_password(
 @router.post("/settings/flags")
 async def change_flags(
     request: Request, show_contacts: str = Form(""), show_map_stats: str = Form(""),
+    auto_slots: str = Form(""),
 ) -> Response:
     if (g := _require_admin(request)) is not None:
         return g
     activation.set_flag("show_contacts", bool(show_contacts))
     activation.set_flag("show_map_stats", bool(show_map_stats))
+    activation.set_flag("auto_slots", bool(auto_slots))
     return RedirectResponse("/activation/settings?fl=ok", status_code=303)
 
 
@@ -809,6 +812,8 @@ async def log_page(request: Request) -> Response:
         "activation/log.html",
         _ctx(
             request,
+            live=activation.live_slots(),
+            upcoming=activation.future_slots()[:3],
             contacts=activation.list_contacts(limit=100),
             stats=activation.stats(),
             now_input=activation.now_input(_tz_mode(request)),

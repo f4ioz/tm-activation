@@ -19,6 +19,35 @@
   </nav>
 </header>
 
+{% if live or upcoming %}
+<div class="act-card act-slots-now">
+  <h2>{{ _("Créneaux du moment") }}</h2>
+  <ul class="act-slots-list">
+    {% for s in live %}
+      {% set pe = to_disp(s.end_utc) %}
+      <li class="act-slot-live{% if s.operator_call == current_op %} is-me{% endif %}">
+        <span class="act-live-tag">{{ _("🔴 EN DIRECT") }}</span>
+        <b class="act-call">{{ s.operator_call }}</b>{% if s.operator_call == current_op %} <span class="act-muted">({{ _("vous") }})</span>{% endif %}
+        <span>{{ s.band }} · {{ s.mode }}</span>
+        <span class="act-muted">{{ _("jusqu'à {when}", when=pe.strftime('%H:%M') if pe else '') }} ({{ tz_label }})</span>
+        {% if slot_qsos.get(s.id) %}<b class="act-slot-qso">{{ _("{n} QSO", n=slot_qsos[s.id]) }}</b>{% endif %}
+        {% if s.source == 'log' %}<span class="act-muted act-slot-auto">{{ _("(d'après le log)") }}</span>{% endif %}
+      </li>
+    {% endfor %}
+    {% for s in upcoming %}
+      {% set ps = to_disp(s.start_utc) %}
+      <li class="act-slot-next{% if s.operator_call == current_op %} is-me{% endif %}">
+        <span class="act-muted">{{ _("à venir") }}</span>
+        <b class="act-call">{{ s.operator_call }}</b>{% if s.operator_call == current_op %} <span class="act-muted">({{ _("vous") }})</span>{% endif %}
+        <span>{{ s.band }} · {{ s.mode }}</span>
+        <span class="act-muted">{{ (dow(ps) ~ ' ' ~ ps.strftime('%H:%M')) if ps }} ({{ tz_label }})</span>
+      </li>
+    {% endfor %}
+  </ul>
+  <p class="act-muted act-map-note">{{ _("Un créneau oublié est créé d'après le log, et un créneau dépassé est prolongé automatiquement.") }}</p>
+</div>
+{% endif %}
+
 <div class="act-card act-op-select">
   <form method="post" action="/activation/whoami" class="act-inline">
     <label>{{ _("Opérateur au micro") }}

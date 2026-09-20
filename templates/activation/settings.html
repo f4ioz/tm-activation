@@ -144,11 +144,13 @@
       <h2>{{ _("Affichage public") }}</h2>
       <p class="act-muted">{{ _("Contrôle ce qui est visible sur les pages publiques") }} ({{ _("ex.") }} <a href="/{{ station.slug }}">/{{ station.slug }}</a>).</p>
       <form method="post" action="/activation/settings/flags" class="act-form">
+        <label class="act-check"><input type="checkbox" name="auto_slots" value="1"{% if auto_slots %} checked{% endif %}> {{ _("Créer et prolonger les créneaux d'après le log") }}</label>
         <label class="act-check"><input type="checkbox" name="show_contacts" value="1"{% if show_contacts %} checked{% endif %}> {{ _("Afficher la liste des contacts (« Derniers contacts »)") }}</label>
         <label class="act-check"><input type="checkbox" name="show_map_stats" value="1"{% if show_map_stats %} checked{% endif %}> {{ _("Afficher la carte, le tableau DXCC et le classement des chasseurs") }}</label>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
       <p class="act-muted">{{ _("Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.") }}</p>
+      <p class="act-muted act-map-note">{{ _("Créneaux d'après le log : un opérateur qui a oublié de réserver, ou qui a dépassé l'heure prévue, voit son créneau créé ou prolongé d'après ses QSO (même bande, même mode, séances séparées de plus de 30 minutes).") }}</p>
     </div>
 
     <div class="act-card">

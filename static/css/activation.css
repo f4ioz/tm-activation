@@ -494,3 +494,14 @@ body.act-site .air-datepicker-time--current-colon { color: var(--text); }
 body.act-site .air-datepicker--buttons { border-top: 1px solid var(--border); }
 body.act-site .air-datepicker-cell.-day-.-other-month-,
 body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-muted); opacity: 0.45; }
+
+/* Créneaux du moment, sur la page de log. */
+.act-slots-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.act-slots-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.5rem; border-left: 3px solid var(--border); border-radius: 3px;
+  font-family: var(--font-mono, monospace); font-size: 0.85rem;
+}
+.act-slots-list li.act-slot-live { border-left-color: var(--green, #2ecc71); }
+.act-slots-list li.is-me { background: color-mix(in srgb, var(--accent) 12%, transparent); border-left-color: var(--accent); }
+.act-slot-auto { font-style: italic; }
