@@ -43,15 +43,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.13.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -104,7 +104,9 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.12
 - **Sauvegardes automatiques** de la base (au démarrage et après chaque
   modification), téléchargeables depuis les Réglages.
 - **Sécurité** : blocage des essais de mots de passe et des robots scanneurs,
-  en-têtes de sécurité, pages opérateurs non indexées.
+  en-têtes de sécurité, pages opérateurs non indexées. Une page de
+  **surveillance** (`/admin/surveillance`, administrateur) montre le journal des
+  connexions, les IP aux essais répétés et les robots bloqués.
 
 ## Trois façons de l'utiliser
 
@@ -152,22 +154,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.12.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.13.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.12.0.tar.gz
-   cd tm-activation-1.12.0
+   tar xzf tm-activation-1.13.0.tar.gz
+   cd tm-activation-1.13.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.12.0.zip
-   cd tm-activation-1.12.0
+   unzip tm-activation-1.13.0.zip
+   cd tm-activation-1.13.0
    sudo bash install.sh --lan
    ```
 
@@ -248,8 +250,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.12.0.tar.gz
-cd tm-activation-1.12.0
+tar xzf tm-activation-1.13.0.tar.gz
+cd tm-activation-1.13.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

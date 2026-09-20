@@ -183,6 +183,7 @@
         </table>
       </div>
       {% endif %}
+      <p><a class="act-cancel-btn" href="/admin/surveillance">{{ _("Surveillance détaillée →") }}</a></p>
       <p class="act-muted act-map-note">{{ _("Une IP publique est bloquée 15 min après 5 échecs de connexion ; le réseau local ne l'est jamais. Journal conservé 90 jours.") }}</p>
       <form method="post" action="/logout" class="act-form"><button type="submit" class="act-cancel-btn">{{ _("Se déconnecter (admin)") }}</button></form>
     </div>{% endif %}

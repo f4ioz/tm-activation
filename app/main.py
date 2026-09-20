@@ -16,6 +16,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app import activation, security
 from app.config import server_config
 from app.routers import activation as activation_router
+from app.routers import admin as admin_router
 from app.routers import auth as auth_router
 from app.routers import site as site_router
 
@@ -65,6 +66,7 @@ app.add_middleware(
 
 app.include_router(site_router.router)
 app.include_router(auth_router.router)
+app.include_router(admin_router.router)
 app.include_router(activation_router.router)
 # En dernier : pages publiques /<indicatif> (route générique à un segment).
 app.include_router(activation_router.public_router)

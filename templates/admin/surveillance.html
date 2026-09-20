@@ -1,0 +1,90 @@
+{% extends "activation/_base.html" %}
+{% block title %}{{ _("Surveillance") }}{% endblock %}
+
+{% block content %}
+<section class="act">
+  <header class="act-head">
+    <h1>{{ _("Surveillance") }}</h1>
+    <p class="act-sub">{{ _("Connexions à l'application et robots bloqués. Réservé à l'administrateur.") }}</p>
+    <nav class="act-tabs">
+      <a href="/activation">{{ _("Tableau de bord") }}</a>
+      <a href="/activation/settings">{{ _("Réglages") }}</a>
+      <a href="/admin/surveillance" class="active">{{ _("Surveillance") }}</a>
+    </nav>
+  </header>
+
+  <div class="act-kpis">
+    <div class="act-kpi"><span class="act-kpi-n">{{ counts[1].ok }}</span><span class="act-kpi-l">{{ _("connexions (24 h)") }}</span></div>
+    <div class="act-kpi"><span class="act-kpi-n">{{ counts[1].failed }}</span><span class="act-kpi-l">{{ _("échecs (24 h)") }}</span></div>
+    <div class="act-kpi"><span class="act-kpi-n">{{ counts[7].failed }}</span><span class="act-kpi-l">{{ _("échecs (7 jours)") }}</span></div>
+    <div class="act-kpi"><span class="act-kpi-n">{{ banned|length }}</span><span class="act-kpi-l">{{ _("IP bloquées") }}</span></div>
+  </div>
+
+  <div class="act-card">
+    <h2>{{ _("Robots bloqués") }}</h2>
+    {% if banned %}
+      <div class="act-scroll">
+        <table class="act-table">
+          <thead><tr><th>IP</th><th>{{ _("Motif") }}</th><th>{{ _("Exemple d'URL") }}</th><th>{{ _("Requêtes refusées") }}</th><th>{{ _("Fin du blocage") }}</th></tr></thead>
+          <tbody>
+            {% for b in banned %}
+              <tr><td class="act-call">{{ b.ip }}</td><td>{{ b.reason }}</td><td class="act-muted">{{ b.sample }}</td>
+                  <td>{{ b.blocked }}</td><td>{{ _("dans {n} min", n=(b.remaining // 60) + 1) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="act-muted">{{ _("Aucune IP bloquée en ce moment.") }}</p>
+    {% endif %}
+    <p class="act-muted act-map-note">{{ _("Une IP publique qui demande {n} adresses de scan (wp-admin, .env…) en {w} min est bloquée {b} min sur tout le site ; {f} échecs de connexion la bloquent {lw} min. Le réseau local n'est jamais bloqué, l'administrateur connecté non plus.", n=scan_threshold, w=scan_window_min, b=ban_minutes, f=login_max, lw=login_window_min) }}</p>
+  </div>
+
+  <div class="act-card act-card-wide">
+    <div class="act-log-head">
+      <h2>{{ _("Journal des connexions") }}</h2>
+      <span class="act-tzswitch">
+        {% for d in [1, 7, 30, 90] %}
+          <a href="/admin/surveillance?days={{ d }}{% if failures_only %}&failures=1{% endif %}"{% if d == days %} class="active"{% endif %}>{{ _("{n} j", n=d) }}</a>
+        {% endfor %}
+        <a href="/admin/surveillance?days={{ days }}{% if not failures_only %}&failures=1{% endif %}"{% if failures_only %} class="active"{% endif %}>{{ _("échecs seuls") }}</a>
+      </span>
+    </div>
+    <div class="act-scroll act-scroll-tall">
+      <table class="act-table">
+        <thead><tr><th>{{ _("Date (UTC)") }}</th><th>IP</th><th>{{ _("Accès") }}</th><th>{{ _("Indicatif") }}</th><th>{{ _("Résultat") }}</th><th>{{ _("Navigateur") }}</th></tr></thead>
+        <tbody>
+          {% for e in events %}
+            <tr{% if not e.success %} class="act-row-conflict"{% endif %}>
+              <td>{{ e.when }}</td><td class="act-call">{{ e.ip }}</td>
+              <td>{% if e.kind == 'admin' %}{{ _("admin") }}{% else %}{{ _("opérateur") }}{% endif %}</td>
+              <td>{{ e.callsign }}</td>
+              <td>{% if e.success %}{{ _("réussie") }}{% else %}<span class="act-warn">{{ _("échec") }}</span>{% endif %}</td>
+              <td class="act-muted">{{ e.ua }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="act-muted">{{ _("Aucune connexion sur cette période.") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="act-muted act-map-note">{{ _("Journal conservé {n} jours. Les mots de passe ne sont évidemment jamais enregistrés.", n=retention) }}</p>
+  </div>
+
+  {% if worst_ips %}
+  <div class="act-card">
+    <h2>{{ _("IP aux essais répétés") }}</h2>
+    <div class="act-scroll">
+      <table class="act-table">
+        <thead><tr><th>IP</th><th>{{ _("Échecs") }}</th><th>{{ _("Dernier essai (UTC)") }}</th></tr></thead>
+        <tbody>
+          {% for w in worst_ips %}
+            <tr><td class="act-call">{{ w.ip }}</td><td>{{ w.n }}</td><td>{{ w.last_str }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

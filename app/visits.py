@@ -109,6 +109,46 @@ def failed_logins(ip: str, since: int) -> int:
                              (ip, since)).fetchone()[0])
 
 
+def auth_counts(days: int) -> dict[str, int]:
+    """Connexions réussies / ratées sur les ``days`` derniers jours."""
+    init_db()
+    since = int(time.time()) - days * 86400
+    with conn() as c:
+        counts = {int(r[0]): int(r[1]) for r in c.execute(
+            "SELECT success, COUNT(*) FROM auth_events WHERE ts >= ? GROUP BY success", (since,))}
+    return {"ok": counts.get(1, 0), "failed": counts.get(0, 0)}
+
+
+def auth_log(days: int = 7, limit: int = 200, failures_only: bool = False) -> list[dict[str, Any]]:
+    """Journal des connexions, le plus récent d'abord (page de surveillance)."""
+    init_db()
+    since = int(time.time()) - days * 86400
+    sql = "SELECT ts, ip, kind, callsign, success, ua FROM auth_events WHERE ts >= ?"
+    if failures_only:
+        sql += " AND success = 0"
+    sql += " ORDER BY ts DESC, id DESC LIMIT ?"
+    with conn() as c:
+        rows = [dict(r) for r in c.execute(sql, (since, int(limit)))]
+    for r in rows:
+        r["when"] = datetime.fromtimestamp(r["ts"], timezone.utc).strftime("%d/%m/%Y %H:%M")
+        r["ua"] = (r["ua"] or "")[:60]
+    return rows
+
+
+def failed_by_ip(days: int = 7, limit: int = 20) -> list[dict[str, Any]]:
+    """IP qui ont le plus échoué (essais de mots de passe)."""
+    init_db()
+    since = int(time.time()) - days * 86400
+    with conn() as c:
+        rows = [dict(r) for r in c.execute(
+            "SELECT ip, COUNT(*) AS n, MAX(ts) AS last FROM auth_events "
+            "WHERE ts >= ? AND success = 0 GROUP BY ip ORDER BY n DESC, last DESC LIMIT ?",
+            (since, int(limit)))]
+    for r in rows:
+        r["last_str"] = datetime.fromtimestamp(r["last"], timezone.utc).strftime("%d/%m/%Y %H:%M")
+    return rows
+
+
 def quick_summary() -> dict[str, Any]:
     """Encart « Connexions » des Réglages : 7 derniers jours."""
     init_db()

@@ -131,7 +131,7 @@ def test_no_branding_of_the_origin_site(admin_pw) -> None:
                                      f"/activation/stations/{st['slug']}/edit")]
     for r in pages:
         assert r.status_code == 200, r.url
-        assert not re.search(r"(?i)f4ioz|/admin/", r.text), r.url
+        assert not re.search(r"(?i)f4ioz|/admin/visites", r.text), r.url
 
 
 def test_web_assets_are_served_locally(admin_pw) -> None:
@@ -192,3 +192,29 @@ def test_admin_pages_in_english(admin_pw) -> None:
     page = admin.get("/activation/settings").text
     assert "Logins" in page and "1 failed login(s)" in page and "Log out (admin)" in page
     assert "Connexions" not in page and "connexion(s)" not in page
+
+
+def test_surveillance_page(admin_pw) -> None:
+    """Page de surveillance : connexions, robots bloqués, réservée à l'admin."""
+    anon = TestClient(app, follow_redirects=False)
+    r = anon.get("/admin/surveillance")
+    assert r.status_code == 303 and r.headers["location"].startswith("/login")
+    # Quelques essais ratés + une connexion réussie depuis une IP publique.
+    public = TestClient(app, follow_redirects=False, client=PUBLIC_PEER)
+    _fail(public, 2)
+    public.post("/login", data={"password": "adminpw"})
+    page = _admin_client().get("/admin/surveillance")
+    assert page.status_code == 200
+    for expected in ("Surveillance", "Journal des connexions", "Robots bloqués",
+                     PUBLIC_PEER[0], "échec", "réussie"):
+        assert expected in page.text, expected
+    # Filtres : période et échecs seuls.
+    assert _admin_client().get("/admin/surveillance?days=30&failures=1").status_code == 200
+    assert "Aucune IP bloquée" in page.text                      # rien de bloqué pour l'instant
+    # Un scanner se fait bloquer : il apparaît dans la page.
+    scanner = TestClient(app, follow_redirects=False, client=("203.0.113.9", 4000))
+    for path in ("/wp-admin/setup-config.php", "/.env", "/vendor/phpunit/phpunit.php",
+                 "/wp-login.php", "/.git/config", "/phpinfo.php"):
+        scanner.get(path)
+    page = _admin_client().get("/admin/surveillance").text
+    assert "203.0.113.9" in page and "Aucune IP bloquée" not in page
