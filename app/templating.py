@@ -45,4 +45,5 @@ templates.env.globals["dow_fr"] = dow_fr
 templates.env.globals["flag_prefixes"] = activation.FLAG_PREFIXES
 templates.env.globals["note_is_sat"] = activation.note_is_sat
 templates.env.globals["dxcc_entity"] = dxcc_flags.entity_for_call
+templates.env.globals["dxcc_flag_file"] = dxcc_flags.flag_file
 i18n.install(templates.env)

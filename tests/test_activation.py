@@ -1848,6 +1848,37 @@ def test_entity_for_call_reads_the_prefix() -> None:
     assert dxcc_flags.flag("FR") == "🇫🇷" and dxcc_flags.flag("GB-SCT") == ""
 
 
+def test_overseas_and_island_entities_are_not_merged() -> None:
+    """La Corse, les Canaries, la Sicile… sont des entités DXCC à part entière,
+    au même titre que la Guadeloupe ou la Guyane : jamais fondues dans le pays."""
+    from app import dxcc_flags
+
+    for call, code, name in (("TK5MH", "FR-COR", "Corsica"), ("FG8OJ", "GP", "Guadeloupe"),
+                             ("FY5KE", "GF", "French Guiana"), ("EA8XX", "ES-CN", "Canary Islands"),
+                             ("EA6AA", "ES-IB", "Balearic Islands"), ("IT9ABC", "IT-SIC", "Sicily"),
+                             ("IS0ABC", "IT-SAR", "Sardinia"), ("CT3FN", "PT-MAD", "Madeira"),
+                             ("CU2AA", "PT-AZO", "Azores"), ("KL7AA", "US-AK", "Alaska"),
+                             ("KH6XX", "US-HI", "Hawaii"), ("RA2FF", "RU-KGD", "Kaliningrad")):
+        assert dxcc_flags.entity_for_call(call) == (code, name), call
+    metropoles = {dxcc_flags.entity_for_call(c)[0] for c in ("F4IOZ", "EA1AA", "I1AAA", "CT1AA",
+                                                             "W1AW", "UA3XX")}
+    assert metropoles == {"FR", "ES", "IT", "PT", "US", "RU"}   # aucune confusion avec les îles
+
+
+def test_every_dxcc_entity_has_its_own_name() -> None:
+    """Deux entités ne doivent jamais partager un code (elles seraient comptées
+    comme un seul pays dans le tableau DXCC)."""
+    from collections import defaultdict
+
+    from app import dxcc_flags
+
+    noms = defaultdict(set)
+    for code, name in dxcc_flags.PREFIXES.values():
+        noms[code].add(name)
+    fusionnees = {code: sorted(n) for code, n in noms.items() if len(n) > 1}
+    assert not fusionnees, f"entités fondues ensemble : {fusionnees}"
+
+
 def test_every_dxcc_code_has_a_flag_image() -> None:
     """Les vignettes sont servies par l'application (Windows n'affiche pas les
     emojis drapeaux) : chaque préfixe doit avoir son image dans static/vendor."""
@@ -1857,7 +1888,7 @@ def test_every_dxcc_code_has_a_flag_image() -> None:
 
     flags = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flags"
     manquants = sorted({code for code, _n in dxcc_flags.PREFIXES.values()
-                        if not (flags / f"{code.lower()}.png").exists()})
+                        if not (flags / f"{dxcc_flags.flag_file(code)}.png").exists()})
     assert not manquants, ("vignettes absentes (relancer packaging/tm-activation/fetch_flags.py) : "
                            + ", ".join(manquants))
 

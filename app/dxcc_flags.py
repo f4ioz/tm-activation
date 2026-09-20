@@ -18,7 +18,7 @@ import re
 # chacune étant une entité DXCC à part entière.
 PREFIXES: dict[str, tuple[str, str]] = {
     # ── Europe ──
-    "F": ("FR", "France"), "TM": ("FR", "France"), "TK": ("FR", "Corsica"),
+    "F": ("FR", "France"), "TM": ("FR", "France"), "TK": ("FR-COR", "Corsica"),
     "ON": ("BE", "Belgium"), "OO": ("BE", "Belgium"), "OT": ("BE", "Belgium"),
     "PA": ("NL", "Netherlands"), "PB": ("NL", "Netherlands"), "PD": ("NL", "Netherlands"),
     "PE": ("NL", "Netherlands"), "PI": ("NL", "Netherlands"),
@@ -34,14 +34,16 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "EI": ("IE", "Ireland"), "EJ": ("IE", "Ireland"),
     "EA": ("ES", "Spain"), "EB": ("ES", "Spain"), "EC": ("ES", "Spain"), "ED": ("ES", "Spain"),
     "EE": ("ES", "Spain"), "EF": ("ES", "Spain"), "EG": ("ES", "Spain"), "AM": ("ES", "Spain"),
-    "EA6": ("ES", "Balearic Islands"), "EA8": ("ES", "Canary Islands"), "EA9": ("ES", "Ceuta & Melilla"),
+    "EA6": ("ES-IB", "Balearic Islands"), "EA8": ("ES-CN", "Canary Islands"),
+    "EA9": ("ES-CE", "Ceuta & Melilla"),
     "CT": ("PT", "Portugal"), "CR": ("PT", "Portugal"), "CQ": ("PT", "Portugal"),
-    "CT3": ("PT", "Madeira"), "CU": ("PT", "Azores"),
+    "CT3": ("PT-MAD", "Madeira"), "CU": ("PT-AZO", "Azores"),
     "I": ("IT", "Italy"), "IK": ("IT", "Italy"), "IZ": ("IT", "Italy"), "IW": ("IT", "Italy"),
-    "IU": ("IT", "Italy"), "II": ("IT", "Italy"), "IS": ("IT", "Sardinia"), "IT9": ("IT", "Sicily"),
+    "IU": ("IT", "Italy"), "II": ("IT", "Italy"), "IS": ("IT-SAR", "Sardinia"),
+    "IT9": ("IT-SIC", "Sicily"),
     "HB": ("CH", "Switzerland"), "HB9": ("CH", "Switzerland"), "HB0": ("LI", "Liechtenstein"),
     "OE": ("AT", "Austria"), "LX": ("LU", "Luxembourg"), "LA": ("NO", "Norway"),
-    "LB": ("NO", "Norway"), "LN": ("NO", "Norway"), "JW": ("SJ", "Svalbard"), "JX": ("NO", "Jan Mayen"),
+    "LB": ("NO", "Norway"), "LN": ("NO", "Norway"), "JW": ("SJ", "Svalbard"), "JX": ("NO-JAN", "Jan Mayen"),
     "SM": ("SE", "Sweden"), "SA": ("SE", "Sweden"), "SB": ("SE", "Sweden"), "SK": ("SE", "Sweden"),
     "SL": ("SE", "Sweden"), "7S": ("SE", "Sweden"), "8S": ("SE", "Sweden"),
     "OH": ("FI", "Finland"), "OF": ("FI", "Finland"), "OG": ("FI", "Finland"), "OH0": ("AX", "Åland"),
@@ -56,7 +58,7 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "YU": ("RS", "Serbia"), "YT": ("RS", "Serbia"), "4O": ("ME", "Montenegro"),
     "Z3": ("MK", "North Macedonia"), "ZA": ("AL", "Albania"), "SV": ("GR", "Greece"),
     "SW": ("GR", "Greece"), "SX": ("GR", "Greece"), "SY": ("GR", "Greece"), "SZ": ("GR", "Greece"),
-    "SV5": ("GR", "Dodecanese"), "SV9": ("GR", "Crete"), "5B": ("CY", "Cyprus"), "C4": ("CY", "Cyprus"),
+    "SV5": ("GR-DOD", "Dodecanese"), "SV9": ("GR-CRE", "Crete"), "5B": ("CY", "Cyprus"), "C4": ("CY", "Cyprus"),
     "YO": ("RO", "Romania"), "YP": ("RO", "Romania"), "YR": ("RO", "Romania"),
     "LZ": ("BG", "Bulgaria"), "UR": ("UA", "Ukraine"), "US": ("UA", "Ukraine"),
     "UT": ("UA", "Ukraine"), "UU": ("UA", "Ukraine"), "UX": ("UA", "Ukraine"), "UY": ("UA", "Ukraine"),
@@ -67,9 +69,9 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "RW": ("RU", "Russia"), "RX": ("RU", "Russia"), "RZ": ("RU", "Russia"), "UA": ("RU", "Russia"),
     "UB": ("RU", "Russia"), "UC": ("RU", "Russia"), "UD": ("RU", "Russia"), "UE": ("RU", "Russia"),
     "UF": ("RU", "Russia"), "UG": ("RU", "Russia"), "UH": ("RU", "Russia"), "UI": ("RU", "Russia"),
-    "RA2": ("RU", "Kaliningrad"), "UA2": ("RU", "Kaliningrad"),
+    "RA2": ("RU-KGD", "Kaliningrad"), "UA2": ("RU-KGD", "Kaliningrad"),
     "3A": ("MC", "Monaco"), "C3": ("AD", "Andorra"), "9H": ("MT", "Malta"), "T7": ("SM", "San Marino"),
-    "HV": ("VA", "Vatican"), "1A": ("IT", "Sov. Military Order of Malta"), "Z6": ("XK", "Kosovo"),
+    "HV": ("VA", "Vatican"), "1A": ("SMOM", "Sov. Military Order of Malta"), "Z6": ("XK", "Kosovo"),
     "TA": ("TR", "Türkiye"), "TB": ("TR", "Türkiye"), "TC": ("TR", "Türkiye"),
     "4X": ("IL", "Israel"), "4Z": ("IL", "Israel"), "ZB": ("GI", "Gibraltar"),
     # ── Amériques ──
@@ -77,8 +79,8 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "AA": ("US", "United States"), "AB": ("US", "United States"), "AC": ("US", "United States"),
     "AD": ("US", "United States"), "AE": ("US", "United States"), "AF": ("US", "United States"),
     "AG": ("US", "United States"), "AI": ("US", "United States"), "AJ": ("US", "United States"),
-    "AK": ("US", "United States"), "AL": ("US", "Alaska"), "KL": ("US", "Alaska"),
-    "KH6": ("US", "Hawaii"), "KP4": ("PR", "Puerto Rico"), "KP2": ("VI", "US Virgin Islands"),
+    "AK": ("US", "United States"), "AL": ("US-AK", "Alaska"), "KL": ("US-AK", "Alaska"),
+    "KH6": ("US-HI", "Hawaii"), "KP4": ("PR", "Puerto Rico"), "KP2": ("VI", "US Virgin Islands"),
     "VE": ("CA", "Canada"), "VA": ("CA", "Canada"), "VO": ("CA", "Canada"), "VY": ("CA", "Canada"),
     "CY": ("CA", "Canada"), "XE": ("MX", "Mexico"), "XF": ("MX", "Mexico"), "4A": ("MX", "Mexico"),
     "6D": ("MX", "Mexico"), "PY": ("BR", "Brazil"), "PP": ("BR", "Brazil"), "PR": ("BR", "Brazil"),
@@ -91,7 +93,8 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "HI": ("DO", "Dominican Republic"), "HH": ("HT", "Haiti"), "6Y": ("JM", "Jamaica"),
     "9Y": ("TT", "Trinidad & Tobago"), "V3": ("BZ", "Belize"), "TG": ("GT", "Guatemala"),
     "YS": ("SV", "El Salvador"), "HR": ("HN", "Honduras"), "YN": ("NI", "Nicaragua"),
-    "TI": ("CR", "Costa Rica"), "HP": ("PA", "Panama"), "FM": ("MQ", "Martinique"),
+    "TI": ("CR", "Costa Rica"), "HP": ("PA", "Panama"), "FM": ("MQ", "Martinique"), "FJ": ("BL", "Saint-Barthélemy"),
+    "FT5": ("TF", "French Southern Territories"), "FT": ("TF", "French Southern Territories"),
     "FG": ("GP", "Guadeloupe"), "FS": ("MF", "Saint Martin"), "FP": ("PM", "St Pierre & Miquelon"),
     "V2": ("AG", "Antigua & Barbuda"), "J3": ("GD", "Grenada"), "J6": ("LC", "Saint Lucia"),
     "J7": ("DM", "Dominica"), "J8": ("VC", "St Vincent"), "VP2": ("VG", "British Virgin Islands"),
@@ -103,14 +106,14 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "5H": ("TZ", "Tanzania"), "5X": ("UG", "Uganda"), "9J": ("ZM", "Zambia"), "Z2": ("ZW", "Zimbabwe"),
     "C9": ("MZ", "Mozambique"), "7Q": ("MW", "Malawi"), "A2": ("BW", "Botswana"), "V5": ("NA", "Namibia"),
     "ZS": ("ZA", "South Africa"), "ZR": ("ZA", "South Africa"), "ZT": ("ZA", "South Africa"),
-    "3B8": ("MU", "Mauritius"), "3B9": ("MU", "Rodrigues"), "FR": ("RE", "Réunion"),
+    "3B8": ("MU", "Mauritius"), "3B9": ("MU-ROD", "Rodrigues"), "FR": ("RE", "Réunion"),
     "FH": ("YT", "Mayotte"), "5R": ("MG", "Madagascar"), "D4": ("CV", "Cape Verde"),
     "6W": ("SN", "Senegal"), "TU": ("CI", "Côte d'Ivoire"), "9G": ("GH", "Ghana"),
     "5N": ("NG", "Nigeria"), "TJ": ("CM", "Cameroon"), "TR": ("GA", "Gabon"), "TT": ("TD", "Chad"),
     "TZ": ("ML", "Mali"), "XT": ("BF", "Burkina Faso"), "5U": ("NE", "Niger"), "TY": ("BJ", "Benin"),
     "5V": ("TG", "Togo"), "9L": ("SL", "Sierra Leone"), "EL": ("LR", "Liberia"),
     "S9": ("ST", "São Tomé"), "D2": ("AO", "Angola"), "9X": ("RW", "Rwanda"), "9U": ("BI", "Burundi"),
-    "IH9": ("IT", "Pantelleria"), "IG9": ("IT", "African Italy"),
+    "IH9": ("IT-AFR", "African Italy"), "IG9": ("IT-AFR", "African Italy"),
     # ── Asie et Océanie ──
     "JA": ("JP", "Japan"), "JE": ("JP", "Japan"), "JF": ("JP", "Japan"), "JG": ("JP", "Japan"),
     "JH": ("JP", "Japan"), "JI": ("JP", "Japan"), "JJ": ("JP", "Japan"), "JK": ("JP", "Japan"),
@@ -137,6 +140,26 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "FW": ("WF", "Wallis & Futuna"), "3D2": ("FJ", "Fiji"), "KH2": ("GU", "Guam"),
     "P2": ("PG", "Papua New Guinea"), "V7": ("MH", "Marshall Islands"), "T8": ("PW", "Palau"),
 }
+
+# Entité DXCC → nom de la vignette dans static/vendor/flags/. Par défaut le
+# code en minuscules ; ces entités-là n'ont pas de code ISO, elles ont soit un
+# drapeau propre (Corse, Canaries, Sicile…), soit celui du pays de rattachement.
+FLAG_FILES = {
+    "FR-COR": "fr-cor", "ES-CN": "es-cn", "ES-IB": "es-ib", "ES-CE": "es-ce",
+    "PT-MAD": "pt-mad", "PT-AZO": "pt-azo", "IT-SIC": "it-sic", "IT-SAR": "it-sar",
+    "RU-KGD": "ru-kgd", "MU-ROD": "mu-rod", "SMOM": "smom",
+    # Crète et Dodécanèse arborent le drapeau grec : pas de drapeau propre.
+    "GR-CRE": "gr", "GR-DOD": "gr",
+    "IT-AFR": "it",          # Pantelleria / Lampedusa
+    "NO-JAN": "no",          # Jan Mayen
+}
+
+
+def flag_file(code: str) -> str:
+    """Nom de la vignette d'une entité (« FR-COR » → « fr-cor »)."""
+    key = (code or "").strip().upper()
+    return FLAG_FILES.get(key, key.lower())
+
 
 _MAX_PREFIX = max(len(p) for p in PREFIXES)
 

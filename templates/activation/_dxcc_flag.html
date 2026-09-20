@@ -6,7 +6,7 @@
    {{ call_flag(q.call) }}                — d'après l'indicatif (ligne de log)
 #}
 {% macro dxcc_flag(code, name="") -%}
-  {%- if code %}<img class="act-dxcc-flag" src="{{ asset('/static/vendor/flags/' ~ code|lower ~ '.png') }}"
+  {%- if code %}<img class="act-dxcc-flag" src="{{ asset('/static/vendor/flags/' ~ dxcc_flag_file(code) ~ '.png') }}"
        width="24" height="18" alt="{{ code }}" title="{{ name or code }}" loading="lazy">{% endif -%}
 {%- endmacro %}
 
