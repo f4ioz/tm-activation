@@ -31,7 +31,7 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 from zoneinfo import ZoneInfo
@@ -1401,6 +1401,76 @@ def stats(station: str | None = None) -> dict[str, Any]:
             ).fetchall()
         ]
     return {"total": int(total), "by_band": by_band, "by_mode": by_mode, "by_op": by_op}
+
+
+# ── Cadence de trafic (jauges du log) ──────────────────────────────────────
+# « Combien j'en fais à l'heure ? » : le compteur qui donne envie d'enchaîner.
+# Deux fenêtres : l'heure écoulée (tendance de fond) et les 10 dernières
+# minutes (le pile-up du moment), chacune comparée à la fenêtre précédente.
+
+RATE_FULL_SCALE = 60        # QSO/h correspondant à une jauge pleine
+RATE_LEVELS = (             # seuils en QSO/h → libellé affiché
+    (0, N_("station calme")),
+    (6, N_("ça démarre")),
+    (18, N_("bon rythme")),
+    (36, N_("ça chauffe")),
+    (60, N_("pile-up !")),
+)
+
+
+def _count_between(c: sqlite3.Connection, station: str, operator: str,
+                   start: datetime, end: datetime) -> int:
+    """QSO enregistrés dans [start, end[ (bornes UTC)."""
+    sql = ("SELECT COUNT(*) FROM contacts WHERE station=? "
+           "AND (qso_date || substr(time_on, 1, 4)) >= ? "
+           "AND (qso_date || substr(time_on, 1, 4)) < ?")
+    params: list[Any] = [station, start.strftime("%Y%m%d%H%M"), end.strftime("%Y%m%d%H%M")]
+    if operator:
+        sql += " AND operator_call = ?"
+        params.append(operator)
+    return int(c.execute(sql, params).fetchone()[0])
+
+
+def _rate_level(per_hour: float) -> str:
+    """Libellé de la cadence (traduit à l'affichage)."""
+    label = RATE_LEVELS[0][1]
+    for threshold, text in RATE_LEVELS:
+        if per_hour >= threshold:
+            label = text
+    return label
+
+
+def qso_rate(operator: str = "", station: str | None = None) -> dict[str, Any]:
+    """Cadence de trafic d'un opérateur (ou de la station si ``operator`` est vide).
+
+    Renvoie, pour l'heure écoulée et pour les 10 dernières minutes, le nombre de
+    QSO, la cadence ramenée à l'heure, la variation par rapport à la période
+    précédente et le remplissage de la jauge (0 à 100).
+    """
+    st = _st(station)
+    op = (operator or "").strip().upper()
+    now = datetime.now(UTC)
+    init_db()
+    windows = {}
+    with conn() as c:
+        for name, minutes in (("hour", 60), ("ten", 10)):
+            # Borne haute à la minute suivante : le QSO qu'on vient d'enregistrer
+            # (même minute que « maintenant ») doit compter tout de suite.
+            recent = _count_between(c, st, op, now - timedelta(minutes=minutes),
+                                    now + timedelta(minutes=1))
+            before = _count_between(c, st, op, now - timedelta(minutes=2 * minutes),
+                                    now - timedelta(minutes=minutes))
+            per_hour = recent * 60 / minutes
+            windows[name] = {
+                "qsos": recent, "previous": before, "per_hour": round(per_hour, 1),
+                "delta": recent - before,
+                "trend": "up" if recent > before else ("down" if recent < before else "flat"),
+                "gauge": min(100, round(per_hour * 100 / RATE_FULL_SCALE)),
+                "level": _rate_level(per_hour),
+            }
+    windows["operator"] = op
+    windows["full_scale"] = RATE_FULL_SCALE
+    return windows
 
 
 def worked_entities(station: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:

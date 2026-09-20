@@ -288,6 +288,11 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 
 .act-inline { display: flex; align-items: flex-end; gap: 0.6rem; flex-wrap: wrap; }
 .act-op-select { display: flex; flex-direction: column; gap: 0.4rem; }
+/* Carte « Opérateur au micro » : sélecteur à gauche, jauges de cadence à droite. */
+.act-op-select { flex-direction: row; flex-wrap: wrap; align-items: flex-start;
+  justify-content: space-between; gap: 0.8rem; }
+.act-op-select > form, .act-op-select > .act-warn { flex: 1 1 14rem; }
+.act-op-select > #act-rate { flex: 0 1 20rem; }
 .act-utc-hint { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
 
 /* Tables */
@@ -546,3 +551,27 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 /* Cellule « drapeau + libellé » des tableaux publics. */
 .act-dxcc-cell { white-space: nowrap; }
 .act-dxcc-cell .act-dxcc-flag { vertical-align: -0.2em; margin-right: 0.15rem; }
+
+/* Jauges de cadence (QSO/h et 10 min) — le compteur qui motive à enchaîner. */
+.act-rate { display: flex; flex-direction: column; gap: 0.5rem;
+  border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem; }
+.act-rate-head { font-family: var(--font-mono, monospace); font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.act-rate-head .act-call { color: var(--accent); }
+.act-gauge-top, .act-gauge-foot { display: flex; align-items: baseline; gap: 0.35rem;
+  font-family: var(--font-mono, monospace); font-size: 0.75rem; }
+.act-gauge-label { color: var(--text-muted); }
+.act-gauge-n { font-size: 1.05rem; color: var(--accent); }
+.act-gauge-bar { height: 7px; border-radius: 3px; background: color-mix(in srgb, var(--border) 60%, transparent);
+  overflow: hidden; margin: 0.2rem 0 0.15rem; }
+.act-gauge-bar > span { display: block; height: 100%; border-radius: 3px;
+  background: var(--accent); transition: width 0.6s ease; }
+.act-gauge.is-warm .act-gauge-bar > span { background: var(--warn, #e0a800); }
+.act-gauge.is-hot .act-gauge-bar > span { background: var(--green, #2ecc71); }
+.act-gauge.is-hot .act-gauge-n { color: var(--green, #2ecc71); }
+.act-trend { margin-left: auto; font-size: 0.75rem; }
+.act-trend.is-up { color: var(--green, #2ecc71); }
+.act-trend.is-down { color: var(--warn, #e0a800); }
+.act-trend.is-flat { color: var(--text-muted); }
+.act-rate-level { margin: 0; font-family: var(--font-mono, monospace); font-size: 0.75rem;
+  color: var(--text-muted); text-align: right; }

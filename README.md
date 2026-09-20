@@ -15,9 +15,10 @@ en direct sur une page publique.
 - **Planning partagé** : qui trafique, quand, sur quelle bande et quel mode,
   avec alerte de chevauchement, comptes à rebours et bilan de chaque créneau.
 - **Log QSO multi-opérateurs** : saisie rapide, heure « maintenant », doublons
-  signalés dès l'indicatif tapé, recherche QRZ, mode satellite, **panneau des
-  spots DX** (« suis-je spotté ? ») et **drapeaux des pays contactés** qui
-  s'ajoutent au fil des QSO.
+  signalés dès l'indicatif tapé, recherche QRZ, mode satellite, **jauges de
+  cadence** (QSO/h et 10 min, avec la tendance), **panneau des spots DX**
+  (« suis-je spotté ? ») et **drapeaux des pays contactés** qui s'ajoutent au
+  fil des QSO.
 - **ADIF** : import avec aperçu, export complet ou d'une sélection, prêt pour
   TQSL / LoTW.
 - **Page publique** pour les chasseurs : activations en cours et à venir, carte
@@ -48,15 +49,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.16.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -92,6 +93,11 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15
     bandes/modes et la date du dernier QSO), ou **doublon** sur la bande et le
     mode choisis ; les QSO faits sous un autre indicatif du club sont signalés
     à part.
+  - **Jauges de cadence** : à côté de « Opérateur au micro », le nombre de QSO
+    de la dernière heure et des 10 dernières minutes, la cadence ramenée à
+    l'heure, la flèche de tendance (▲ / ▼ par rapport à la période précédente)
+    et deux jauges qui passent au vert quand ça décolle — de « station calme »
+    à « pile-up ! ». Mis à jour à chaque QSO enregistré.
   - **Suis-je spotté ?** : les derniers spots DX de l'indicatif (DXWatch, puis
     HamQTH en secours) s'affichent au-dessus du formulaire, avec la fréquence,
     le spotteur, l'ancienneté et le commentaire ; un clic sur la fréquence la
@@ -170,22 +176,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.15.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.16.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.15.1.tar.gz
-   cd tm-activation-1.15.1
+   tar xzf tm-activation-1.16.0.tar.gz
+   cd tm-activation-1.16.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.15.1.zip
-   cd tm-activation-1.15.1
+   unzip tm-activation-1.16.0.zip
+   cd tm-activation-1.16.0
    sudo bash install.sh --lan
    ```
 
@@ -272,8 +278,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.15.1.tar.gz
-cd tm-activation-1.15.1
+tar xzf tm-activation-1.16.0.tar.gz
+cd tm-activation-1.16.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

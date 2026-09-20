@@ -62,6 +62,7 @@
     <noscript><button type="submit">OK</button></noscript>
   </form>
   {% if not current_op %}<p class="act-warn">{{ _("Sélectionne ton indicatif avant de logger.") }}</p>{% endif %}
+  <div id="act-rate" hx-get="/activation/rate" hx-trigger="load, every 30s, act-qso from:body" hx-swap="innerHTML"></div>
 </div>
 
 <div class="act-card">
@@ -325,6 +326,7 @@
 
   // Après un QSO loggé (formulaire remis à zéro par htmx).
   window.actAfterLog = function () {
+    if (window.htmx) htmx.trigger(document.body, 'act-qso');   // jauges de cadence
     toggle.checked = false; syncSat();
     restoreKeep();
     applyPrefs();

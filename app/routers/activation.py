@@ -875,6 +875,19 @@ async def slot_conflict_route(request: Request, band: str = "", mode: str = "") 
     )
 
 
+@router.get("/rate", response_class=HTMLResponse)
+async def rate_panel(request: Request) -> Response:
+    """Jauges de cadence de l'opérateur au micro (ou de la station)."""
+    if (g := _guard(request)) is not None:
+        return g
+    return templates.TemplateResponse(
+        request,
+        "activation/partials/rate.html",
+        {"rate": activation.qso_rate(_current_op(request))},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.get("/spots", response_class=HTMLResponse)
 async def spots_panel(request: Request) -> Response:
     """Panneau « suis-je spotté ? » du log (rafraîchi par htmx, jamais bloquant).

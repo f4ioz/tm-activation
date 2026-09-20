@@ -1,0 +1,29 @@
+{# Jauges de cadence, à droite de « Opérateur au micro ». Rafraîchies par htmx
+   toutes les 30 s et après chaque QSO enregistré. #}
+<div class="act-rate">
+  <div class="act-rate-head">
+    {{ _("Cadence") }}
+    {% if rate.operator %}<b class="act-call">{{ rate.operator }}</b>
+    {% else %}<span class="act-muted">{{ _("toute la station") }}</span>{% endif %}
+  </div>
+
+  {% for w, label in [(rate.hour, _("dernière heure")), (rate.ten, _("10 dernières min"))] %}
+    <div class="act-gauge{% if w.gauge >= 60 %} is-hot{% elif w.gauge >= 30 %} is-warm{% endif %}">
+      <div class="act-gauge-top">
+        <span class="act-gauge-label">{{ label }}</span>
+        <span class="act-trend is-{{ w.trend }}" title="{{ _("période précédente : {n} QSO", n=w.previous) }}">
+          {%- if w.trend == 'up' %}▲ +{{ w.delta }}
+          {%- elif w.trend == 'down' %}▼ {{ w.delta }}
+          {%- else %}▬{% endif -%}
+        </span>
+      </div>
+      <div class="act-gauge-bar"><span style="width: {{ w.gauge }}%"></span></div>
+      <div class="act-gauge-foot">
+        <b class="act-gauge-n">{{ w.qsos }}</b>
+        <span class="act-muted">{{ _("QSO · {n}/h", n=w.per_hour|round|int) }}</span>
+      </div>
+    </div>
+  {% endfor %}
+
+  <p class="act-rate-level">{{ _(rate.hour.level) }}</p>
+</div>

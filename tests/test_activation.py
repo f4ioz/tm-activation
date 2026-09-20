@@ -1952,3 +1952,66 @@ def test_spots_are_cached_between_calls(monkeypatch) -> None:
     spots.recent_spots("TM25TEST", force=True)
     assert calls == ["TM25TEST", "TM25TEST"]
     spots.clear_cache()
+
+
+# ── Jauges de cadence ──────────────────────────────────────────────────────
+
+
+def _qso_minutes_ago(call: str, minutes: int, operator: str = "F4IOZ") -> None:
+    when = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    activation.add_contact(call=call, band="20M", mode="SSB", operator_call=operator,
+                           qso_date=when.strftime("%Y%m%d"), time_on=when.strftime("%H%M"))
+
+
+def test_qso_rate_counts_both_windows() -> None:
+    activation.set_flag("auto_slots", False)     # pas de créneaux déduits ici
+    for i, minutes in enumerate((2, 5, 9, 20, 40)):
+        _qso_minutes_ago(f"DL{i}ABC", minutes)
+    rate = activation.qso_rate()
+    assert rate["hour"]["qsos"] == 5 and rate["hour"]["per_hour"] == 5.0
+    assert rate["ten"]["qsos"] == 3 and rate["ten"]["per_hour"] == 18.0
+    assert rate["ten"]["gauge"] == 30                    # 18 QSO/h sur une pleine échelle de 60
+    assert rate["hour"]["level"] == "station calme"    # 5 QSO/h
+    assert rate["ten"]["level"] == "bon rythme"        # 18 QSO/h projetés
+
+
+def test_qso_rate_counts_the_qso_just_logged() -> None:
+    """Le QSO enregistré à la minute même doit faire bouger la jauge aussitôt."""
+    activation.set_flag("auto_slots", False)
+    assert activation.qso_rate()["ten"]["qsos"] == 0
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    assert activation.qso_rate()["ten"]["qsos"] == 1
+
+
+def test_qso_rate_trend_compares_with_the_previous_period() -> None:
+    activation.set_flag("auto_slots", False)
+    for i, minutes in enumerate((3, 6, 75, 80, 90)):     # 2 dans l'heure, 3 avant
+        _qso_minutes_ago(f"DL{i}ABC", minutes)
+    rate = activation.qso_rate()
+    assert rate["hour"]["previous"] == 3 and rate["hour"]["delta"] == -1
+    assert rate["hour"]["trend"] == "down"
+    assert rate["ten"]["trend"] == "up" and rate["ten"]["delta"] == 2
+
+
+def test_qso_rate_can_be_limited_to_one_operator() -> None:
+    activation.set_flag("auto_slots", False)
+    _qso_minutes_ago("DL1ABC", 5, operator="F4IOZ")
+    _qso_minutes_ago("DL2ABC", 5, operator="F5RRO")
+    assert activation.qso_rate()["ten"]["qsos"] == 2            # toute la station
+    mine = activation.qso_rate("F4IOZ")
+    assert mine["ten"]["qsos"] == 1 and mine["operator"] == "F4IOZ"
+
+
+def test_rate_panel_is_shown_on_the_log_page(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    admin = _private_client()
+    assert 'hx-get="/activation/rate"' in admin.get("/activation/log").text
+    _qso_minutes_ago("DL1ABC", 3)
+    page = admin.get("/activation/rate").text
+    assert "Cadence" in page and "dernière heure" in page and "10 dernières min" in page
+    assert "act-gauge-bar" in page
+
+
+def test_rate_panel_needs_the_operator_area() -> None:
+    assert TestClient(app, follow_redirects=False).get("/activation/rate").status_code == 303
