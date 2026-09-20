@@ -1,4 +1,4 @@
-*Version française : [README.md](README.md)* — the step-by-step guides in `docs/` are still French only.
+*Version française : [README.md](README.md)*
 
 # TM Activation
 
@@ -16,15 +16,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.5.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.5.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.5.0.tar.gz
 ```
 
 ## Features
@@ -64,7 +64,7 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.4.
 | Ports to open | none | 80 and 443 on the router | none |
 | Dedicated public IPv4 | no | required | no (works on 4G, shared IPv4) |
 | Installation | `sudo ./install.sh --lan` | `sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr` | `sudo ./install.sh --tunnel --domain tm.mon-club.fr` |
-| Details | below | [docs/internet-raspberry-pi.md](docs/internet-raspberry-pi.md) | [docs/cloudflare-tunnel.md](docs/cloudflare-tunnel.md) |
+| Details | below | [docs/internet-raspberry-pi.en.md](docs/internet-raspberry-pi.en.md) | [docs/cloudflare-tunnel.en.md](docs/cloudflare-tunnel.en.md) |
 
 Run with no option, `sudo ./install.sh` is a **guided installation**. It first
 asks all the questions (usage, domain, router, callsign, club, passwords) and
@@ -99,22 +99,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.4.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.5.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.4.0.tar.gz
-   cd tm-activation-1.4.0
+   tar xzf tm-activation-1.5.0.tar.gz
+   cd tm-activation-1.5.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.4.0.zip
-   cd tm-activation-1.4.0
+   unzip tm-activation-1.5.0.zip
+   cd tm-activation-1.5.0
    sudo bash install.sh --lan
    ```
 
@@ -192,8 +192,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.4.0.tar.gz
-cd tm-activation-1.4.0
+tar xzf tm-activation-1.5.0.tar.gz
+cd tm-activation-1.5.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -205,7 +205,7 @@ behind nginx. Without `--email`, HTTPS is enabled later with
 **Raspberry Pi behind the club's or the home router**: static address for the
 Pi, public IPv4 address, domain name (the club's or a free DuckDNS one), port
 forwarding on the router… everything is detailed step by step in
-[`docs/internet-raspberry-pi.md`](docs/internet-raspberry-pi.md). The operators
+[`docs/internet-raspberry-pi.en.md`](docs/internet-raspberry-pi.en.md). The operators
 on site keep the `http://<pi-name>.local` access.
 
 If you already manage nginx yourself, use `--manual` and start from

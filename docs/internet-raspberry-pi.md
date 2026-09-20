@@ -11,8 +11,8 @@ du club ou de la maison.
           ▼                                    │
    ┌─────────────┐  ports 80 et 443   ┌────────▼────────────────────────┐
    │     Box     │ ─────────────────▶ │ Raspberry Pi                    │
-   │ (IPv4 publ.)│   redirigés         │ nginx (HTTPS) → TM Activation  │
-   └─────────────┘                     └─────────────────────────────────┘
+   │ (IPv4 publ.)│   redirigés        │ nginx (HTTPS) → TM Activation   │
+   └─────────────┘                    └─────────────────────────────────┘
 ```
 
 **Il faut :**
