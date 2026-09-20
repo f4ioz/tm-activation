@@ -42,11 +42,13 @@
           <td>{{ q.rst_sent }}/{{ q.rst_rcvd }}</td>
           <td>{{ q.operator_call }}</td>
           <td class="act-actions">
+            {% if not locked_op or q.operator_call == locked_op %}
             <a class="act-edit" href="/activation/contacts/{{ q.id }}/edit" title="{{ _("Modifier") }}">✎</a>
             <button type="button" class="act-del"
                     hx-post="/activation/contacts/{{ q.id }}/delete"
                     hx-target="#act-log-result" hx-swap="innerHTML"
                     hx-confirm="{{ _("Supprimer le QSO avec {call} ?", call=q.call) }}">✕</button>
+            {% endif %}
           </td>
         </tr>
       {% else %}

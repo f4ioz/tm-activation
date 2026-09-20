@@ -52,6 +52,10 @@
 
 <div class="act-card act-op-select">
   <div class="act-op-left">
+  {% if locked_op %}
+  <p class="act-op-me">{{ _("Opérateur au micro") }} <b class="act-call">{{ locked_op }}</b>
+    <span class="act-muted">{{ _("(votre compte)") }}</span></p>
+  {% else %}
   <form method="post" action="/activation/whoami" class="act-inline">
     <label>{{ _("Opérateur au micro") }}
       <select name="operator" onchange="this.form.submit()">
@@ -62,6 +66,7 @@
     <input type="hidden" name="next" value="/activation/log">
     <noscript><button type="submit">OK</button></noscript>
   </form>
+  {% endif %}
   {% if not current_op %}<p class="act-warn">{{ _("Sélectionne ton indicatif avant de logger.") }}</p>{% endif %}
   </div>
   <div id="act-spots" hx-get="/activation/spots" hx-include="[name=band], [name=mode]"

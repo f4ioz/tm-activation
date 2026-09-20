@@ -29,12 +29,18 @@
   <div class="act-card">
     <h2>{{ _("Réserver un créneau") }}</h2>
     <form method="post" action="/activation/slots" class="act-form">
+      {% if locked_op %}
+      <p class="act-op-me">{{ _("Opérateur") }} <b class="act-call">{{ locked_op }}</b>
+        <span class="act-muted">{{ _("(votre compte)") }}</span></p>
+      <input type="hidden" name="operator" value="{{ locked_op }}">
+      {% else %}
       <label>{{ _("Opérateur") }}
         <select name="operator" required>
           <option value="">—</option>
           {% for op in operators %}<option value="{{ op.callsign }}"{% if op.callsign == current_op %} selected{% endif %}>{{ op.callsign }}{% if op.name %} — {{ op.name }}{% endif %}</option>{% endfor %}
         </select>
       </label>
+      {% endif %}
       <label>{{ _("Début (heure {tz})", tz=tz_label) }} <input type="datetime-local" name="start" value="{{ now_input }}" required
         data-picker="datetime" data-picker-id="slot-start" data-tz="{{ tz_mode }}"></label>
       <div class="act-quick" data-quick-for="slot-start">
@@ -85,8 +91,10 @@
           <td class="act-slot-qso">{{ slot_qsos.get(s.id) or '' }}</td>
           <td>{{ s.note }}</td>
           <td class="act-actions">
+            {% if not locked_op or s.operator_call == locked_op %}
             <a class="act-edit" href="/activation/slots/{{ s.id }}/edit" title="{{ _("Modifier") }}">✎</a>
             <form method="post" action="/activation/slots/{{ s.id }}/delete" onsubmit="return confirm({{ _("Supprimer ce créneau ?")|tojson|forceescape }})"><button type="submit" class="act-del">✕</button></form>
+            {% endif %}
           </td>
         </tr>
       {% else %}

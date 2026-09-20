@@ -619,3 +619,6 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 /* Jauges côte à côte (gain de hauteur dans la carte « Opérateur au micro »). */
 .act-gauges { display: flex; flex-wrap: wrap; gap: 0.9rem; }
 .act-gauges > .act-gauge { flex: 1 1 8.5rem; min-width: 8.5rem; }
+/* Indicatif imposé (compte opérateur non administrateur) : affiché, pas choisi. */
+.act-op-me { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+.act-op-me .act-call { font-size: 1rem; }

@@ -74,6 +74,11 @@
     <h2>{{ _("Importer un ADIF") }}</h2>
     <form method="post" action="/activation/import" enctype="multipart/form-data" class="act-form">
       <label>{{ _("Fichier ADIF") }} <input type="file" name="file" accept=".adi,.adif,text/plain" required></label>
+      {% if locked_op %}
+      <p class="act-op-me">{{ _("Rattacher à l'opérateur") }} <b class="act-call">{{ locked_op }}</b>
+        <span class="act-muted">{{ _("(votre compte)") }}</span></p>
+      <input type="hidden" name="operator" value="{{ locked_op }}">
+      {% else %}
       <label>{{ _("Rattacher à l'opérateur") }}
         <select name="operator" required>
           <option value="">{{ _("— choisir —") }}</option>
@@ -82,6 +87,7 @@
       </label>
       <label class="act-check"><input type="radio" name="op_source" value="form" checked> {{ _("Tous les QSO pour cet opérateur") }}</label>
       <label class="act-check"><input type="radio" name="op_source" value="file"> {{ _("Garder le champ OPERATOR du fichier quand il existe") }}</label>
+      {% endif %}
       <button type="submit">{{ _("Analyser le fichier") }}</button>
     </form>
     <p class="act-muted act-map-note">{{ _("Un aperçu signale les doublons avant tout import : QSO déjà dans le log (même indicatif, bande et mode à ±10 min), en double dans le fichier, ou station déjà contactée sur la bande/mode.") }}</p>
@@ -89,7 +95,7 @@
 
   <div class="act-card">
     <h2>{{ _("Export complet") }}</h2>
-    <p class="act-muted">{{ _("Tout le log ({n} QSO), prêt pour TQSL / LoTW.", n=contacts|length) }}</p>
+    <p class="act-muted">{% if locked_op %}{{ _("Vos {n} QSO, prêts pour TQSL / LoTW.", n=contacts|length) }}{% else %}{{ _("Tout le log ({n} QSO), prêt pour TQSL / LoTW.", n=contacts|length) }}{% endif %}</p>
     <p class="act-inline"><a class="act-cancel-btn" href="/activation/export.adi">{{ _("ADIF complet") }}</a> <a class="act-cancel-btn" href="/activation/export.csv">CSV</a></p>
   </div>
 </div>

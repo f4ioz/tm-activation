@@ -2160,3 +2160,98 @@ def test_hamqth_fallback_reads_its_own_format(monkeypatch) -> None:
     assert len(spots) == 1 and spots[0]["spotter"] == "ON4ZD"
     assert spots[0]["age_min"] in (6, 7, 8) and spots[0]["band"] == "40M"
     dx_spots.clear_cache()
+
+
+# ── Périmètre d'un opérateur non administrateur ────────────────────────────
+
+
+def _member_client(call: str = "F5ABC") -> TestClient:
+    """Session d'un opérateur ordinaire (mot de passe individuel, pas admin)."""
+    activation.set_flag("per_operator_auth", True)
+    activation.set_flag("auto_slots", False)
+    client = _op_client()
+    assert _login(client, call, PW).status_code == 303
+    return client
+
+
+def test_member_logs_under_their_own_callsign_only() -> None:
+    client = _member_client()
+    r = client.post("/activation/contacts",
+                    data={"call": "DL1ABC", "band": "20M", "mode": "SSB",
+                          "operator": "F5RRO", "now": "1"})      # tentative au nom d'un autre
+    assert r.status_code == 200
+    assert [q["operator_call"] for q in activation.list_contacts()] == ["F5ABC"]
+
+
+def test_member_cannot_switch_to_another_operator() -> None:
+    client = _member_client()
+    client.post("/activation/whoami", data={"operator": "F5RRO", "next": "/activation/log"})
+    page = client.get("/activation/log").text
+    assert "F5ABC" in page and "F5RRO" not in page
+    assert '<select name="operator"' not in page        # plus de choix : l'indicatif est imposé
+
+
+def test_member_cannot_touch_another_operators_qso() -> None:
+    activation.set_flag("auto_slots", False)
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F5RRO")
+    other = activation.list_contacts()[0]["id"]
+    client = _member_client()
+    r = client.post(f"/activation/contacts/{other}/delete")
+    assert "autre opérateur" in r.text and len(activation.list_contacts()) == 1
+    assert client.get(f"/activation/contacts/{other}/edit").status_code == 303
+    r = client.post(f"/activation/contacts/{other}",
+                    data={"call": "DL9ZZZ", "band": "20M", "mode": "SSB", "operator": "F5ABC"})
+    assert r.status_code == 303 and activation.list_contacts()[0]["call"] == "DL1ABC"
+    # Son propre QSO, en revanche, lui appartient.
+    client.post("/activation/contacts",
+                data={"call": "ON4ZZ", "band": "20M", "mode": "SSB", "now": "1"})
+    mine = [q for q in activation.list_contacts() if q["operator_call"] == "F5ABC"][0]["id"]
+    assert "autre opérateur" not in client.post(f"/activation/contacts/{mine}/delete").text
+    assert [q["call"] for q in activation.list_contacts()] == ["DL1ABC"]
+
+
+def test_member_exports_only_their_own_qso() -> None:
+    activation.set_flag("auto_slots", False)
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F5RRO")
+    client = _member_client()
+    client.post("/activation/contacts",
+                data={"call": "ON4ZZ", "band": "20M", "mode": "SSB", "now": "1"})
+    adif = client.get("/activation/export.adi").text
+    assert "ON4ZZ" in adif and "DL1ABC" not in adif
+    csv_body = client.get("/activation/export.csv").text
+    assert "ON4ZZ" in csv_body and "DL1ABC" not in csv_body
+    page = client.get("/activation/adif").text
+    assert "ON4ZZ" in page and "DL1ABC" not in page
+    # Même en cochant l'id du QSO d'un autre dans l'export d'une sélection.
+    other = [q for q in activation.list_contacts() if q["operator_call"] == "F5RRO"][0]["id"]
+    r = client.post("/activation/export-selection.adi", data={"ids": [other]})
+    assert r.status_code == 303 and "err=empty" in r.headers["location"]
+
+
+def test_member_books_slots_under_their_own_callsign_only() -> None:
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M"
+    autre = activation.add_slot("F5RRO", (now + timedelta(hours=3)).strftime(fmt),
+                                (now + timedelta(hours=4)).strftime(fmt), "20M", "SSB")
+    client = _member_client()
+    client.post("/activation/slots",
+                data={"operator": "F5RRO", "start": (now + timedelta(hours=5)).strftime(fmt),
+                      "end": (now + timedelta(hours=6)).strftime(fmt), "band": "40M", "mode": "CW"})
+    nouveau = [s for s in activation.list_slots() if s["band"] == "40M"]
+    assert nouveau and nouveau[0]["operator_call"] == "F5ABC"    # réservé pour lui, pas pour F5RRO
+    # Le créneau d'un autre reste intouchable.
+    assert client.get(f"/activation/slots/{autre}/edit").status_code == 303
+    client.post(f"/activation/slots/{autre}/delete")
+    assert activation.get_slot(autre) is not None
+
+
+def test_admin_operator_keeps_the_full_scope() -> None:
+    activation.set_flag("per_operator_auth", True)
+    activation.add_operator("F5BOS", "Chef")
+    activation.set_operator_admin("F5BOS", True)
+    client = _op_client()
+    assert _login(client, "F5BOS", PW).status_code == 303
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F5RRO")
+    page = client.get("/activation/log").text
+    assert '<select name="operator"' in page                     # il choisit qui est au micro
+    assert "DL1ABC" in client.get("/activation/export.adi").text  # et exporte tout le log

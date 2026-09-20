@@ -94,8 +94,20 @@ def _safe_next(value: str | None) -> str:
     return security.safe_next(value, "/activation", prefix="/activation")
 
 
+def _locked_op(request: Request) -> str:
+    """Indicatif imposé à la session ("" = libre de choisir).
+
+    Un opérateur connecté avec son propre mot de passe et non administrateur
+    reste sur son périmètre : il logue, planifie, importe et exporte sous son
+    seul indicatif. L'admin du site et le mot de passe commun ne sont pas
+    concernés (une seule connexion pour toute l'équipe).
+    """
+    op = _session_op(request)
+    return "" if not op or _is_admin(request) else op
+
+
 def _current_op(request: Request) -> str:
-    return (request.cookies.get(COOKIE_OP) or "").upper()
+    return _locked_op(request) or (request.cookies.get(COOKIE_OP) or "").upper()
 
 
 def _ctx(request: Request, **extra: object) -> dict:
@@ -109,6 +121,7 @@ def _ctx(request: Request, **extra: object) -> dict:
         "is_admin": _is_admin(request),
         "site_admin": is_private(request),     # journal des visites : admin du site seul
         "session_op": _session_op(request),
+        "locked_op": _locked_op(request),
         "station": activation.current_station(),
         "slot_qsos": activation.slot_qso_counts(),
     }
@@ -298,6 +311,8 @@ async def set_operator(request: Request, operator: str = Form(""), next: str = F
     target = next if next.startswith("/activation") else "/activation/log"
     resp = RedirectResponse(target, status_code=303)
     cs = (operator or "").strip().upper()
+    if _locked_op(request):
+        return resp                      # opérateur verrouillé sur son indicatif
     if activation.valid_callsign(cs):
         resp.set_cookie(COOKIE_OP, cs, max_age=30 * 86400, samesite="lax", path="/activation",
                         secure=security.is_https(request))
@@ -617,9 +632,17 @@ def _band_key(band: str) -> tuple[int, str]:
     return (bands.index(band) if band in bands else len(bands), band)
 
 
+def _own_contacts(request: Request) -> list[dict]:
+    """QSO visibles par la session : tout le log, ou les seuls QSO de
+    l'opérateur quand son indicatif est verrouillé."""
+    contacts = activation.list_contacts()
+    locked = _locked_op(request)
+    return [q for q in contacts if q["operator_call"] == locked] if locked else contacts
+
+
 def _adif_page(request: Request, preview: dict | None = None) -> Response:
     """Page ADIF : import (avec aperçu éventuel) + export d'une sélection."""
-    contacts = activation.list_contacts()
+    contacts = _own_contacts(request)
     q = request.query_params
     flash = None
     if q.get("imported") is not None:
@@ -665,7 +688,9 @@ async def import_preview(
     if (g := _guard(request)) is not None:
         return g
     text = (await file.read()).decode("utf-8", errors="replace")
-    prefer_file = op_source == "file"
+    locked = _locked_op(request)
+    operator = locked or operator
+    prefer_file = op_source == "file" and not locked
     rows = activation.analyze_adif(text, operator, prefer_file)
     counts = dict.fromkeys(activation.IMPORT_STATUS, 0)
     for r in rows:
@@ -700,7 +725,8 @@ async def import_confirm(
         activation.backup_now()    # filet de sécurité avant un import en masse
     except Exception:  # noqa: BLE001
         pass
-    rows = activation.analyze_adif(text, operator, op_source == "file")
+    locked = _locked_op(request)
+    rows = activation.analyze_adif(text, locked or operator, op_source == "file" and not locked)
     res = activation.import_rows(rows, set(sel))
     return RedirectResponse(
         f"/activation/adif?imported={res['added']}&skipped={res['skipped']}&invalid={res['invalid']}",
@@ -714,6 +740,8 @@ async def export_selection(request: Request, ids: list[int] = Form(default=[])) 
     if (g := _guard(request)) is not None:
         return g
     contacts = activation.contacts_by_ids(ids)
+    if (locked := _locked_op(request)):
+        contacts = [q for q in contacts if q["operator_call"] == locked]
     if not contacts:
         return RedirectResponse("/activation/adif?err=empty", status_code=303)
     stamp = datetime.now(activation.UTC).strftime("%Y%m%d-%H%M")
@@ -738,6 +766,7 @@ async def create_slot(
     if (g := _guard(request)) is not None:
         return g
     tzm = _tz_mode(request)
+    operator = _locked_op(request) or operator      # pas de créneau au nom d'un autre
     start_utc = activation.input_to_utc_iso(start, tzm)
     end_utc = activation.input_to_utc_iso(end, tzm)
     warn = ""
@@ -752,12 +781,21 @@ async def create_slot(
     return RedirectResponse(f"/activation/planning{warn}", status_code=303)
 
 
+def _may_touch_slot(request: Request, slot_id: int) -> bool:
+    """Créneau modifiable/supprimable par la session ? (chacun les siens)"""
+    locked = _locked_op(request)
+    if not locked:
+        return True
+    slot = activation.get_slot(slot_id)
+    return bool(slot) and slot["operator_call"] == locked
+
+
 @router.get("/slots/{slot_id}/edit", response_class=HTMLResponse)
 async def edit_slot_form(request: Request, slot_id: int) -> Response:
     if (g := _guard(request)) is not None:
         return g
     slot = activation.get_slot(slot_id)
-    if slot is None:
+    if slot is None or not _may_touch_slot(request, slot_id):
         return RedirectResponse("/activation/planning", status_code=303)
     return templates.TemplateResponse(
         request,
@@ -779,7 +817,10 @@ async def edit_slot_submit(
 ) -> Response:
     if (g := _guard(request)) is not None:
         return g
+    if not _may_touch_slot(request, slot_id):
+        return RedirectResponse("/activation/planning", status_code=303)
     tzm = _tz_mode(request)
+    operator = _locked_op(request) or operator
     start_utc = activation.input_to_utc_iso(start, tzm)
     end_utc = activation.input_to_utc_iso(end, tzm)
     warn = ""
@@ -798,6 +839,8 @@ async def edit_slot_submit(
 async def remove_slot(request: Request, slot_id: int) -> Response:
     if (g := _guard(request)) is not None:
         return g
+    if not _may_touch_slot(request, slot_id):
+        return RedirectResponse("/activation/planning", status_code=303)
     activation.delete_slot(slot_id)
     return RedirectResponse("/activation/planning", status_code=303)
 
@@ -935,7 +978,7 @@ async def create_contact(
 ) -> Response:
     if (g := _guard(request)) is not None:
         return g
-    op = (operator or _current_op(request)).strip().upper()
+    op = (_locked_op(request) or operator or _current_op(request)).strip().upper()
     dupe = activation.is_dupe(call, band, mode) if activation.valid_callsign(call) else False
     error = None
     try:
@@ -987,10 +1030,32 @@ async def create_contact(
     )
 
 
+def _may_touch(request: Request, contact_id: int) -> bool:
+    """QSO modifiable/supprimable par la session ? (chacun ses propres QSO)"""
+    locked = _locked_op(request)
+    if not locked:
+        return True
+    contacts = activation.contacts_by_ids([contact_id])
+    return bool(contacts) and contacts[0]["operator_call"] == locked
+
+
 @router.post("/contacts/{contact_id}/delete", response_class=HTMLResponse)
 async def remove_contact(request: Request, contact_id: int) -> Response:
     if (g := _guard(request)) is not None:
         return g
+    if not _may_touch(request, contact_id):
+        return templates.TemplateResponse(
+            request,
+            "activation/partials/log_result.html",
+            {
+                "contacts": activation.list_contacts(limit=100),
+                "stats": activation.stats(),
+                "entities": activation.worked_entities(),
+                "dupe": False,
+                "error": _("Ce QSO est celui d'un autre opérateur : demandez à un administrateur."),
+                "last_call": "",
+            },
+        )
     activation.delete_contact(contact_id)
     return templates.TemplateResponse(
         request,
@@ -1010,6 +1075,8 @@ async def remove_contact(request: Request, contact_id: int) -> Response:
 async def edit_contact_form(request: Request, contact_id: int) -> Response:
     if (g := _guard(request)) is not None:
         return g
+    if not _may_touch(request, contact_id):
+        return RedirectResponse("/activation/log", status_code=303)
     contact = activation.get_contact(contact_id)
     if contact is None:
         return RedirectResponse("/activation/log", status_code=303)
@@ -1039,6 +1106,9 @@ async def update_contact(
 ) -> Response:
     if (g := _guard(request)) is not None:
         return g
+    if not _may_touch(request, contact_id):
+        return RedirectResponse("/activation/log", status_code=303)
+    operator = _locked_op(request) or operator      # pas de QSO au nom d'un autre
     try:
         freq_mhz = float(freq.replace(",", ".")) if freq.strip() else None
     except ValueError:
@@ -1063,7 +1133,7 @@ async def update_contact(
 async def export_adif(request: Request) -> Response:
     if (g := _guard(request)) is not None:
         return g
-    body = activation.to_adif()
+    body = activation.to_adif(_own_contacts(request))
     fname = f"{activation.callsign().lower()}.adi"
     return PlainTextResponse(
         body,
@@ -1076,7 +1146,7 @@ async def export_adif(request: Request) -> Response:
 async def export_csv(request: Request) -> Response:
     if (g := _guard(request)) is not None:
         return g
-    body = activation.to_csv()
+    body = activation.to_csv(_own_contacts(request))
     fname = f"{activation.callsign().lower()}.csv"
     return PlainTextResponse(
         body,
