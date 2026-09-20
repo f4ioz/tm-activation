@@ -1512,3 +1512,26 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
     assert ">2</td>" in planning or ">2<" in planning
     _public()
     assert "2 QSO" in TestClient(app).get("/tm25test").text
+
+
+def test_admin_logout_button_is_everywhere_for_the_main_admin(monkeypatch) -> None:
+    """Bouton « Admin ⎋ » : visible pour l'admin principal, sur toutes les pages
+    de l'espace activation (publiques comprises), et il ferme bien la session."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    _public()
+    admin = _private_client()
+    pages = ("/activation", "/activation/planning", "/activation/settings", "/tm25test",
+             "/activations")   # /activation/login redirige quand on est déjà connecté
+    for path in pages:
+        page = admin.get(path)
+        assert page.status_code == 200, path
+        assert 'action="/logout"' in page.text and "Admin ⎋" in page.text, path
+        assert f'name="next" value="{path}"' in page.text, path
+    anon = TestClient(app, follow_redirects=False)
+    assert "Admin ⎋" not in anon.get("/tm25test").text          # visiteur : rien
+    r = admin.post("/logout", data={"next": "/tm25test"})
+    assert r.status_code == 303 and r.headers["location"] == "/tm25test"
+    # Le cookie admin est effacé (le client de test garde celui posé à la main).
+    cookie = r.headers.get("set-cookie", "")
+    assert auth_mod.COOKIE_NAME in cookie and "Max-Age=0" in cookie
+    assert TestClient(app, follow_redirects=False).get("/activation/settings").status_code == 303

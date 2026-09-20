@@ -137,6 +137,7 @@ async def operator_login_page(request: Request, next: str = "/activation") -> Re
             "station": activation.current_station(),
             "next": _safe_next(next),
             "error": None,
+            "site_admin": is_private(request),
             "configured": bool(activation.operator_password()) or activation.per_operator_auth(),
             "per_operator": activation.per_operator_auth(),
             "last_call": "",
@@ -207,6 +208,7 @@ async def operator_login_submit(
             "station": activation.current_station(),
             "next": target,
             "error": error,
+            "site_admin": is_private(request),
             "configured": bool(expected) or per_op,
             "per_operator": per_op,
             "last_call": op,
@@ -1012,6 +1014,7 @@ async def stations_page(request: Request) -> Response:
         request,
         "activation/stations.html",
         {
+            "site_admin": is_private(request),
             "callsign": club_config().get("callsign") or activation.callsign(),
             "label": club_config().get("name") or _("Indicatifs spéciaux"),
             "stations": [
@@ -1063,6 +1066,7 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
         "activation/public.html",
         {
             "station": st,
+            "site_admin": is_private(request),
             "slug": st["slug"],
             "callsign": cs,
             "label": st["label"] or cs,

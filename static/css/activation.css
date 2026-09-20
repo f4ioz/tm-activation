@@ -416,3 +416,5 @@ a.act-station-card:hover { border-color: var(--accent); }
 /* Boutons de gestion des comptes opérateurs (Réglages) : au fil du texte. */
 .act-acct-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
 .act-acct-actions form { margin: 0; }
+/* Sortie du mode administrateur, depuis n'importe quelle page d'activation. */
+.act-admin-out button { font-family: var(--font-mono, monospace); font-size: 0.75rem; }

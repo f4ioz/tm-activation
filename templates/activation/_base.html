@@ -30,6 +30,12 @@
     <div class="act-bar-right">
       {% block topnav %}{% endblock %}
       {% set here = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+      {% if site_admin is defined and site_admin %}
+      <form method="post" action="/logout" class="act-bar-logout act-admin-out">
+        <input type="hidden" name="next" value="{{ here }}">
+        <button type="submit" title="{{ _("Quitter le mode administrateur") }}">{{ _("Admin") }} ⎋</button>
+      </form>
+      {% endif %}
       <nav class="act-lang" aria-label="{{ _("Langue") }}">
         {%- for code, name in lang_names.items() %}
         <a href="/activation/lang/{{ code }}?next={{ here|urlencode }}" hreflang="{{ code }}" lang="{{ code }}" title="{{ name }}"
