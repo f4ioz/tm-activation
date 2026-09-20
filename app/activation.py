@@ -1783,28 +1783,49 @@ def map_data(station: str | None = None) -> dict[str, Any]:
     return {"points": list(groups.values()), "stations": len(grids), "located": located}
 
 
+def _entity_name(call: str) -> str:
+    """Nom de l'entité DXCC déduit du préfixe ("" si le préfixe est inconnu)."""
+    return dxcc_flags.entity_for_call(call)[1]
+
+
 def dxcc_table(station: str | None = None) -> dict[str, Any]:
-    """Entités DXCC contactées (d'après QRZ) : stations et QSO par entité."""
+    """Entités DXCC contactées : stations et QSO par entité.
+
+    L'entité vient du callbook QRZ quand il la connaît, sinon du **préfixe de
+    l'indicatif** : sans compte QRZ (ou avant que le callbook soit rempli), le
+    tableau est quand même juste pour l'immense majorité des stations. Seuls
+    les indicatifs dont le préfixe est inconnu restent « pas encore
+    identifiés ».
+    """
     st = _st(station)
     init_db()
     with conn() as c:
-        entities = [
-            dict(r) for r in c.execute(
-                "SELECT cb.dxcc, cb.dxcc_name, COUNT(DISTINCT ct.call) AS stations, "
-                "COUNT(*) AS qsos FROM contacts ct "
-                "JOIN callbook cb ON cb.call = ct.call AND cb.status = 'ok' "
-                "WHERE ct.station = ? AND cb.dxcc_name != '' GROUP BY cb.dxcc, cb.dxcc_name "
-                "ORDER BY stations DESC, qsos DESC, cb.dxcc_name",
-                (st,),
-            ).fetchall()
-        ]
-        unidentified = c.execute(
-            "SELECT COUNT(DISTINCT ct.call) FROM contacts ct "
-            "LEFT JOIN callbook cb ON cb.call = ct.call AND cb.status = 'ok' "
-            "AND cb.dxcc_name != '' WHERE ct.station = ? AND cb.call IS NULL",
-            (st,),
-        ).fetchone()[0]
-    return {"entities": entities, "count": len(entities), "unidentified": int(unidentified)}
+        rows = c.execute(
+            "SELECT ct.call, COUNT(*) AS qsos, cb.dxcc, cb.dxcc_name FROM contacts ct "
+            "LEFT JOIN callbook cb ON cb.call = ct.call AND cb.status = 'ok' AND cb.dxcc_name != '' "
+            "WHERE ct.station = ? GROUP BY ct.call", (st,)
+        ).fetchall()
+    groups: dict[str, dict[str, Any]] = {}
+    unidentified = 0
+    for row in rows:
+        code, prefix_name = dxcc_flags.entity_for_call(row["call"])
+        qrz_name = (row["dxcc_name"] or "").strip()
+        if not code and not qrz_name:
+            unidentified += 1
+            continue
+        # Regroupement par entité : le code du drapeau réunit les variantes de
+        # nom (« Germany » côté préfixe, « Fed. Rep. of Germany » côté QRZ).
+        key = code or qrz_name.upper()
+        item = groups.setdefault(key, {"dxcc": row["dxcc"], "code": code,
+                                       "dxcc_name": qrz_name or prefix_name,
+                                       "stations": 0, "qsos": 0, "from_qrz": bool(qrz_name)})
+        item["stations"] += 1
+        item["qsos"] += int(row["qsos"])
+        if qrz_name and not item["from_qrz"]:      # le nom officiel QRZ l'emporte
+            item["dxcc_name"], item["dxcc"], item["from_qrz"] = qrz_name, row["dxcc"], True
+    entities = sorted(groups.values(),
+                      key=lambda e: (-e["stations"], -e["qsos"], e["dxcc_name"]))
+    return {"entities": entities, "count": len(entities), "unidentified": unidentified}
 
 
 # ── Règle de points (réglable par l'admin dans les Réglages) ───────────────
@@ -1946,7 +1967,8 @@ def hunters_ranking(limit: int | None = 50, station: str | None = None) -> list[
             "bands": len({q["band"] for q in qsos}), "modes": len({q["mode"] for q in qsos}),
             "band_modes": len(best),
             "last": max(f"{q['qso_date']}{q['time_on']}" for q in qsos),
-            "dxcc_name": dxcc.get(call, ""), "points": total,
+            "dxcc_name": dxcc.get(call, "") or _entity_name(call),
+            "dxcc_code": dxcc_flags.entity_for_call(call)[0], "points": total,
             "km": round(km) if km is not None else None,
         })
     out.sort(key=_hunter_sort_key)

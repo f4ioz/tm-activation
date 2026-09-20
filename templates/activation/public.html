@@ -1,4 +1,5 @@
 {% extends "activation/_base.html" %}
+{% from "activation/_dxcc_flag.html" import dxcc_flag, call_flag %}
 {% block title %}{{ callsign }} — {{ _("Activation spéciale") }}{% if station.label %} · {{ station.label }}{% endif %}{% endblock %}
 {% block robots %}index, follow{% endblock %}
 {% block meta_description %}{{ _("Suivi en direct de {call} — {label} : planning, comptes à rebours, statistiques et recherche de vos QSO.", call=callsign, label=label) }}{% endblock %}
@@ -125,7 +126,7 @@
         <thead><tr><th>{{ _("Entité") }}</th><th>{{ _("Stations") }}</th><th>QSO</th></tr></thead>
         <tbody>
           {% for e in dxcc.entities %}
-            <tr><td>{{ e.dxcc_name }}</td><td>{{ e.stations }}</td><td>{{ e.qsos }}</td></tr>
+            <tr><td class="act-dxcc-cell">{{ dxcc_flag(e.code, e.dxcc_name) }} {{ e.dxcc_name }}</td><td>{{ e.stations }}</td><td>{{ e.qsos }}</td></tr>
           {% else %}
             <tr><td colspan="3" class="act-muted">{{ _("Identification en cours…") }}</td></tr>
           {% endfor %}
@@ -144,7 +145,7 @@
         <tbody>
           {% for h in ranking %}
             <tr{% if h.call == search_call %} class="is-me"{% endif %}>
-              <td>{{ h.rank }}</td><td class="act-call">{{ h.call }}</td><td>{{ h.dxcc_name }}</td>
+              <td>{{ h.rank }}</td><td class="act-call">{{ h.call }}</td><td class="act-dxcc-cell">{{ dxcc_flag(h.dxcc_code, h.dxcc_name) }} {{ h.dxcc_name }}</td>
               {% if scoring.enabled %}<td><b>{{ h.points }}</b></td>{% endif %}
               {% if with_km %}<td>{{ h.km if h.km is not none else '?' }}</td>{% endif %}
               <td>{% if scoring.enabled %}{{ h.band_modes }}{% else %}<b>{{ h.band_modes }}</b>{% endif %}</td><td>{{ h.qsos }}</td>
@@ -170,7 +171,7 @@
     <tbody>
       {% for q in recent %}
         {% set d = cdt(q) %}
-        <tr><td>{{ date_short(d) if d else q.qso_date }}</td><td>{{ d.strftime('%H:%M') if d else q.time_on }}</td><td class="act-call">{{ q.call }}</td><td>{{ q.band }}</td><td>{{ q.mode }}</td><td class="act-sat-tag">{{ q.sat_name or '' }}</td></tr>
+        <tr><td>{{ date_short(d) if d else q.qso_date }}</td><td>{{ d.strftime('%H:%M') if d else q.time_on }}</td><td class="act-call act-dxcc-cell">{{ call_flag(q.call) }} {{ q.call }}</td><td>{{ q.band }}</td><td>{{ q.mode }}</td><td class="act-sat-tag">{{ q.sat_name or '' }}</td></tr>
       {% else %}
         <tr><td colspan="6" class="act-muted">{{ _("Le log s'ouvrira au lancement de l'activation.") }}</td></tr>
       {% endfor %}

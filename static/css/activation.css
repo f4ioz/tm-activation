@@ -543,3 +543,6 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 @media (max-width: 640px) {
   .act-dxcc-name { display: none; }   /* écran étroit : drapeau + compteur suffisent */
 }
+/* Cellule « drapeau + libellé » des tableaux publics. */
+.act-dxcc-cell { white-space: nowrap; }
+.act-dxcc-cell .act-dxcc-flag { vertical-align: -0.2em; margin-right: 0.15rem; }

@@ -44,15 +44,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.1.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.1.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.15.0.tar.gz
 ```
 
 ## Features
@@ -99,8 +99,9 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.14
     lines, then confirmation) and full or selective export, ready to sign with
     TQSL for LoTW. CSV export.
 - **Public page** per callsign (`/tm50abc`): live and upcoming activations, map
-  of the stations worked, DXCC table, hunter ranking (configurable points
-  rule), "am I in the log?" search. The names of the stations worked are never
+  of the stations worked, DXCC table **with flags** (the entity is derived from
+  the prefix, so the table is right even **without a QRZ account**), hunter
+  ranking (configurable points rule), "am I in the log?" search. The names of the stations worked are never
   published.
 - **Several special callsigns**: only one "current" at a time, the previous ones
   remain available to view (`/activations`).
@@ -161,22 +162,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.14.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.15.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.14.1.tar.gz
-   cd tm-activation-1.14.1
+   tar xzf tm-activation-1.15.0.tar.gz
+   cd tm-activation-1.15.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.14.1.zip
-   cd tm-activation-1.14.1
+   unzip tm-activation-1.15.0.zip
+   cd tm-activation-1.15.0
    sudo bash install.sh --lan
    ```
 
@@ -254,8 +255,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.14.1.tar.gz
-cd tm-activation-1.14.1
+tar xzf tm-activation-1.15.0.tar.gz
+cd tm-activation-1.15.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

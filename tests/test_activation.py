@@ -715,8 +715,32 @@ def test_dxcc_table_counts_entities() -> None:
     for call in ("DL1ABC", "DL2ABC", "G0XYZ", "F1ZZZ"):
         activation.qrz_lookup(call, fake)
     t = activation.dxcc_table()
-    assert t["count"] == 2 and t["unidentified"] == 1
-    assert t["entities"][0] == {"dxcc": 230, "dxcc_name": "Germany", "stations": 2, "qsos": 3}
+    # F1ZZZ est inconnu de QRZ, mais son préfixe suffit à l'identifier.
+    assert t["count"] == 3 and t["unidentified"] == 0
+    first = t["entities"][0]
+    assert first["dxcc_name"] == "Germany" and first["code"] == "DE"
+    assert (first["dxcc"], first["stations"], first["qsos"]) == (230, 2, 3)
+    assert [e["dxcc_name"] for e in t["entities"][1:]] == ["England", "France"]
+
+
+def test_dxcc_table_works_without_qrz() -> None:
+    """Sans compte QRZ (callbook vide), l'entité vient du préfixe de l'indicatif."""
+    for call in ("DL1ABC", "G0XYZ", "F1ZZZ", "VE1ZZ", "XYZZY9"):
+        _qso(call)
+    t = activation.dxcc_table()
+    assert [(e["dxcc_name"], e["code"]) for e in t["entities"]] == [
+        ("Canada", "CA"), ("England", "GB-ENG"), ("France", "FR"), ("Germany", "DE")]
+    assert t["unidentified"] == 1                    # XYZZY9 : préfixe inconnu
+    assert all(not e["from_qrz"] for e in t["entities"])
+
+
+def test_public_page_shows_the_country_flags() -> None:
+    _public()
+    _qso("DL1ABC")
+    activation.set_flag("show_contacts", True)
+    page = TestClient(app).get("/tm25test").text
+    assert "/static/vendor/flags/de.png" in page and "Germany" in page
+    assert "pas encore identifiée" not in page      # le préfixe suffit, sans QRZ
 
 
 def test_hunters_ranking_order() -> None:

@@ -1,3 +1,4 @@
+{% from "activation/_dxcc_flag.html" import dxcc_flag, call_flag %}
 {% if error %}
   <p class="act-alert act-alert-err">⚠ {{ error }}</p>
 {% elif dupe|default(false) %}
@@ -14,8 +15,7 @@
   <ul class="act-dxcc">
     {% for e in ents %}
       <li class="act-dxcc-item{% if loop.first %} is-last{% endif %}" title="{{ e.name }} ({{ e.code }}) — {{ _("{n} QSO", n=e.n) }}">
-        <img class="act-dxcc-flag" src="{{ asset('/static/vendor/flags/' ~ e.code|lower ~ '.png') }}"
-             width="24" height="18" alt="{{ e.code }}" loading="lazy">
+        {{ dxcc_flag(e.code, e.name) }}
         <span class="act-dxcc-name">{{ e.name }}</span>
         <span class="act-dxcc-n">{{ e.n }}</span>
       </li>
@@ -35,7 +35,7 @@
       {% for q in contacts %}
         <tr>
           <td>{{ q.qso_date }}</td><td>{{ q.time_on }}</td>
-          <td class="act-call">{{ q.call }}</td>
+          <td class="act-call act-dxcc-cell">{{ call_flag(q.call) }} {{ q.call }}</td>
           <td>{{ q.band }}</td><td>{{ q.mode }}</td>
           <td class="act-sat-tag">{{ q.sat_name or '' }}</td>
           <td>{{ q.rst_sent }}/{{ q.rst_rcvd }}</td>

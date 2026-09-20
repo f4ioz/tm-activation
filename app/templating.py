@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from app import activation, i18n
+from app import activation, dxcc_flags, i18n
 from app.config import club_config
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -44,4 +44,5 @@ templates.env.globals["asset"] = asset
 templates.env.globals["dow_fr"] = dow_fr
 templates.env.globals["flag_prefixes"] = activation.FLAG_PREFIXES
 templates.env.globals["note_is_sat"] = activation.note_is_sat
+templates.env.globals["dxcc_entity"] = dxcc_flags.entity_for_call
 i18n.install(templates.env)
