@@ -2,12 +2,38 @@
 
 # TM Activation
 
-Web application to manage the activation of amateur radio **special callsigns**
-(TM…, TO…, etc.) by a radio club: operator schedule, multi-operator QSO log,
-ADIF import/export and a public page for hunters.
+**Your club is activating a special callsign? Here is everything to run the
+schedule, the log and the public page — with nothing to install on anyone's
+computer.**
 
-It installs in a few minutes on a **Raspberry Pi** or a **Linux server** and
-runs on its own, including on a local network with no Internet.
+Web application for the activation of amateur radio **special callsigns** (TM…,
+TO…, etc.) by a radio club: each operator books their slots and logs their QSOs
+from a phone or a PC, while hunters follow the activation live on a public page.
+
+![Public activation page](docs/images/public.png)
+
+- **Shared schedule**: who is on air, when, on which band and mode, with an
+  overlap warning, countdowns and the QSO count of each slot.
+- **Multi-operator QSO log**: quick entry, "now" time, duplicates flagged as
+  soon as the callsign is typed, QRZ lookup, satellite mode.
+- **ADIF**: import with a preview, full or selective export, ready for
+  TQSL / LoTW.
+- **Public page** for hunters: current and upcoming activations, contacts map,
+  DXCC table, points ranking and an "am I in the log?" search.
+- **Operator accounts**, your choice: one shared password, or one per operator
+  with optional approval and several administrators.
+- **French and English**, picked by the visitor.
+
+It installs in a few minutes on a **Raspberry Pi**, a **Proxmox container** or a
+Linux server, and runs on its own — including on a local network with **no
+Internet** (libraries, fonts and calendar are bundled; only the map background
+and QRZ need a connection).
+
+| QSO log | Schedule |
+|---|---|
+| ![Logging a QSO](docs/images/log.png) | ![Slot schedule](docs/images/planning.png) |
+
+![Contacts map](docs/images/map.jpg)
 
 Developed by Olivier F4IOZ, then extracted from his website to be shared with
 radio clubs.
@@ -16,15 +42,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.1.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.1.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.9.1.tar.gz
 ```
 
 ## Features
@@ -115,22 +141,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.9.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.9.1.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.9.0.tar.gz
-   cd tm-activation-1.9.0
+   tar xzf tm-activation-1.9.1.tar.gz
+   cd tm-activation-1.9.1
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.9.0.zip
-   cd tm-activation-1.9.0
+   unzip tm-activation-1.9.1.zip
+   cd tm-activation-1.9.1
    sudo bash install.sh --lan
    ```
 
@@ -208,8 +234,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.9.0.tar.gz
-cd tm-activation-1.9.0
+tar xzf tm-activation-1.9.1.tar.gz
+cd tm-activation-1.9.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
