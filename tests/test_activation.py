@@ -1944,11 +1944,15 @@ def test_spots_panel_lists_the_spots(monkeypatch) -> None:
              "when": "1433z 20 Sep", "age_min": 3, "band": "20M"}
         ],
     )
-    page = _private_client().get("/activation/spots").text
-    assert "14190.0" in page and "K4NYX" in page and "20M" in page
-    assert "loud in FL" in page and "il y a 3 min" in page
+    client = _private_client()
+    page = client.get("/activation/spots").text
+    assert "14190.0" in page and "K4NYX" in page and "20M" in page and "il y a 3 min" in page
     assert "actUseSpot('14.190', '20M')" in page      # clic → fréquence reprise dans le formulaire
     assert "act-card" not in page                     # panneau intégré à la carte de l'opérateur
+    assert "loud in FL" not in page                   # le commentaire n'est plus affiché
+    # Le panneau ne montre que la bande travaillée.
+    assert "14190.0" in client.get("/activation/spots?band=20M").text
+    assert client.get("/activation/spots?band=40M").text.strip() == ""
 
 
 def test_spots_needs_the_operator_area() -> None:

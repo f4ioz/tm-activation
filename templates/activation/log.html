@@ -63,8 +63,9 @@
     <noscript><button type="submit">OK</button></noscript>
   </form>
   {% if not current_op %}<p class="act-warn">{{ _("Sélectionne ton indicatif avant de logger.") }}</p>{% endif %}
-  <div id="act-spots" hx-get="/activation/spots" hx-trigger="load, every 60s" hx-swap="innerHTML"></div>
   </div>
+  <div id="act-spots" hx-get="/activation/spots" hx-include="[name=band]"
+       hx-trigger="load, every 60s, act-band from:body, act-qso from:body" hx-swap="innerHTML"></div>
   <div id="act-rate" hx-get="/activation/rate" hx-trigger="load, every 30s, act-qso from:body" hx-swap="innerHTML"></div>
 </div>
 
@@ -273,6 +274,10 @@
       })
       .catch(function () { blockHint.textContent = ''; });
   }
+  // Les spots ne montrent que notre bande : ils suivent le sélecteur.
+  bandSel.addEventListener('change', function () {
+    if (window.htmx) htmx.trigger(document.body, 'act-band');
+  });
   bandSel.addEventListener('change', checkSlot);
   modeSel.addEventListener('change', checkSlot);
   setInterval(checkSlot, 60000);      // un créneau peut commencer pendant la saisie

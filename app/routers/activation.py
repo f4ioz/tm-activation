@@ -889,15 +889,20 @@ async def rate_panel(request: Request) -> Response:
 
 
 @router.get("/spots", response_class=HTMLResponse)
-async def spots_panel(request: Request) -> Response:
+async def spots_panel(request: Request, band: str = "") -> Response:
     """Panneau « suis-je spotté ? » du log (rafraîchi par htmx, jamais bloquant).
 
-    Sans Internet, la liste revient vide et le panneau reste simplement absent.
+    Seuls les spots de la bande travaillée sont montrés — c'est là que se joue
+    le pile-up. Sans Internet, la liste revient vide et le panneau disparaît.
     """
     if (g := _guard(request)) is not None:
         return g
     call = activation.callsign()
-    found = await run_in_threadpool(dx_spots.recent_spots, call, 3)   # panneau compact
+    found = await run_in_threadpool(dx_spots.recent_spots, call, 20)
+    wanted = (band or "").strip().upper()
+    if wanted:
+        found = [spot for spot in found if spot["band"] == wanted]
+    found = found[:3]
     return templates.TemplateResponse(
         request,
         "activation/partials/spots.html",

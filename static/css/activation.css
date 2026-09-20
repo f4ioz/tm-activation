@@ -291,8 +291,9 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 /* Carte « Opérateur au micro » : sélecteur à gauche, jauges de cadence à droite. */
 .act-op-select { flex-direction: row; flex-wrap: wrap; align-items: flex-start;
   justify-content: space-between; gap: 0.8rem; }
-.act-op-select > .act-op-left { flex: 1 1 18rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.act-op-select > #act-rate { flex: 1 1 22rem; }
+.act-op-select > .act-op-left { flex: 0 1 15rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.act-op-select > #act-spots { flex: 1 1 17rem; }
+.act-op-select > #act-rate { flex: 1 1 21rem; }
 .act-utc-hint { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
 
 /* Tables */
