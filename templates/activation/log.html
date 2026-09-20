@@ -43,8 +43,8 @@
     <input type="hidden" name="operator" value="{{ current_op }}">
     <div class="act-row">
       <label>{{ _("Indicatif contacté") }} <input type="text" name="call" required autofocus autocapitalize="characters" autocomplete="off" placeholder="DL1ABC"></label>
-      <label>{{ _("Bande") }} <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
-      <label>{{ _("Mode") }} <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
+      <label>{{ _("RST envoyé") }} <input type="text" name="rst_sent" value="59" maxlength="5" autocomplete="off"></label>
+      <label>{{ _("RST reçu") }} <input type="text" name="rst_rcvd" value="59" maxlength="5" autocomplete="off"></label>
     </div>
     <div class="act-toggles">
       <label class="act-check"><input type="checkbox" id="act-qrz-toggle" checked> {{ _("🔎 Recherche QRZ en quittant la case indicatif") }}</label>
@@ -56,8 +56,8 @@
         <label>{{ _("Date et heure ({tz})", tz=tz_label) }} <input type="datetime-local" name="when" value="{{ now_input }}" data-tz="{{ tz_mode }}"></label>
         <label class="act-check"><input type="checkbox" id="act-now-toggle" name="now" value="1" checked> {{ _("Maintenant") }}</label>
       </div>
-      <label>{{ _("RST envoyé") }} <input type="text" name="rst_sent" value="59" maxlength="5" autocomplete="off"></label>
-      <label>{{ _("RST reçu") }} <input type="text" name="rst_rcvd" value="59" maxlength="5" autocomplete="off"></label>
+      <label>{{ _("Bande") }} <select name="band" required>{% for b in bands %}<option value="{{ b }}"{% if b == '20M' %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+      <label>{{ _("Mode") }} <select name="mode" required>{% for m in modes %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select></label>
       <label>{{ _("Fréq (MHz)") }} <input type="text" name="freq" inputmode="decimal" placeholder="14.190" autocomplete="off"></label>
       <label>{{ _("Locator (option)") }} <input type="text" name="gridsquare" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="JO31"></label>
     </div>
