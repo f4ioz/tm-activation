@@ -555,6 +555,8 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
    et le nombre de QSO restent en infobulle pour ne pas gonfler la carte. */
 .act-dxcc-mini { margin-top: 0.6rem; gap: 0.25rem; }
 .act-dxcc-mini .act-dxcc-item { padding: 0; border: 0; border-radius: 0; }
+.act-dxcc-more { font-family: var(--font-mono, monospace); font-size: 0.75rem;
+  color: var(--text-muted); align-self: center; }
 
 /* Cellule « drapeau + libellé » des tableaux publics. */
 .act-dxcc-cell { white-space: nowrap; }
