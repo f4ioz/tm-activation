@@ -957,9 +957,13 @@ def test_map_style_settings_route_admin_only(monkeypatch) -> None:
 def test_public_map_carries_the_style(monkeypatch) -> None:
     _public("JN18FS")
     _qso("DL1ABC", band="20M", mode="CW", grid="JO31AB")
-    activation.set_map_style({"enabled": "1", "color_CW": "#abcdef", "shape_20M": "diamond"})
+    activation.set_map_style({"enabled": "1", "filters": "1", "color_CW": "#abcdef",
+                              "shape_20M": "diamond"})
     page = TestClient(app).get("/tm25test").text
     assert "act-map-legend" in page and "#abcdef" in page and "diamond" in page
+    assert '"filters": true' in page and 'data-all=' in page   # cases à cocher bande/mode
+    activation.set_map_style({"enabled": "1"})                 # filtres décochés
+    assert '"filters": false' in TestClient(app).get("/tm25test").text
 
 
 def test_public_board_shows_points_when_enabled(monkeypatch) -> None:

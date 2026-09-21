@@ -369,6 +369,17 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-map-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0.5rem 0 0;
   font-family: var(--font-mono, monospace); font-size: 0.75rem; color: var(--text-muted); }
 .act-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* Légende cliquable : chaque entrée filtre sa bande ou son mode. */
+.act-legend-item.is-filter { cursor: pointer; user-select: none; }
+.act-legend-item.is-filter input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.act-legend-item.is-filter:has(input:not(:checked)) { opacity: 0.45; }
+.act-legend-actions { display: inline-flex; gap: 0.3rem; }
+.act-legend-actions button {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: 3px; padding: 0 0.4rem; cursor: pointer;
+  font-family: inherit; font-size: inherit;
+}
+.act-legend-actions button:hover { color: var(--accent); border-color: var(--accent); }
 .act-map-home { stroke: color-mix(in srgb, var(--accent) 50%, #000); fill: var(--accent); }
 .leaflet-tooltip.act-map-label {
   background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--border);

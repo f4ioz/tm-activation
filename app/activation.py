@@ -1969,6 +1969,7 @@ MAP_SHAPES = ("circle", "diamond", "square", "triangle", "star", "cross", "hexag
 
 DEFAULT_MAP_STYLE: dict[str, Any] = {
     "enabled": True,                  # décoché : tous les points identiques
+    "filters": True,                  # cases à cocher bande/mode sous la carte
     "mode_colors": {
         "SSB": "#e8543f", "CW": "#f2b134", "FT8": "#2f7fd1", "FT4": "#17a2a2",
         "RTTY": "#8e5bd0", "PSK31": "#d2691e", "FM": "#2fa84f", "AM": "#8a8f98",
@@ -2000,6 +2001,7 @@ def get_map_style(station: str | None = None) -> dict[str, Any]:
     d = DEFAULT_MAP_STYLE
     return {
         "enabled": bool(saved.get("enabled", d["enabled"])),
+        "filters": bool(saved.get("filters", d["filters"])),
         "mode_colors": {**d["mode_colors"],
                         **{m: _clean_color(c, d["mode_colors"].get(m, d["mode_default"]))
                            for m, c in (saved.get("mode_colors") or {}).items()}},
@@ -2022,6 +2024,7 @@ def set_map_style(form: dict[str, Any], station: str | None = None) -> dict[str,
     d = DEFAULT_MAP_STYLE
     style = {
         "enabled": bool(form.get("enabled")),
+        "filters": bool(form.get("filters")),
         "mode_colors": {m: _clean_color(form.get(f"color_{m}"),
                                         d["mode_colors"].get(m, d["mode_default"]))
                         for m in MODES},

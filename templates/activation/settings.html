@@ -259,6 +259,7 @@
                             "cross": _("Croix"), "pentagon": _("Pentagone")} %}
       <form method="post" action="/activation/settings/map" class="act-form">
         <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if map_style.enabled %} checked{% endif %}> {{ _("Distinguer les bandes et les modes sur la carte publique") }}</label>
+        <label class="act-check"><input type="checkbox" name="filters" value="1"{% if map_style.filters %} checked{% endif %}> {{ _("Cases à cocher sous la carte pour n'afficher que certaines bandes ou certains modes") }}</label>
         <fieldset class="act-fieldset">
           <legend>{{ _("Couleur par mode") }}</legend>
           <div class="act-style-grid">

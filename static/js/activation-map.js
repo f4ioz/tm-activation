@@ -76,6 +76,7 @@
   points.forEach(function (p) { (perGrid[p.grid] = perGrid[p.grid] || []).push(p); });
 
   var bounds = [];
+  var markers = [];             // { marker, band, mode } pour les filtres
   Object.keys(perGrid).forEach(function (grid) {
     var group = perGrid[grid];
     group.forEach(function (p, i) {
@@ -101,6 +102,7 @@
       });
       var head = esc(p.grid) + ' · ' + esc(p.band) + ' · ' + esc(p.mode);
       m.bindPopup('<b>' + head + '</b><br>' + p.calls.map(esc).join('<br>'));
+      markers.push({ marker: m, band: p.band, mode: p.mode });
       bounds.push([p.lat, p.lon]);
     });
   });
@@ -121,19 +123,63 @@
   map.on('zoomend', syncLabels);
   syncLabels();
 
-  // Légende : seulement les bandes et les modes réellement travaillés.
+  /* Légende : seulement les bandes et les modes réellement travaillés. Avec
+   * l'option « filtres », chaque entrée devient une case à cocher — un point
+   * reste visible tant que SA bande ET SON mode sont cochés. */
+  var NEUTRAL = '#5b6b7c';
   var legend = document.getElementById('act-map-legend');
-  if (legend && styled && points.length) {
-    var neutral = '#5b6b7c';
-    var html = '';
-    (data.modes || []).forEach(function (mode) {
-      html += '<span class="act-legend-item">' + shapeSvg('circle', colorOf(mode), 14)
-        + esc(mode) + '</span>';
-    });
-    (data.bands || []).forEach(function (band) {
-      html += '<span class="act-legend-item">' + shapeSvg(shapeOf(band), neutral, 14)
-        + esc(band) + '</span>';
-    });
+  var modes = data.modes || [];
+  var bands = data.bands || [];
+  var filtering = !!style.filters;
+
+  function symbol(kind, value) {
+    return kind === 'mode' ? shapeSvg('circle', colorOf(value), 14)
+      : shapeSvg(shapeOf(value), styled ? NEUTRAL : PLAIN, 14);
+  }
+
+  function entry(kind, value) {
+    var sym = symbol(kind, value) + esc(value);
+    if (!filtering) return '<span class="act-legend-item">' + sym + '</span>';
+    return '<label class="act-legend-item is-filter"><input type="checkbox" checked'
+      + ' data-kind="' + kind + '" data-value="' + esc(value) + '">' + sym + '</label>';
+  }
+
+  if (legend && points.length && (styled || filtering)) {
+    var html = modes.map(function (m) { return entry('mode', m); }).join('')
+      + bands.map(function (b) { return entry('band', b); }).join('');
+    if (filtering) {
+      html += '<span class="act-legend-actions">'
+        + '<button type="button" data-all>' + esc(legend.dataset.all || 'Tout') + '</button>'
+        + '<button type="button" data-none>' + esc(legend.dataset.none || 'Aucun') + '</button>'
+        + '</span>';
+    }
     legend.innerHTML = html;
+  }
+
+  if (legend && filtering) {
+    var boxes = legend.querySelectorAll('input[type=checkbox]');
+
+    function apply() {
+      var on = { mode: {}, band: {} };
+      Array.prototype.forEach.call(boxes, function (box) {
+        on[box.dataset.kind][box.dataset.value] = box.checked;
+      });
+      markers.forEach(function (m) {
+        // Bande ou mode absent de la légende (champ vide) : toujours visible.
+        var show = (!m.mode || on.mode[m.mode] !== false)
+          && (!m.band || on.band[m.band] !== false);
+        if (show && !map.hasLayer(m.marker)) map.addLayer(m.marker);
+        else if (!show && map.hasLayer(m.marker)) map.removeLayer(m.marker);
+      });
+    }
+
+    legend.addEventListener('change', apply);
+    legend.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-all], button[data-none]');
+      if (!btn) return;
+      var value = btn.hasAttribute('data-all');
+      Array.prototype.forEach.call(boxes, function (box) { box.checked = value; });
+      apply();
+    });
   }
 })();
