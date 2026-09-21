@@ -54,15 +54,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.22.3.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.22.3.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.23.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.23.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.22.3.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.23.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -176,6 +176,7 @@ n'est imposé.
 | Afficher la liste des contacts | au choix | « Derniers contacts » sur la page publique |
 | Afficher carte, DXCC et classement | au choix | la partie « chasseurs » de la page publique |
 | Classement aux points | non | sinon classement aux couples bande × mode |
+| Couleurs et formes de la carte | oui | une couleur par mode, une forme par bande (réglables) |
 | Compte QRZ.com | facultatif | noms, locators et pays des stations contactées |
 | Heure locale ou UTC | locale | l'heure locale est **celle du visiteur**, mémorisée |
 | Langue FR / EN | navigateur | bouton dans le bandeau, mémorisé |
@@ -226,22 +227,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.22.3.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.23.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.22.3.tar.gz
-   cd tm-activation-1.22.3
+   tar xzf tm-activation-1.23.0.tar.gz
+   cd tm-activation-1.23.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.22.3.zip
-   cd tm-activation-1.22.3
+   unzip tm-activation-1.23.0.zip
+   cd tm-activation-1.23.0
    sudo bash install.sh --lan
    ```
 
@@ -328,8 +329,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.22.3.tar.gz
-cd tm-activation-1.22.3
+tar xzf tm-activation-1.23.0.tar.gz
+cd tm-activation-1.23.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

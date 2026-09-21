@@ -251,6 +251,46 @@
       <p class="act-muted act-map-note">{{ _("Règle actuelle : {rule}.", rule=scoring_summary) }} {{ _("Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).") }}</p>
     </div>
 
+    <div class="act-card act-card-wide" id="carte">
+      <h2>{{ _("Carte des contacts") }} — {{ callsign }}</h2>
+      {% if mp_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Style de la carte enregistré.") }}</p>{% endif %}
+      {% set shape_names = {"circle": _("Rond"), "square": _("Carré"), "triangle": _("Triangle"),
+                            "diamond": _("Losange"), "star": _("Étoile"), "hexagon": _("Hexagone"),
+                            "cross": _("Croix"), "pentagon": _("Pentagone")} %}
+      <form method="post" action="/activation/settings/map" class="act-form">
+        <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if map_style.enabled %} checked{% endif %}> {{ _("Distinguer les bandes et les modes sur la carte publique") }}</label>
+        <fieldset class="act-fieldset">
+          <legend>{{ _("Couleur par mode") }}</legend>
+          <div class="act-style-grid">
+            {% for m in modes %}<label class="act-style-cell">{{ m }} <input type="color" name="color_{{ m }}" value="{{ map_style.mode_colors.get(m, map_style.mode_default) }}"></label>{% endfor %}
+            <label class="act-style-cell">{{ _("Autres") }} <input type="color" name="color_default" value="{{ map_style.mode_default }}"></label>
+          </div>
+        </fieldset>
+        <fieldset class="act-fieldset">
+          <legend>{{ _("Forme par bande") }}</legend>
+          <div class="act-style-grid">
+            {% for b in bands %}
+              <label class="act-style-cell">{{ b }}
+                <select name="shape_{{ b }}">
+                  {% for sh in map_shapes %}<option value="{{ sh }}"{% if map_style.band_shapes.get(b, map_style.band_default) == sh %} selected{% endif %}>{{ shape_names[sh] }}</option>{% endfor %}
+                </select>
+              </label>
+            {% endfor %}
+            <label class="act-style-cell">{{ _("Autres") }}
+              <select name="shape_default">
+                {% for sh in map_shapes %}<option value="{{ sh }}"{% if map_style.band_default == sh %} selected{% endif %}>{{ shape_names[sh] }}</option>{% endfor %}
+              </select>
+            </label>
+          </div>
+        </fieldset>
+        <div class="act-acct-actions">
+          <button type="submit">{{ _("Enregistrer") }}</button>
+          <button type="submit" name="reset" value="1" class="act-cancel-btn">{{ _("Valeurs par défaut") }}</button>
+        </div>
+      </form>
+      <p class="act-muted act-map-note">{{ _("Un point par locator, bande et mode : la couleur dit le mode, la forme dit la bande. Les points d'un même carré sont écartés en couronne, et la légende sous la carte ne montre que les bandes et modes travaillés.") }}</p>
+    </div>
+
     <div class="act-card">
       <h2>{{ _("Sauvegardes") }}</h2>
       <p class="act-muted">

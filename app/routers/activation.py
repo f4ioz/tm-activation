@@ -403,6 +403,9 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             qrz_account=activation.qrz_account(),
             qz_flash=request.query_params.get("qz"),
             scoring=activation.get_scoring(),
+            map_style=activation.get_map_style(),
+            map_shapes=activation.MAP_SHAPES,
+            mp_flash=request.query_params.get("mp"),
             scoring_summary=activation.scoring_summary(),
             sc_flash=request.query_params.get("sc"),
             my_grid=activation.my_gridsquare(),
@@ -533,6 +536,16 @@ async def change_scoring(request: Request) -> Response:
     form = await request.form()
     activation.set_scoring(dict(form))
     return RedirectResponse("/activation/settings?sc=ok#points", status_code=303)
+
+
+@router.post("/settings/map")
+async def change_map_style(request: Request) -> Response:
+    """Couleurs (modes) et formes (bandes) de la carte publique (admin)."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    form = await request.form()
+    activation.set_map_style(dict(form))
+    return RedirectResponse("/activation/settings?mp=ok#carte", status_code=303)
 
 
 # ── Indicatifs spéciaux (admin) ────────────────────────────────────────────
@@ -1203,6 +1216,7 @@ def _public_stats(station: str, search_call: str = "") -> dict:
     return {
         "show_map_stats": True,
         "map_data": activation.map_data(station),
+        "map_style": activation.get_map_style(station),
         "dxcc": activation.dxcc_table(station),
         "ranking": ranking[:50],
         "search_rank": next((h for h in ranking if h["call"] == search_call), None),

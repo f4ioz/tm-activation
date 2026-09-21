@@ -1872,21 +1872,44 @@ def call_grids(station: str | None = None) -> dict[str, str]:
 
 
 def map_data(station: str | None = None) -> dict[str, Any]:
-    """Stations contactées regroupées par locator, pour la carte publique.
+    """Stations contactées pour la carte publique : un point par locator, bande
+    et mode.
 
     Locator : voir ``call_grids``. Position = CENTRE du locator (jamais les
     coordonnées précises de QRZ) et aucune donnée nominative : indicatif +
-    locator seulement.
+    locator seulement. Les points d'un même carré sont écartés à l'affichage
+    (voir static/js/activation-map.js) pour rester tous visibles.
     """
-    grids = call_grids(station)
-    groups: dict[str, dict[str, Any]] = {}
-    for call, grid in grids.items():
+    st = _st(station)
+    grids = call_grids(st)
+    init_db()
+    with conn() as c:
+        rows = c.execute(
+            "SELECT call, band, mode, COUNT(*) AS n, MAX(qso_date || time_on) AS last "
+            "FROM contacts WHERE station = ? GROUP BY call, band, mode", (st,)
+        ).fetchall()
+    groups: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        grid = grids.get(row["call"], "")
         if not grid:
             continue
-        lat, lon = locator_center(grid)
-        groups.setdefault(grid, {"grid": grid, "lat": lat, "lon": lon, "calls": []})["calls"].append(call)
-    located = sum(len(g["calls"]) for g in groups.values())
-    return {"points": list(groups.values()), "stations": len(grids), "located": located}
+        band, mode = (row["band"] or "").upper(), (row["mode"] or "").upper()
+        key = (grid, band, mode)
+        point = groups.get(key)
+        if point is None:
+            lat, lon = locator_center(grid)
+            point = groups[key] = {"grid": grid, "lat": lat, "lon": lon, "band": band,
+                                   "mode": mode, "calls": [], "qsos": 0, "last": ""}
+        point["calls"].append(row["call"])
+        point["qsos"] += int(row["n"])
+        point["last"] = max(point["last"], row["last"] or "")
+    for point in groups.values():
+        point["calls"].sort()
+    located = sum(1 for grid in grids.values() if grid)
+    points = sorted(groups.values(), key=lambda p: (p["grid"], p["band"], p["mode"]))
+    return {"points": points, "stations": len(grids), "located": located,
+            "bands": sorted({p["band"] for p in points if p["band"]}),
+            "modes": sorted({p["mode"] for p in points if p["mode"]})}
 
 
 def _entity_name(call: str) -> str:
@@ -1933,6 +1956,84 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
     entities = sorted(groups.values(),
                       key=lambda e: (-e["stations"], -e["qsos"], e["dxcc_name"]))
     return {"entities": entities, "count": len(entities), "unidentified": unidentified}
+
+
+# ── Style de la carte publique (réglable par l'admin dans les Réglages) ────
+# Un point par locator × bande × mode : la COULEUR dit le mode, la FORME dit la
+# bande. Les deux tables sont modifiables ; un mode ou une bande absent de la
+# table prend la valeur « autres ».
+
+# Ordre choisi pour que deux bandes voisines ne se ressemblent pas : la table
+# fait le tour des formes, donc au-delà de 8 bandes une forme resservira.
+MAP_SHAPES = ("circle", "diamond", "square", "triangle", "star", "cross", "hexagon", "pentagon")
+
+DEFAULT_MAP_STYLE: dict[str, Any] = {
+    "enabled": True,                  # décoché : tous les points identiques
+    "mode_colors": {
+        "SSB": "#e8543f", "CW": "#f2b134", "FT8": "#2f7fd1", "FT4": "#17a2a2",
+        "RTTY": "#8e5bd0", "PSK31": "#d2691e", "FM": "#2fa84f", "AM": "#8a8f98",
+        "SSTV": "#e0559c", "DIGI": "#1f6f8b",
+    },
+    "mode_default": "#5b6b7c",        # modes absents de la table
+    "band_shapes": {
+        band: MAP_SHAPES[i % len(MAP_SHAPES)] for i, band in enumerate(BANDS)
+    },
+    "band_default": "circle",         # bandes absentes de la table
+}
+
+_RE_COLOR = re.compile(r"^#[0-9a-f]{6}$")
+
+
+def _clean_color(value: Any, default: str) -> str:
+    color = str(value or "").strip().lower()
+    return color if _RE_COLOR.match(color) else default
+
+
+def _clean_shape(value: Any, default: str) -> str:
+    shape = str(value or "").strip().lower()
+    return shape if shape in MAP_SHAPES else default
+
+
+def get_map_style(station: str | None = None) -> dict[str, Any]:
+    """Couleurs (modes) et formes (bandes) de la carte d'un indicatif."""
+    saved = (load_settings().get("map_style_by_station") or {}).get(_st(station)) or {}
+    d = DEFAULT_MAP_STYLE
+    return {
+        "enabled": bool(saved.get("enabled", d["enabled"])),
+        "mode_colors": {**d["mode_colors"],
+                        **{m: _clean_color(c, d["mode_colors"].get(m, d["mode_default"]))
+                           for m, c in (saved.get("mode_colors") or {}).items()}},
+        "mode_default": _clean_color(saved.get("mode_default"), d["mode_default"]),
+        "band_shapes": {**d["band_shapes"],
+                        **{b: _clean_shape(sh, d["band_shapes"].get(b, d["band_default"]))
+                           for b, sh in (saved.get("band_shapes") or {}).items()}},
+        "band_default": _clean_shape(saved.get("band_default"), d["band_default"]),
+    }
+
+
+def set_map_style(form: dict[str, Any], station: str | None = None) -> dict[str, Any]:
+    """Enregistre le style de la carte ; « reset » revient aux valeurs par défaut."""
+    data = load_settings()
+    key = _st(station)
+    if form.get("reset"):
+        (data.get("map_style_by_station") or {}).pop(key, None)
+        _save_settings(data)
+        return get_map_style(key)
+    d = DEFAULT_MAP_STYLE
+    style = {
+        "enabled": bool(form.get("enabled")),
+        "mode_colors": {m: _clean_color(form.get(f"color_{m}"),
+                                        d["mode_colors"].get(m, d["mode_default"]))
+                        for m in MODES},
+        "mode_default": _clean_color(form.get("color_default"), d["mode_default"]),
+        "band_shapes": {b: _clean_shape(form.get(f"shape_{b}"),
+                                        d["band_shapes"].get(b, d["band_default"]))
+                        for b in BANDS},
+        "band_default": _clean_shape(form.get("shape_default"), d["band_default"]),
+    }
+    data.setdefault("map_style_by_station", {})[key] = style
+    _save_settings(data)
+    return get_map_style(key)
 
 
 # ── Règle de points (réglable par l'admin dans les Réglages) ───────────────

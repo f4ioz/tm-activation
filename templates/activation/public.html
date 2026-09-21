@@ -132,8 +132,9 @@
     <span class="act-muted act-map-note">{{ _("{n} / {total} stations localisées", n=map_data.located, total=map_data.stations) }}</span>
   </div>
   <div id="act-map" class="act-map" role="img" aria-label="{{ _("Carte des stations contactées par {call}", call=callsign) }}"></div>
-  <p class="act-muted act-map-note">{{ _("Position au centre du locator. Zoomez pour afficher les indicatifs, cliquez un point pour le détail.") }}</p>
-  <script type="application/json" id="act-map-data">{{ {"points": map_data.points, "home": home}|tojson }}</script>
+  <div id="act-map-legend" class="act-map-legend"></div>
+  <p class="act-muted act-map-note">{{ _("Position au centre du locator. Zoomez pour afficher les indicatifs, cliquez un point pour le détail.") }}{% if map_style.enabled %} {{ _("Couleur = mode, forme = bande ; les points d'un même carré sont écartés.") }}{% endif %}</p>
+  <script type="application/json" id="act-map-data">{{ {"points": map_data.points, "home": home, "bands": map_data.bands, "modes": map_data.modes, "style": map_style}|tojson }}</script>
 </div>
 
 <div class="act-grid act-grid-2">

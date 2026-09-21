@@ -904,6 +904,64 @@ def test_scoring_settings_route_admin_only(monkeypatch) -> None:
     assert op.post("/activation/settings/scoring", data={"enabled": "1"}).headers["location"].startswith("/login")
 
 
+def test_map_data_splits_points_by_band_and_mode() -> None:
+    """Un point par locator × bande × mode ; deux stations du même carré sur la
+    même bande et le même mode ne font qu'un point."""
+    _qso("DL1ABC", band="20M", mode="SSB", grid="JO31AB")
+    _qso("DL1ABC", band="40M", mode="CW", grid="JO31AB")
+    _qso("DL2ABC", band="20M", mode="SSB", grid="JO31CD")   # autre carré : son propre point
+    _qso("DL3ABC", band="20M", mode="SSB", grid="JO31AB")
+    data = activation.map_data()
+    keyed = {(p["grid"], p["band"], p["mode"]): p for p in data["points"]}
+    assert ("JO31AB", "20M", "SSB") in keyed and ("JO31AB", "40M", "CW") in keyed
+    assert keyed[("JO31AB", "20M", "SSB")]["calls"] == ["DL1ABC", "DL3ABC"]
+    assert keyed[("JO31AB", "40M", "CW")]["qsos"] == 1
+    assert data["bands"] == ["20M", "40M"] and data["modes"] == ["CW", "SSB"]
+    assert data["located"] == 3 and data["stations"] == 3
+
+
+def test_map_style_defaults_and_reset() -> None:
+    style = activation.get_map_style()
+    assert style["enabled"] and style["mode_colors"]["SSB"].startswith("#")
+    assert style["band_shapes"]["20M"] in activation.MAP_SHAPES
+    saved = activation.set_map_style({"enabled": "1", "color_SSB": "#123456",
+                                      "shape_20M": "star", "color_CW": "rouge vif",
+                                      "shape_40M": "banane"})
+    assert saved["mode_colors"]["SSB"] == "#123456" and saved["band_shapes"]["20M"] == "star"
+    # Valeurs refusées : on garde les défauts plutôt qu'un style cassé.
+    assert saved["mode_colors"]["CW"] == activation.DEFAULT_MAP_STYLE["mode_colors"]["CW"]
+    assert saved["band_shapes"]["40M"] == activation.DEFAULT_MAP_STYLE["band_shapes"]["40M"]
+    off = activation.set_map_style({"color_SSB": "#123456"})
+    assert off["enabled"] is False
+    back = activation.set_map_style({"reset": "1"})
+    assert back == activation.get_map_style()
+    assert back["mode_colors"]["SSB"] == activation.DEFAULT_MAP_STYLE["mode_colors"]["SSB"]
+
+
+def test_map_style_settings_route_admin_only(monkeypatch) -> None:
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    admin = _private_client()
+    r = admin.post("/activation/settings/map", data={"enabled": "1", "color_FT8": "#00ff00",
+                                                     "shape_20M": "cross"})
+    assert r.status_code == 303 and "mp=ok" in r.headers["location"]
+    style = activation.get_map_style()
+    assert style["mode_colors"]["FT8"] == "#00ff00" and style["band_shapes"]["20M"] == "cross"
+    page = admin.get("/activation/settings").text
+    assert "Carte des contacts" in page and 'name="shape_40M"' in page
+    activation.set_operator_password("oppass")
+    op = TestClient(app, follow_redirects=False)
+    op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
+    assert op.post("/activation/settings/map", data={"enabled": "1"}).headers["location"].startswith("/login")
+
+
+def test_public_map_carries_the_style(monkeypatch) -> None:
+    _public("JN18FS")
+    _qso("DL1ABC", band="20M", mode="CW", grid="JO31AB")
+    activation.set_map_style({"enabled": "1", "color_CW": "#abcdef", "shape_20M": "diamond"})
+    page = TestClient(app).get("/tm25test").text
+    assert "act-map-legend" in page and "#abcdef" in page and "diamond" in page
+
+
 def test_public_board_shows_points_when_enabled(monkeypatch) -> None:
     _public("JN18FS89")
     _qso("DL1ABC", mode="CW", grid="JO31")

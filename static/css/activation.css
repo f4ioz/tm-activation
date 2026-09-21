@@ -322,6 +322,13 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
   font-family: var(--font-mono, monospace); font-size: 0.85rem;
 }
 .act-cancel-btn:hover { color: var(--text); border-color: var(--text-muted); }
+/* Bouton secondaire DANS un formulaire (ex. « Valeurs par défaut ») : la règle
+   .act-form button est plus spécifique, il faut la repasser derrière. */
+.act-form button.act-cancel-btn {
+  background: transparent; color: var(--text-muted); border: 1px solid var(--border);
+  font-weight: 400; padding: 0.4rem 0.9rem;
+}
+.act-form button.act-cancel-btn:hover { color: var(--text); border-color: var(--text-muted); }
 
 .act-log-head { display: flex; justify-content: space-between; align-items: baseline; }
 .act-count { color: var(--accent); }
@@ -354,7 +361,14 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--text-muted); }
 .act-map .leaflet-control-attribution a { color: var(--cyan); }
 /* Contour foncé : points lisibles sur le fond clair d'OpenStreetMap. */
-.act-map-pt { stroke: color-mix(in srgb, var(--cyan) 50%, #000); fill: var(--cyan); }
+/* Point de la carte : symbole SVG (couleur = mode, forme = bande). Sans
+   style personnalisé, le SVG reprend le cyan du site. */
+.act-map-pt { background: none; border: 0; line-height: 0; }
+.act-map-pt svg { display: block; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
+/* Légende sous la carte : un symbole + son libellé par mode puis par bande. */
+.act-map-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0.5rem 0 0;
+  font-family: var(--font-mono, monospace); font-size: 0.75rem; color: var(--text-muted); }
+.act-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; }
 .act-map-home { stroke: color-mix(in srgb, var(--accent) 50%, #000); fill: var(--accent); }
 .leaflet-tooltip.act-map-label {
   background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--border);
@@ -405,6 +419,13 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .act-fieldset legend { padding: 0 0.3rem; }
 .act-mode-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+/* Réglages de la carte : une case « libellé + couleur/forme » par mode et par bande. */
+.act-style-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); }
+.act-style-cell { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+  font-family: var(--font-mono, monospace); font-size: 0.8rem; }
+.act-style-cell input[type="color"] { width: 2.4rem; height: 1.6rem; padding: 0; border: 1px solid var(--border);
+  background: none; cursor: pointer; }
+.act-style-cell select { min-width: 0; flex: 1 1 5rem; }
 .act-form input[type="number"] { max-width: 9rem; }
 
 /* ── Indicatifs spéciaux ──────────────────────────────────────────────── */
