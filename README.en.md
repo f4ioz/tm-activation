@@ -33,9 +33,14 @@ Linux server, and runs on its own — including on a local network with **no
 Internet** (libraries, fonts, calendar and flags are bundled; only the map
 background, the QRZ lookups and the DX spots need a connection).
 
-| QSO log | Schedule |
+The log page during an activation: current slot, DX spots, rate gauges,
+countries already worked, and the log book right next to the entry form.
+
+![The log page during an activation](docs/images/log.png)
+
+| Slot schedule | Settings (the options) |
 |---|---|
-| ![Logging a QSO](docs/images/log.png) | ![Slot schedule](docs/images/planning.png) |
+| ![Slot schedule](docs/images/planning.png) | ![Settings options](docs/images/settings.png) |
 
 ![DXCC worked and hunter ranking](docs/images/dxcc.png)
 
@@ -48,15 +53,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.tar.gz
 ```
 
 ## Features
@@ -146,6 +151,24 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21
   (`/admin/surveillance`, administrator) shows the login log, the IPs with
   repeated attempts and the blocked robots.
 
+### Options (Settings)
+
+Everything can be switched on or off from **Settings** (administrator): nothing
+is forced on you.
+
+| Option | Default | Effect |
+|---|---|---|
+| One password per operator | off | individual accounts instead of the shared password |
+| Approve new accounts | off | an administrator approves before the first login |
+| Create and extend slots from the log | on | catches forgotten bookings |
+| Refuse logging on a booked band and mode | on | avoids two stations at once |
+| Show the contact list | your choice | "Latest contacts" on the public page |
+| Show map, DXCC and ranking | your choice | the "hunters" part of the public page |
+| Points ranking | off | otherwise ranked by distinct band × mode pairs |
+| QRZ.com account | optional | names, locators and countries of the stations worked |
+| Local time or UTC | local | each visitor's choice, remembered |
+| French / English | browser | button in the banner, remembered |
+
 ## Three ways to use it
 
 | | Local network | Internet through your router | Internet through Cloudflare Tunnel |
@@ -191,22 +214,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.21.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.21.1.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.21.0.tar.gz
-   cd tm-activation-1.21.0
+   tar xzf tm-activation-1.21.1.tar.gz
+   cd tm-activation-1.21.1
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.21.0.zip
-   cd tm-activation-1.21.0
+   unzip tm-activation-1.21.1.zip
+   cd tm-activation-1.21.1
    sudo bash install.sh --lan
    ```
 
@@ -289,8 +312,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.21.0.tar.gz
-cd tm-activation-1.21.0
+tar xzf tm-activation-1.21.1.tar.gz
+cd tm-activation-1.21.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

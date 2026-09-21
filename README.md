@@ -34,9 +34,14 @@ un réseau local **sans Internet** (bibliothèques, polices, calendrier et
 drapeaux embarqués ; seuls le fond de carte, la recherche QRZ et les spots DX
 demandent une connexion).
 
-| Log QSO | Planning |
+La page de log, pendant une activation : créneau en cours, spots DX, cadence
+du moment, pays déjà contactés et carnet à côté de la saisie.
+
+![Page de log pendant une activation](docs/images/log.png)
+
+| Planning des créneaux | Réglages (les options) |
 |---|---|
-| ![Saisie d'un QSO](docs/images/log.png) | ![Planning des créneaux](docs/images/planning.png) |
+| ![Planning des créneaux](docs/images/planning.png) | ![Options des réglages](docs/images/settings.png) |
 
 ![DXCC contactés et classement des chasseurs](docs/images/dxcc.png)
 
@@ -49,15 +54,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.tar.gz
 ```
 
 ## Fonctionnalités
@@ -151,6 +156,24 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21
   **surveillance** (`/admin/surveillance`, administrateur) montre le journal des
   connexions, les IP aux essais répétés et les robots bloqués.
 
+### Options (Réglages)
+
+Tout est activable ou désactivable depuis **Réglages** (administrateur) : rien
+n'est imposé.
+
+| Option | Par défaut | Effet |
+|---|---|---|
+| Un mot de passe par opérateur | non | chacun son compte au lieu du mot de passe commun |
+| Valider les nouveaux comptes | non | un administrateur approuve avant la première connexion |
+| Créer et prolonger les créneaux d'après le log | oui | rattrape les oublis de réservation |
+| Interdire de loguer sur une bande et un mode réservés | oui | évite deux stations à la fois |
+| Afficher la liste des contacts | au choix | « Derniers contacts » sur la page publique |
+| Afficher carte, DXCC et classement | au choix | la partie « chasseurs » de la page publique |
+| Classement aux points | non | sinon classement aux couples bande × mode |
+| Compte QRZ.com | facultatif | noms, locators et pays des stations contactées |
+| Heure locale ou UTC | locale | au choix de chaque visiteur, mémorisé |
+| Langue FR / EN | navigateur | bouton dans le bandeau, mémorisé |
+
 ## Trois façons de l'utiliser
 
 | | Réseau local | Internet par votre box | Internet par Cloudflare Tunnel |
@@ -197,22 +220,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.21.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.21.1.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.21.0.tar.gz
-   cd tm-activation-1.21.0
+   tar xzf tm-activation-1.21.1.tar.gz
+   cd tm-activation-1.21.1
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.21.0.zip
-   cd tm-activation-1.21.0
+   unzip tm-activation-1.21.1.zip
+   cd tm-activation-1.21.1
    sudo bash install.sh --lan
    ```
 
@@ -299,8 +322,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.21.0.tar.gz
-cd tm-activation-1.21.0
+tar xzf tm-activation-1.21.1.tar.gz
+cd tm-activation-1.21.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
