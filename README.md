@@ -41,7 +41,7 @@ du moment, pays déjà contactés et carnet à côté de la saisie.
 
 | Planning des créneaux | Réglages (les options) |
 |---|---|
-| ![Planning des créneaux](docs/images/planning.png) | ![Réglages : style et filtres de la carte](docs/images/settings.png) |
+| ![Planning des créneaux](docs/images/planning.png) | ![Réglages : affichage public et style de la carte](docs/images/settings.png) |
 
 ![DXCC contactés et classement des chasseurs](docs/images/dxcc.png)
 
@@ -54,15 +54,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.24.2.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.24.2.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.24.3.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.24.3.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.24.2.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.24.3.tar.gz
 ```
 
 ## Fonctionnalités
@@ -228,22 +228,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.24.2.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.24.3.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.24.2.tar.gz
-   cd tm-activation-1.24.2
+   tar xzf tm-activation-1.24.3.tar.gz
+   cd tm-activation-1.24.3
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.24.2.zip
-   cd tm-activation-1.24.2
+   unzip tm-activation-1.24.3.zip
+   cd tm-activation-1.24.3
    sudo bash install.sh --lan
    ```
 
@@ -330,8 +330,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.24.2.tar.gz
-cd tm-activation-1.24.2
+tar xzf tm-activation-1.24.3.tar.gz
+cd tm-activation-1.24.3
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
