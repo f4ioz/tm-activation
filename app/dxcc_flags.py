@@ -12,6 +12,7 @@ disponible, donne de toute façon le nom exact de l'entité.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # Préfixe d'appel → (code du drapeau, nom de l'entité). Le code est un ISO 3166-1
 # alpha-2, ou un code de subdivision pour les nations du Royaume-Uni (GB-SCT…),
@@ -19,21 +20,28 @@ import re
 PREFIXES: dict[str, tuple[str, str]] = {
     # ── Europe ──
     "F": ("FR", "France"), "TM": ("FR", "France"), "TK": ("FR-COR", "Corsica"),
-    "ON": ("BE", "Belgium"), "OO": ("BE", "Belgium"), "OT": ("BE", "Belgium"),
-    "PA": ("NL", "Netherlands"), "PB": ("NL", "Netherlands"), "PD": ("NL", "Netherlands"),
-    "PE": ("NL", "Netherlands"), "PI": ("NL", "Netherlands"),
+    "ON": ("BE", "Belgium"), "OO": ("BE", "Belgium"), "OP": ("BE", "Belgium"),
+    "OQ": ("BE", "Belgium"), "OR": ("BE", "Belgium"), "OS": ("BE", "Belgium"),
+    "OT": ("BE", "Belgium"),
+    "PA": ("NL", "Netherlands"), "PB": ("NL", "Netherlands"), "PC": ("NL", "Netherlands"),
+    "PD": ("NL", "Netherlands"), "PE": ("NL", "Netherlands"), "PF": ("NL", "Netherlands"),
+    "PG": ("NL", "Netherlands"), "PH": ("NL", "Netherlands"), "PI": ("NL", "Netherlands"),
     "DL": ("DE", "Germany"), "DA": ("DE", "Germany"), "DB": ("DE", "Germany"),
     "DC": ("DE", "Germany"), "DD": ("DE", "Germany"), "DF": ("DE", "Germany"),
     "DG": ("DE", "Germany"), "DH": ("DE", "Germany"), "DJ": ("DE", "Germany"),
     "DK": ("DE", "Germany"), "DM": ("DE", "Germany"), "DO": ("DE", "Germany"),
-    "DP": ("DE", "Germany"), "DQ": ("DE", "Germany"), "DR": ("DE", "Germany"),
+    "DN": ("DE", "Germany"), "DP": ("DE", "Germany"), "DQ": ("DE", "Germany"),
+    "DR": ("DE", "Germany"),
     "G": ("GB-ENG", "England"), "M": ("GB-ENG", "England"), "2E": ("GB-ENG", "England"),
     "GM": ("GB-SCT", "Scotland"), "MM": ("GB-SCT", "Scotland"), "GW": ("GB-WLS", "Wales"),
     "MW": ("GB-WLS", "Wales"), "GI": ("GB-NIR", "Northern Ireland"), "MI": ("GB-NIR", "Northern Ireland"),
-    "GD": ("IM", "Isle of Man"), "GU": ("GG", "Guernsey"), "GJ": ("JE", "Jersey"),
+    "2M": ("GB-SCT", "Scotland"), "2W": ("GB-WLS", "Wales"), "2I": ("GB-NIR", "Northern Ireland"),
+    "GD": ("IM", "Isle of Man"), "2D": ("IM", "Isle of Man"), "GU": ("GG", "Guernsey"),
+    "2U": ("GG", "Guernsey"), "GJ": ("JE", "Jersey"), "2J": ("JE", "Jersey"),
     "EI": ("IE", "Ireland"), "EJ": ("IE", "Ireland"),
     "EA": ("ES", "Spain"), "EB": ("ES", "Spain"), "EC": ("ES", "Spain"), "ED": ("ES", "Spain"),
-    "EE": ("ES", "Spain"), "EF": ("ES", "Spain"), "EG": ("ES", "Spain"), "AM": ("ES", "Spain"),
+    "EE": ("ES", "Spain"), "EF": ("ES", "Spain"), "EG": ("ES", "Spain"), "EH": ("ES", "Spain"),
+    "AM": ("ES", "Spain"),
     "EA6": ("ES-IB", "Balearic Islands"), "EA8": ("ES-CN", "Canary Islands"),
     "EA9": ("ES-CE", "Ceuta & Melilla"),
     "CT": ("PT", "Portugal"), "CR": ("PT", "Portugal"), "CQ": ("PT", "Portugal"),
@@ -43,15 +51,22 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "IT9": ("IT-SIC", "Sicily"),
     "HB": ("CH", "Switzerland"), "HB9": ("CH", "Switzerland"), "HB0": ("LI", "Liechtenstein"),
     "OE": ("AT", "Austria"), "LX": ("LU", "Luxembourg"), "LA": ("NO", "Norway"),
-    "LB": ("NO", "Norway"), "LN": ("NO", "Norway"), "JW": ("SJ", "Svalbard"), "JX": ("NO-JAN", "Jan Mayen"),
-    "SM": ("SE", "Sweden"), "SA": ("SE", "Sweden"), "SB": ("SE", "Sweden"), "SK": ("SE", "Sweden"),
+    "LB": ("NO", "Norway"), "LC": ("NO", "Norway"), "LD": ("NO", "Norway"),
+    "LE": ("NO", "Norway"), "LF": ("NO", "Norway"), "LG": ("NO", "Norway"),
+    "LH": ("NO", "Norway"), "LI": ("NO", "Norway"), "LJ": ("NO", "Norway"),
+    "LK": ("NO", "Norway"), "LL": ("NO", "Norway"), "LM": ("NO", "Norway"),
+    "LN": ("NO", "Norway"), "JW": ("SJ", "Svalbard"), "JX": ("NO-JAN", "Jan Mayen"),
+    "SM": ("SE", "Sweden"), "SA": ("SE", "Sweden"), "SB": ("SE", "Sweden"), "SC": ("SE", "Sweden"),
+    "SD": ("SE", "Sweden"), "SE": ("SE", "Sweden"), "SF": ("SE", "Sweden"), "SG": ("SE", "Sweden"),
+    "SH": ("SE", "Sweden"), "SI": ("SE", "Sweden"), "SJ": ("SE", "Sweden"), "SK": ("SE", "Sweden"),
     "SL": ("SE", "Sweden"), "7S": ("SE", "Sweden"), "8S": ("SE", "Sweden"),
     "OH": ("FI", "Finland"), "OF": ("FI", "Finland"), "OG": ("FI", "Finland"), "OH0": ("AX", "Åland"),
-    "OZ": ("DK", "Denmark"), "OU": ("DK", "Denmark"), "5Q": ("DK", "Denmark"),
+    "OZ": ("DK", "Denmark"), "OU": ("DK", "Denmark"), "OV": ("DK", "Denmark"),
+    "OW": ("DK", "Denmark"), "5Q": ("DK", "Denmark"),
     "OX": ("GL", "Greenland"), "OY": ("FO", "Faroe Islands"), "TF": ("IS", "Iceland"),
     "ES": ("EE", "Estonia"), "YL": ("LV", "Latvia"), "LY": ("LT", "Lithuania"),
     "SP": ("PL", "Poland"), "SN": ("PL", "Poland"), "SO": ("PL", "Poland"), "SQ": ("PL", "Poland"),
-    "3Z": ("PL", "Poland"), "HF": ("PL", "Poland"),
+    "SR": ("PL", "Poland"), "3Z": ("PL", "Poland"), "HF": ("PL", "Poland"),
     "OK": ("CZ", "Czech Republic"), "OL": ("CZ", "Czech Republic"),
     "OM": ("SK", "Slovakia"), "HA": ("HU", "Hungary"), "HG": ("HU", "Hungary"),
     "S5": ("SI", "Slovenia"), "9A": ("HR", "Croatia"), "E7": ("BA", "Bosnia-Herzegovina"),
@@ -153,6 +168,53 @@ FLAG_FILES = {
     "IT-AFR": "it",          # Pantelleria / Lampedusa
     "NO-JAN": "no",          # Jan Mayen
 }
+
+
+# Nom d'entité (celui que renvoie le callbook QRZ) → code du drapeau. Sans ce
+# repli, une station au préfixe absent de la table formerait une entité à part,
+# sans drapeau, à côté de la même entité trouvée par préfixe : le pays comptait
+# alors double (« Netherlands » deux fois pour PH0DV à côté des PA…).
+NAME_ALIASES = {
+    "fed rep of germany": "Germany", "federal republic of germany": "Germany",
+    "czechia": "Czech Republic", "european russia": "Russia",
+    "asiatic russia": "Russia", "russian federation": "Russia",
+    "united states of america": "United States", "usa": "United States",
+    "holland": "Netherlands", "the netherlands": "Netherlands",
+    "bosnia herzegovina": "Bosnia-Herzegovina", "aland islands": "Åland",
+}
+
+
+def normalize_name(name: str) -> str:
+    """Clé de comparaison d'un nom d'entité : sans accent, ni ponctuation, ni casse."""
+    plain = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode()
+    return " ".join(re.split(r"[^a-z0-9]+", plain.lower()))
+
+
+_BY_NAME: dict[str, str] = {}
+for _code, _name in PREFIXES.values():
+    _BY_NAME.setdefault(normalize_name(_name), _code)
+
+
+def code_for_name(name: str) -> str:
+    """Code du drapeau d'après le nom de l'entité ('' si le nom est inconnu)."""
+    key = normalize_name(name)
+    if not key:
+        return ""
+    return _BY_NAME.get(key) or _BY_NAME.get(normalize_name(NAME_ALIASES.get(key, "")), "")
+
+
+def entity_key(call: str, qrz_name: str = "") -> tuple[str, str, str]:
+    """(clé de regroupement, code du drapeau, nom d'après le préfixe).
+
+    La clé est le code de l'entité — du préfixe de l'indicatif, sinon du nom
+    donné par le callbook — pour que la même entité ne soit jamais comptée deux
+    fois. Un pays inconnu de la table des préfixes mais nommé par QRZ est
+    regroupé sur son nom ; sans nom ni préfixe connus, la clé est vide.
+    """
+    code, prefix_name = entity_for_call(call)
+    if not code:
+        code = code_for_name(qrz_name)
+    return code or normalize_name(qrz_name), code, prefix_name
 
 
 def flag_file(code: str) -> str:

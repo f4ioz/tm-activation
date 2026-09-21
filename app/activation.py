@@ -1528,10 +1528,10 @@ def worked_entities(station: str | None = None, limit: int | None = None) -> lis
                  for r in c.execute("SELECT call, dxcc_name, country FROM callbook").fetchall()}
     seen: dict[str, dict[str, Any]] = {}
     for row in rows:
-        code, name = dxcc_flags.entity_for_call(row["call"])
+        _key, code, name = dxcc_flags.entity_key(row["call"], known.get(row["call"], ""))
         if not code:
             continue
-        item = seen.setdefault(code, {"code": code, "name": name,
+        item = seen.setdefault(code, {"code": code, "name": name or known.get(row["call"], ""),
                                       "n": 0, "last": "", "calls": 0, "from_qrz": False})
         item["n"] += int(row["n"])
         item["calls"] += 1
@@ -1914,14 +1914,15 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
     groups: dict[str, dict[str, Any]] = {}
     unidentified = 0
     for row in rows:
-        code, prefix_name = dxcc_flags.entity_for_call(row["call"])
         qrz_name = (row["dxcc_name"] or "").strip()
-        if not code and not qrz_name:
+        # Regroupement par entité : le code réunit les variantes de nom
+        # (« Germany » côté préfixe, « Fed. Rep. of Germany » côté QRZ) ET les
+        # deux sources — un préfixe absent de la table ne doit pas créer une
+        # seconde entité, sans drapeau, à côté de la même entité connue.
+        key, code, prefix_name = dxcc_flags.entity_key(row["call"], qrz_name)
+        if not key:
             unidentified += 1
             continue
-        # Regroupement par entité : le code du drapeau réunit les variantes de
-        # nom (« Germany » côté préfixe, « Fed. Rep. of Germany » côté QRZ).
-        key = code or qrz_name.upper()
         item = groups.setdefault(key, {"dxcc": row["dxcc"], "code": code,
                                        "dxcc_name": qrz_name or prefix_name,
                                        "stations": 0, "qsos": 0, "from_qrz": bool(qrz_name)})
@@ -2074,7 +2075,7 @@ def hunters_ranking(limit: int | None = 50, station: str | None = None) -> list[
             "band_modes": len(best),
             "last": max(f"{q['qso_date']}{q['time_on']}" for q in qsos),
             "dxcc_name": dxcc.get(call, "") or _entity_name(call),
-            "dxcc_code": dxcc_flags.entity_for_call(call)[0], "points": total,
+            "dxcc_code": dxcc_flags.entity_key(call, dxcc.get(call, ""))[1], "points": total,
             "km": round(km) if km is not None else None,
         })
     out.sort(key=_hunter_sort_key)

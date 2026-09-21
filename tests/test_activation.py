@@ -734,6 +734,46 @@ def test_dxcc_table_works_without_qrz() -> None:
     assert all(not e["from_qrz"] for e in t["entities"])
 
 
+def test_dxcc_table_merges_an_entity_known_only_by_qrz() -> None:
+    """Préfixe absent de la table + entité donnée par QRZ = MÊME pays.
+
+    Sans cela, PH0DV formait un second « Netherlands », sans drapeau, à côté
+    des PA… : le pays comptait double, et le total dépendait de ce que le
+    callbook avait déjà récupéré (résultats différents d'une instance à l'autre).
+    """
+    for call in ("PA1MV", "XYZZY9"):
+        _qso(call)
+    activation.qrz_lookup("XYZZY9", _FakeQrz({"XYZZY9": _rec("XYZZY9", land="Netherlands",
+                                                             dxcc="263")}))
+    t = activation.dxcc_table()
+    assert t["count"] == 1 and t["unidentified"] == 0
+    entity = t["entities"][0]
+    assert (entity["code"], entity["dxcc_name"]) == ("NL", "Netherlands")
+    assert (entity["stations"], entity["qsos"]) == (2, 2)
+    # Le classement des chasseurs montre alors le même drapeau pour les deux.
+    assert {h["dxcc_code"] for h in activation.hunters_ranking()} == {"NL"}
+
+
+def test_dutch_and_british_secondary_prefixes_are_known() -> None:
+    """Préfixes qui manquaient à la table : PH0DV n'avait pas de drapeau."""
+    from app import dxcc_flags
+
+    for call, code in (("PH0DV", "NL"), ("PC5Q", "NL"), ("2W0ABC", "GB-WLS"),
+                       ("2M0ABC", "GB-SCT"), ("OS0AA", "BE"), ("OV3T", "DK")):
+        assert dxcc_flags.entity_for_call(call)[0] == code, call
+
+
+def test_entity_key_falls_back_on_the_callbook_name() -> None:
+    from app import dxcc_flags
+
+    assert dxcc_flags.code_for_name("Fed. Rep. of Germany") == "DE"
+    assert dxcc_flags.code_for_name("Neverland") == ""
+    assert dxcc_flags.entity_key("XYZZY9", "Netherlands")[:2] == ("NL", "NL")
+    # Pays inconnu de la table : regroupé sur son nom, mais sans drapeau.
+    assert dxcc_flags.entity_key("XYZZY9", "Neverland") == ("neverland", "", "")
+    assert dxcc_flags.entity_key("XYZZY9", "") == ("", "", "")
+
+
 def test_public_page_shows_the_country_flags() -> None:
     _public()
     _qso("DL1ABC")
