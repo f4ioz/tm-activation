@@ -11,6 +11,27 @@
       var t = null;
       try { t = localStorage.getItem('theme'); } catch (e) {}
       document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+
+      // Fuseau du visiteur déposé pour le serveur : les heures « locales » sont
+      // les siennes (un chasseur canadien lit les créneaux à son heure). Sans
+      // JavaScript, le serveur garde le fuseau de la station.
+      try {
+        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && !/[^A-Za-z0-9_+\-\/]/.test(tz)) {
+          var name = 'tm_tzname=';
+          var known = document.cookie.split('; ').filter(function (c) { return c.indexOf(name) === 0; })[0];
+          // Valeur brute : « / » est légal dans un cookie, et l'encoder donnerait
+          // « America%2FToronto », que le serveur ne reconnaîtrait pas comme fuseau.
+          document.cookie = name + tz + ';path=/;max-age=' + (180 * 86400) + ';samesite=lax'
+                            + (location.protocol === 'https:' ? ';secure' : '');
+          // Première visite (ou déménagement) : la page a été rendue dans un
+          // autre fuseau, on la redemande une fois, maintenant que le serveur sait.
+          if (known !== name + tz && !sessionStorage.getItem('tzreload')) {
+            sessionStorage.setItem('tzreload', '1');
+            location.reload();
+          }
+        }
+      } catch (e) {}
     })();
   </script>
   <link rel="stylesheet" href="{{ asset('/static/vendor/fonts/fonts.css') }}">

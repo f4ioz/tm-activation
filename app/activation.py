@@ -34,10 +34,10 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app import auth as _auth, dxcc_flags
-from app.config import activation_config, qrz_config
+from app.config import activation_config, qrz_config, site_config
 from app.i18n import N_, _
 from app.qrz_xml import QrzXmlClient, get_shared_client
 
@@ -799,19 +799,55 @@ def now_utc_parts() -> tuple[str, str]:
     return now.strftime("%Y%m%d"), now.strftime("%H%M")
 
 
-# ── Affichage local (Paris) / UTC ──────────────────────────────────────────
-# Le stockage reste TOUJOURS en UTC. Ces helpers ne pilotent que l'affichage
-# et la saisie selon un mode "local" (Europe/Paris) ou "utc".
+# ── Affichage local / UTC ──────────────────────────────────────────────────
+# Le stockage reste TOUJOURS en UTC. Ces helpers ne pilotent que l'affichage et
+# la saisie. Le « mode » vaut "utc", "local" (fuseau de la station, config.yml)
+# ou directement un fuseau IANA — celui du visiteur, que son navigateur annonce
+# (« Europe/Brussels », « America/New_York »…) : un chasseur canadien lit les
+# créneaux à son heure sans rien régler.
 
 TZ_MODES = ("local", "utc")
 
 
+def station_tz() -> ZoneInfo:
+    """Fuseau de la station (config.yml : site.timezone), Paris par défaut."""
+    name = str(site_config().get("timezone") or "").strip()
+    return _zone(name) or PARIS
+
+
+def _zone(name: str) -> ZoneInfo | None:
+    """ZoneInfo d'un nom IANA, None s'il est inconnu (cache mémoire)."""
+    key = (name or "").strip()
+    if not key or len(key) > 64:
+        return None
+    if key not in _ZONES:
+        try:
+            _ZONES[key] = ZoneInfo(key)
+        except (ZoneInfoNotFoundError, ValueError, OSError):
+            _ZONES[key] = None
+    return _ZONES[key]
+
+
+_ZONES: dict[str, ZoneInfo | None] = {}
+
+
+def valid_tz(name: str) -> bool:
+    """Nom de fuseau IANA utilisable ? (ce que renvoie le navigateur)"""
+    return _zone(name) is not None
+
+
 def tzinfo_for(mode: str) -> ZoneInfo | timezone:
-    return UTC if mode == "utc" else PARIS
+    if mode == "utc":
+        return UTC
+    return _zone(mode) or station_tz()
 
 
 def tz_label(mode: str) -> str:
-    return "UTC" if mode == "utc" else "Paris"
+    """Étiquette courte du fuseau : « UTC », « Paris », « New York »."""
+    if mode == "utc":
+        return "UTC"
+    name = mode if _zone(mode) else str(site_config().get("timezone") or "Europe/Paris")
+    return name.split("/")[-1].replace("_", " ")
 
 
 def disp(utc_iso: str, mode: str = "local") -> datetime | None:

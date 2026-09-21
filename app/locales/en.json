@@ -182,7 +182,7 @@
  "Les indicatifs spéciaux activés par {club} : pages d'activation, logs, cartes et classements.": "Special callsigns activated by {club}: activation pages, logs, maps and rankings.",
  "Libellé": "Label",
  "Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.": "Unticked: contacts are not listed (search by callsign still works). The map and ranking show callsign + locator, never the name.",
- "Locale (Paris)": "Local (Paris)",
+ "Locale ({tz})": "Local ({tz})",
  "Locator": "Locator",
  "Locator (option)": "Locator (optional)",
  "Locator de la station": "Station locator",

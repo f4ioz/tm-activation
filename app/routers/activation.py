@@ -23,6 +23,8 @@ from fastapi.responses import (
 )
 from starlette.concurrency import run_in_threadpool
 
+from urllib.parse import unquote
+
 from starlette.convertors import Convertor, register_url_convertor
 
 from app import activation, dx_spots, i18n, security, visits
@@ -39,11 +41,33 @@ public_router = APIRouter(tags=["activation"], dependencies=[Depends(i18n.reques
 
 COOKIE_OP = "tm_op"
 COOKIE_TZ = "tm_tz"
+COOKIE_TZNAME = "tm_tzname"     # fuseau annoncé par le navigateur du visiteur
 
 
 def _tz_mode(request: Request) -> str:
+    """Fuseau d'affichage de la requête : « utc », ou un fuseau IANA.
+
+    En mode local, c'est celui du visiteur (son navigateur l'a déposé dans un
+    cookie) : les heures s'affichent chez lui à son heure, sans réglage. À
+    défaut — pas de JavaScript, premier affichage — c'est celui de la station.
+    """
     mode = request.cookies.get(COOKIE_TZ) or "local"
-    return mode if mode in activation.TZ_MODES else "local"
+    if mode == "utc":
+        return "utc"
+    return _visitor_tz(request) or "local"
+
+
+def _visitor_tz(request: Request) -> str:
+    """Fuseau annoncé par le navigateur ("" s'il manque ou n'existe pas).
+
+    Le « / » est décodé au cas où un navigateur l'aurait échappé (%2F)."""
+    raw = unquote((request.cookies.get(COOKIE_TZNAME) or "").strip())
+    return raw if activation.valid_tz(raw) else ""
+
+
+def _local_tz_label(request: Request) -> str:
+    """Nom du fuseau du visiteur, même quand il lit la page en UTC."""
+    return activation.tz_label(_visitor_tz(request) or "local")
 
 
 def _authed(request: Request) -> bool:
@@ -135,6 +159,8 @@ def _ctx(request: Request, **extra: object) -> dict:
     }
     mode = _tz_mode(request)
     ctx["tz_mode"] = mode
+    ctx["tz_utc"] = mode == "utc"
+    ctx["local_tz_label"] = _local_tz_label(request)
     ctx["tz_label"] = activation.tz_label(mode)
     ctx["to_disp"] = lambda iso, m=mode: activation.disp(iso, m)
     ctx["cdt"] = lambda q, m=mode: activation.contact_disp(q.get("qso_date", ""), q.get("time_on", ""), m)
@@ -270,7 +296,7 @@ async def set_language(request: Request, code: str, next: str = "/activations") 
 
 @router.get("/tz")
 async def set_timezone(request: Request, mode: str = "local", next: str = "/activation") -> Response:
-    """Préférence d'affichage Local (Paris) / UTC. Le stockage reste UTC.
+    """Préférence d'affichage Local (fuseau du visiteur) / UTC. Stockage en UTC.
 
     Non protégé : c'est une simple préférence d'affichage (vaut aussi pour le
     board public). Cookie path=/ pour couvrir /activation et les pages /<indicatif>.
@@ -1261,7 +1287,9 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
             "show_contacts": activation.show_contacts(),
             **_public_stats(cs, call.strip().upper()),
             "tz_mode": mode,
+            "tz_utc": mode == "utc",
             "tz_label": activation.tz_label(mode),
+            "local_tz_label": _local_tz_label(request),
             "to_disp": lambda iso, m=mode: activation.disp(iso, m),
             "cdt": lambda q, m=mode: activation.contact_disp(q.get("qso_date", ""), q.get("time_on", ""), m),
         },

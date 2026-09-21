@@ -2291,3 +2291,56 @@ def test_shared_password_admin_flag_frees_the_choice_but_not_the_settings() -> N
                       "operator": "F5RRO", "now": "1"})
     assert [q["operator_call"] for q in activation.list_contacts()] == ["F5RRO"]
     assert client.get("/activation/settings").status_code == 303   # mot de passe commun : non
+
+
+# ── Heure locale : celle du visiteur ───────────────────────────────────────
+
+
+def test_visitor_timezone_drives_the_local_display() -> None:
+    _public()
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                           qso_date="20260921", time_on="1200")
+    activation.set_flag("show_contacts", True)
+    heures = {}
+    for tz in ("Europe/Paris", "America/New_York", "Asia/Tokyo"):
+        client = TestClient(app)
+        client.cookies.set("tm_tzname", tz)
+        page = client.get("/tm25test").text
+        heures[tz] = re.findall(r"\b\d{2}:\d{2}\b", page)[0]
+    assert heures["Europe/Paris"] == "14:00"        # 12:00 UTC en heure d'été
+    assert heures["America/New_York"] == "08:00"
+    assert heures["Asia/Tokyo"] == "21:00"
+    # L'étiquette nomme le fuseau du visiteur.
+    client = TestClient(app)
+    client.cookies.set("tm_tzname", "America/New_York")
+    assert "Locale (New York)" in client.get("/tm25test").text
+
+
+def test_unknown_or_hostile_timezone_falls_back_to_the_station() -> None:
+    _public()
+    for bogus in ("Mars/Olympus", "../../etc/passwd", "x" * 200, ""):
+        client = TestClient(app)
+        client.cookies.set("tm_tzname", bogus)
+        assert "Locale (Paris)" in client.get("/tm25test").text
+    assert activation.tz_label("local") == "Paris" and activation.tz_label("utc") == "UTC"
+    assert activation.valid_tz("Europe/Brussels") and not activation.valid_tz("Mars/Olympus")
+
+
+def test_utc_mode_still_wins_over_the_visitor_timezone() -> None:
+    _public()
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                           qso_date="20260921", time_on="1200")
+    activation.set_flag("show_contacts", True)
+    client = TestClient(app)
+    client.cookies.set("tm_tzname", "Asia/Tokyo")
+    client.cookies.set("tm_tz", "utc")
+    page = client.get("/tm25test").text
+    assert re.findall(r"\b\d{2}:\d{2}\b", page)[0] == "12:00"
+    assert "Locale (Tokyo)" in page          # la bascule propose son heure à lui
+
+
+def test_typed_times_are_read_in_the_visitor_timezone() -> None:
+    """Un créneau saisi à 20:00 à New York n'est pas 20:00 à Paris."""
+    assert activation.input_to_utc_iso("2026-09-21T20:00", "America/New_York") == "2026-09-22T00:00"
+    assert activation.input_to_utc_iso("2026-09-21T20:00", "local") == "2026-09-21T18:00"
+    assert activation.input_to_utc_iso("2026-09-21T20:00", "utc") == "2026-09-21T20:00"

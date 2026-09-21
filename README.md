@@ -54,15 +54,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.22.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.22.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.22.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -144,6 +144,12 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.21
   des stations contactées ne sont jamais publiés.
 - **Plusieurs indicatifs spéciaux** : un seul « en cours » à la fois, les
   précédents restent consultables (`/activations`).
+- **Chacun à son heure** : « Locale » affiche les heures dans le fuseau du
+  **visiteur**, annoncé par son navigateur — un chasseur canadien lit les
+  créneaux à son heure sans rien régler, et les heures qu'il saisit sont
+  comprises dans son fuseau. Bouton **Heure : Locale / UTC** dans les pages, et
+  UTC partout dans la base et l'ADIF. Sans JavaScript, c'est le fuseau de la
+  station (`site.timezone` de `config.yml`) qui sert de repère.
 - **Français / English** : chaque page s'affiche dans la langue du navigateur
   (anglais pour les chasseurs étrangers), avec un bouton **FR | EN** dans le
   bandeau ; le choix est mémorisé. L'installeur pose la question au démarrage
@@ -171,7 +177,7 @@ n'est imposé.
 | Afficher carte, DXCC et classement | au choix | la partie « chasseurs » de la page publique |
 | Classement aux points | non | sinon classement aux couples bande × mode |
 | Compte QRZ.com | facultatif | noms, locators et pays des stations contactées |
-| Heure locale ou UTC | locale | au choix de chaque visiteur, mémorisé |
+| Heure locale ou UTC | locale | l'heure locale est **celle du visiteur**, mémorisée |
 | Langue FR / EN | navigateur | bouton dans le bandeau, mémorisé |
 
 ## Trois façons de l'utiliser
@@ -220,22 +226,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.21.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.22.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.21.1.tar.gz
-   cd tm-activation-1.21.1
+   tar xzf tm-activation-1.22.0.tar.gz
+   cd tm-activation-1.22.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.21.1.zip
-   cd tm-activation-1.21.1
+   unzip tm-activation-1.22.0.zip
+   cd tm-activation-1.22.0
    sudo bash install.sh --lan
    ```
 
@@ -322,8 +328,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.21.1.tar.gz
-cd tm-activation-1.21.1
+tar xzf tm-activation-1.22.0.tar.gz
+cd tm-activation-1.22.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -504,9 +510,6 @@ sudo userdel tmact
 
 ## Limites connues
 
-- Heure locale : fuseau Europe/Paris (identique à celui de la Belgique, du
-  Luxembourg et de la Suisse). L'heure UTC est toujours disponible via le
-  sélecteur « Heure », et le stockage se fait en UTC.
 - LoTW : pas d'envoi automatique. L'export ADIF se signe avec TQSL, qui demande
   le certificat de l'indicatif spécial.
 - Un seul processus (worker) : largement suffisant pour une activation.
