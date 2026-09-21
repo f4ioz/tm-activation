@@ -551,6 +551,11 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 @media (max-width: 640px) {
   .act-dxcc-name { display: none; }   /* écran étroit : drapeau + compteur suffisent */
 }
+/* Carte « Entités DXCC » de la page publique : drapeaux seuls, serrés ; le pays
+   et le nombre de QSO restent en infobulle pour ne pas gonfler la carte. */
+.act-dxcc-mini { margin-top: 0.6rem; gap: 0.25rem; }
+.act-dxcc-mini .act-dxcc-item { padding: 0; border: 0; border-radius: 0; }
+
 /* Cellule « drapeau + libellé » des tableaux publics. */
 .act-dxcc-cell { white-space: nowrap; }
 .act-dxcc-cell .act-dxcc-flag { vertical-align: -0.2em; margin-right: 0.15rem; }

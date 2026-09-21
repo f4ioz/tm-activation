@@ -81,6 +81,17 @@
   <div class="act-card">
     <h2>{{ _("Entités DXCC") }}</h2>
     <p class="act-big">{{ dxcc.count }}</p>
+    {# Drapeaux seuls : pays et nombre de QSO en infobulle, le détail est
+       dans le tableau « DXCC contactés » plus bas. #}
+    {% if dxcc.entities %}
+      <ul class="act-dxcc act-dxcc-mini">
+        {% for e in dxcc.entities if e.code %}
+          <li class="act-dxcc-item" title="{{ e.dxcc_name }} — {{ _("{n} QSO", n=e.qsos) }}">
+            {{ dxcc_flag(e.code, e.dxcc_name) }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   </div>
   {% endif %}
 </div>
