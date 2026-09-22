@@ -1925,6 +1925,40 @@ def test_logo_keeps_its_transparency_in_the_pdf(monkeypatch, tmp_path) -> None:
     assert b"/SMask" in body                      # transparence conservée
 
 
+def test_report_header_lines_never_overlap(monkeypatch, tmp_path) -> None:
+    """Bandeau du PDF : indicatif, libellé et dates empilés, à toute densité.
+
+    Vécu en prod : le rapport resserré sur une page gardait des positions
+    calculées pour le grand bandeau — les trois lignes se chevauchaient."""
+    import re
+
+    from app import report as report_mod
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    activation.update_station("TM25TEST", label="Cinquante ans du radio-club et de ses amis",
+                              start_date="2026-09-06", end_date="2026-09-20")
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    data = report_mod._gather("TM25TEST")
+    opts = activation.get_report_options()
+    for level, metrics in enumerate(report_mod.DENSITIES):
+        doc = report_mod._compose("TM25TEST", data, opts, metrics, None, "Radioclub", False)
+        stream = doc.pages[0].stream().decode("latin-1")
+        band = metrics["band"]
+        height = doc.pages[0].height
+        lignes = []
+        for size, y, text in re.findall(r"/F\d ([\d.]+) Tf [\d.]+ ([\d.]+) Td \((.*?)\) Tj",
+                                        stream):
+            haut = height - float(y) - float(size)      # haut du texte, repère écran
+            if haut < band and "Rapport" not in text and "tabli le" not in text:
+                lignes.append((haut, float(size), text))
+        lignes.sort()
+        assert len(lignes) == 3, f"densité {level} : {lignes}"
+        for (haut, size, texte), (suivant, _s, _t) in zip(lignes, lignes[1:]):
+            assert haut + size <= suivant + 0.5, \
+                f"densité {level} : « {texte} » déborde sur la ligne suivante"
+        assert lignes[-1][0] + lignes[-1][1] <= band - 4      # rien ne dépasse du bandeau
+
+
 def test_report_footer_is_signed(monkeypatch, tmp_path) -> None:
     """Pied de page : la signature du logiciel, sur chaque page."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")

@@ -38,11 +38,14 @@ SIGNATURE = "TM-Activation · F4IOZ"
 # barres du rythme et les interlignes, puis le bandeau de titre.
 DENSITIES: list[dict[str, float]] = [
     {"band": 104, "kpi": 54, "day": 118, "day_hours": 92, "hour": 74,
-     "grid": 15.0, "row": 14.0, "gap": 14.0, "title": 30, "kpi_value": 21},
+     "grid": 15.0, "row": 14.0, "gap": 14.0, "title": 30, "kpi_value": 21,
+     "label": 12.5, "meta": 9.5},
     {"band": 88, "kpi": 46, "day": 88, "day_hours": 68, "hour": 58,
-     "grid": 13.5, "row": 12.5, "gap": 9.0, "title": 26, "kpi_value": 18},
+     "grid": 13.5, "row": 12.5, "gap": 9.0, "title": 26, "kpi_value": 18,
+     "label": 11.5, "meta": 9.0},
     {"band": 74, "kpi": 40, "day": 66, "day_hours": 52, "hour": 46,
-     "grid": 12.5, "row": 11.5, "gap": 6.0, "title": 22, "kpi_value": 16},
+     "grid": 12.5, "row": 11.5, "gap": 6.0, "title": 22, "kpi_value": 16,
+     "label": 10.5, "meta": 8.5},
 ]
 FLAGS_DIR = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flags"
 
@@ -136,19 +139,34 @@ class _Sheet:
                 box_w = min(box_h * lw / lh, 170.0)
                 page.image(MARGIN, (band_h - box_h) / 2, box_w, box_h, logo, max_side=340)
                 text_left = MARGIN + box_w + 16
-        page.text(text_left, band_h * 0.20, callsign, size=self.m["title"], bold=True, color=WHITE,
-                  width=self.width * 0.62 - (text_left - MARGIN))
-        if label:
-            page.text(text_left, band_h * 0.56, label, size=12.5, color=WHITE,
-                      width=self.width * 0.62 - (text_left - MARGIN))
-        line = " · ".join(bit for bit in (period, club) if bit)
-        page.text(text_left, band_h - 26, line, size=9.5, color=pdf.mix(WHITE, ACCENT, 0.35),
-                  width=self.width * 0.66 - (text_left - MARGIN))
+        # Les lignes sont EMPILÉES et le bloc centré : le bandeau change de
+        # hauteur selon la densité, des positions en dur finissaient par se
+        # chevaucher (vu sur un rapport resserré à une page).
+        title_size, label_size, meta_size = self.m["title"], self.m["label"], self.m["meta"]
         stamp = datetime.now(UTC).strftime("%d/%m/%Y %H:%M")
-        page.text(MARGIN, band_h * 0.24, _("Rapport d'activité"), size=11, bold=True, color=WHITE,
-                  align="right", width=self.width)
-        page.text(MARGIN, band_h * 0.42, _("établi le {when} UTC", when=stamp), size=9,
-                  color=pdf.mix(WHITE, ACCENT, 0.35), align="right", width=self.width)
+        line = " · ".join(bit for bit in (period, club) if bit)
+        left_lines = [(callsign, title_size, True, WHITE)]
+        if label:
+            left_lines.append((label, label_size, False, WHITE))
+        if line:
+            left_lines.append((line, meta_size, False, pdf.mix(WHITE, ACCENT, 0.35)))
+        right_lines = [(_("Rapport d'activité"), meta_size + 1.5, True, WHITE),
+                       (_("établi le {when} UTC", when=stamp), meta_size,
+                        False, pdf.mix(WHITE, ACCENT, 0.35))]
+
+        def draw(lines: list[tuple[str, float, bool, pdf.Color]], x: float, width: float,
+                 align: str) -> None:
+            spacing = 3.0 if self.m["gap"] > 8 else 2.0
+            height = sum(size * 1.15 for _text, size, _b, _c in lines) + spacing * (len(lines) - 1)
+            y = max((band_h - 6 - height) / 2, 4.0)
+            for text, size, bold, color in lines:
+                page.text(x, y, text, size=size, bold=bold, color=color,
+                          align=align, width=width)
+                y += size * 1.15 + spacing
+
+        right_width = self.width * 0.30
+        draw(left_lines, text_left, MARGIN + self.width - right_width - 12 - text_left, "left")
+        draw(right_lines, MARGIN + self.width - right_width, right_width, "right")
         self.y = band_h + self.m["gap"] + 10
 
     def section(self, title: str, hint: str = "", icon: str = "") -> None:
