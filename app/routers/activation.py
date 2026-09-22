@@ -393,6 +393,7 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             show_contacts=activation.show_contacts(),
             show_map_stats=activation.show_map_stats(),
             auto_slots=activation.auto_slots(),
+            sl_flash=request.query_params.get("sl"),
             slot_lock=activation.slot_lock(),
             callbook=activation.callbook_progress(),
             per_operator_auth=activation.per_operator_auth(),
@@ -536,6 +537,17 @@ async def change_scoring(request: Request) -> Response:
     form = await request.form()
     activation.set_scoring(dict(form))
     return RedirectResponse("/activation/settings?sc=ok#points", status_code=303)
+
+
+@router.post("/settings/slots-from-log")
+async def rebuild_slots_from_log(request: Request) -> Response:
+    """Recale tout de suite les créneaux sur le log (admin), sans attendre un QSO."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    done = activation.reconcile_slots_from_log(force=True)
+    return RedirectResponse(
+        f"/activation/settings?sl={done['created']}-{done['extended']}", status_code=303
+    )
 
 
 @router.post("/settings/map")

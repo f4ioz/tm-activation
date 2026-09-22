@@ -1174,9 +1174,13 @@ def blocking_slot(operator_call: str, band: str, mode: str, when_utc: str | None
     return None
 
 
-def reconcile_slots_from_log(station: str | None = None) -> dict[str, int]:
-    """Crée les créneaux oubliés et étire ceux qui ont débordé. {créés, étirés}."""
-    if not auto_slots():
+def reconcile_slots_from_log(station: str | None = None, force: bool = False) -> dict[str, int]:
+    """Crée les créneaux oubliés et étire ceux qui ont débordé. {créés, étirés}.
+
+    ``force`` : l'admin le demande depuis les Réglages, on le fait même si le
+    rattrapage automatique est décoché (bouton « Mettre à jour maintenant »).
+    """
+    if not (force or auto_slots()):
         return {"created": 0, "extended": 0}
     st = _st(station)
     created = extended = 0

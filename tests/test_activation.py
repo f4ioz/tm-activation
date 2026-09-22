@@ -1656,6 +1656,38 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
     assert "3 QSO" in TestClient(app).get("/tm25test").text
 
 
+def test_settings_button_realigns_slots_on_the_log(monkeypatch) -> None:
+    """Bouton « Mettre à jour les créneaux d'après le log » : marche même quand
+    le rattrapage automatique est décoché (l'admin le demande explicitement)."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    for call, time_on in (("DL1ABC", "1000"), ("DL2ABC", "1010"), ("DL3ABC", "1020")):
+        activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260907", time_on=time_on)
+    assert activation.list_slots() == []              # rien pendant que l'option est off
+    admin = _private_client()
+    r = admin.post("/activation/settings/slots-from-log")
+    assert r.status_code == 303 and "sl=1-0" in r.headers["location"]
+    slots = activation.list_slots()
+    assert len(slots) == 1 and slots[0]["source"] == "log"
+    assert activation.slot_qso_counts()[slots[0]["id"]] == 3
+    page = admin.get("/activation/settings?sl=1-0").text
+    assert "1 créé(s)" in page and "Mettre à jour les créneaux" in page
+    # Réservé à l'admin.
+    activation.set_operator_password("oppass")
+    op = TestClient(app, follow_redirects=False)
+    op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
+    assert op.post("/activation/settings/slots-from-log").headers["location"].startswith("/login")
+
+
+def test_settings_slot_flash_ignores_a_tampered_parameter(monkeypatch) -> None:
+    """Le compte rendu vient de l'URL : une valeur bricolée ne doit rien afficher."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    page = _private_client().get("/activation/settings?sl=<img src=x onerror=alert(1)>-oops").text
+    assert "Créneaux recalés" not in page          # compte rendu non affiché
+    assert "<img src=x" not in page                # et jamais réinjecté tel quel
+
+
 def test_qso_logged_on_the_last_minute_of_a_slot_counts() -> None:
     """Cas vécu (TM25TEST, passage FO-29) : créneau 18:59→19:15, cinq QSO dont
     un à 19:15 pile — la vignette n'en affichait que quatre.

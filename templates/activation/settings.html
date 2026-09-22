@@ -152,6 +152,14 @@
       </form>
       <p class="act-muted">{{ _("Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.") }}</p>
       <p class="act-muted act-map-note">{{ _("Créneaux d'après le log : un opérateur qui a oublié de réserver, ou qui a dépassé l'heure prévue, voit son créneau créé ou prolongé d'après ses QSO (même bande, même mode, séances séparées de plus de 30 minutes).") }}</p>
+      {% set sl = (sl_flash or '').split('-') %}
+      {% if sl|length == 2 and sl[0].isdigit() and sl[1].isdigit() %}
+        <p class="act-alert act-alert-ok">{{ _("Créneaux recalés sur le log : {c} créé(s), {e} prolongé(s).", c=sl[0], e=sl[1]) }}</p>
+      {% endif %}
+      <form method="post" action="/activation/settings/slots-from-log" class="act-form">
+        <button type="submit" class="act-cancel-btn">{{ _("Mettre à jour les créneaux d'après le log maintenant") }}</button>
+      </form>
+      <p class="act-muted act-map-note">{{ _("Le rattrapage se fait normalement à l'enregistrement d'un QSO ou à l'import d'un ADIF. Ce bouton le déclenche tout de suite — utile après un import fait ailleurs, ou quand l'option ci-dessus était décochée. Les créneaux ne sont jamais raccourcis ni supprimés, et le nombre de QSO d'une vignette est recalculé à chaque affichage.") }}</p>
     </div>
 
     <div class="act-card">
