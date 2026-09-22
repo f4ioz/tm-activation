@@ -15,7 +15,10 @@
   {% if is_admin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
 </nav>
 
-{% include "activation/_tz_toggle.html" %}
+<div class="act-dash-head">
+  {% include "activation/_tz_toggle.html" %}
+  {% if is_admin %}<a class="act-cancel-btn act-report-link" href="/activation/report.pdf">{{ _("📄 Rapport PDF") }}</a>{% endif %}
+</div>
 
 <div class="act-kpis">
   <div class="act-kpi"><span class="act-kpi-n">{{ stats.total }}</span><span class="act-kpi-l">QSO</span></div>

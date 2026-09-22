@@ -27,7 +27,7 @@ from urllib.parse import unquote
 
 from starlette.convertors import Convertor, register_url_convertor
 
-from app import activation, dx_spots, i18n, security, visits
+from app import activation, dx_spots, i18n, report, security, visits
 from app.auth import is_private
 from app.config import club_config
 from app.i18n import _
@@ -395,6 +395,7 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             show_map_stats=activation.show_map_stats(),
             auto_slots=activation.auto_slots(),
             sl_flash=request.query_params.get("sl"),
+            rp_flash=request.query_params.get("rp"),
             public_slots_max=activation.public_slots_max(),
             public_slots_cap=activation.PUBLIC_SLOTS_MAX,
             slot_lock=activation.slot_lock(),
@@ -550,6 +551,24 @@ async def change_scoring(request: Request) -> Response:
     form = await request.form()
     activation.set_scoring(dict(form))
     return RedirectResponse("/activation/settings?sc=ok#points", status_code=303)
+
+
+@router.get("/report.pdf")
+async def activity_report(request: Request, station: str = "") -> Response:
+    """Bilan illustré de l'activation, en PDF (administrateur)."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    call = (station or activation.callsign()).strip().upper()
+    if activation.get_station(call) is None:
+        return RedirectResponse("/activation/settings?rp=unknown", status_code=303)
+    data = await run_in_threadpool(report.build_report, call)
+    name = f"{activation.slugify_call(call)}-rapport.pdf"
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}"',
+                 "Cache-Control": "no-store"},
+    )
 
 
 @router.post("/settings/slots-from-log")

@@ -315,6 +315,18 @@
     </div>
 
     <div class="act-card">
+      <h2>{{ _("Rapport d'activité") }}</h2>
+      {% if rp_flash == 'unknown' %}<p class="act-alert act-alert-err">{{ _("Indicatif inconnu.") }}</p>{% endif %}
+      <p class="act-muted">{{ _("Un PDF d'une page : compteurs, rythme jour par jour et heure par heure, bandes, modes, entités DXCC et meilleurs chasseurs. À imprimer ou à joindre au compte rendu du club.") }}</p>
+      <p><a class="act-cancel-btn" href="/activation/report.pdf">{{ _("Télécharger le rapport de {call}", call=callsign) }}</a></p>
+      {% if stations|length > 1 %}
+      <p class="act-muted act-map-note">{{ _("Autres indicatifs :") }}
+        {% for s in stations if s.callsign != callsign %}<a href="/activation/report.pdf?station={{ s.callsign }}">{{ s.callsign }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+      </p>
+      {% endif %}
+    </div>
+
+    <div class="act-card">
       <h2>{{ _("Sauvegardes") }}</h2>
       <p class="act-muted">
         {{ _("Snapshots automatiques (base + mot de passe) dans") }} <code>var/backups/</code> : {{ _("au démarrage et après chaque modification. Rotation sur les 40 derniers.") }}

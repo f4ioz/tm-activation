@@ -88,6 +88,10 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-tzswitch a:hover { color: var(--accent); border-color: var(--accent); }
 .act-tzswitch a.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 
+/* Bandeau du tableau de bord : fuseau à gauche, rapport PDF à droite. */
+.act-dash-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.act-report-link { text-decoration: none; font-size: 0.8rem; }
+
 /* ── Sélecteur de langue (FR | EN) du bandeau ─────────────────────────── */
 .act-lang { display: flex; gap: 0.2rem; font-family: var(--font-mono, monospace); font-size: 0.75rem; }
 .act-lang a {

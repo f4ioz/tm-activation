@@ -1806,6 +1806,39 @@ def test_password_rule_is_enforced_at_account_creation() -> None:
         activation.set_operator_password_for("F5WEAK", "faible")
 
 
+def test_activity_report_pdf(monkeypatch) -> None:
+    """Rapport PDF : réservé à l'admin, lisible, et présent dans les Réglages."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    for i, call in enumerate(("DL1ABC", "ON4ZZ", "G0XYZ", "EA5QQ")):
+        activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260910", time_on=f"10{i:02d}", gridsquare="JO31")
+    admin = _private_client()
+    r = admin.get("/activation/report.pdf")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert "tm25test-rapport.pdf" in r.headers["content-disposition"]
+    body = r.content
+    assert body.startswith(b"%PDF-1.") and body.rstrip().endswith(b"%%EOF")
+    assert b"/Type /Catalog" in body and b"/Type /Page " in body
+    assert b"(TM25TEST)" in body                      # le titre de l'activation
+    assert b"(529)" not in body and b"(4)" in body     # le nombre de QSO du log de test
+    # Indicatif inconnu : on revient aux Réglages, pas d'erreur 500.
+    assert admin.get("/activation/report.pdf?station=XX9ZZZ").status_code == 303
+    assert '/activation/report.pdf"' in admin.get("/activation/settings").text
+    # Espace opérateurs : refusé.
+    activation.set_operator_password("oppass")
+    op = TestClient(app, follow_redirects=False)
+    op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
+    assert op.get("/activation/report.pdf").headers["location"].startswith("/login")
+
+
+def test_activity_report_survives_an_empty_log(monkeypatch) -> None:
+    """Rapport demandé avant le premier QSO : une page valide, pas une erreur."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    body = _private_client().get("/activation/report.pdf").content
+    assert body.startswith(b"%PDF-1.") and b"(0)" in body
+
+
 def test_planning_highlights_the_booking_form(monkeypatch) -> None:
     """La carte « Réserver un créneau » est encadrée : c'est le geste principal
     de la page, il ne doit pas se confondre avec « Ajouter un opérateur »."""

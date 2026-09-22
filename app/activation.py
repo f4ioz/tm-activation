@@ -2006,6 +2006,52 @@ def _entity_name(call: str) -> str:
     return dxcc_flags.entity_for_call(call)[1]
 
 
+def qso_timeline(station: str | None = None) -> dict[str, Any]:
+    """Rythme de l'activité : QSO par jour et par heure UTC.
+
+    ``by_day`` (chronologique), ``by_hour`` (24 valeurs, 0 h → 23 h UTC),
+    la meilleure journée, la meilleure heure d'horloge (toutes journées
+    confondues), le meilleur créneau d'une heure précise, le nombre d'heures
+    où la station a été active et la moyenne de QSO sur ces heures-là.
+    """
+    st = _st(station)
+    init_db()
+    with conn() as c:
+        rows = c.execute(
+            "SELECT qso_date AS day, substr(time_on, 1, 2) AS hour, COUNT(*) AS n "
+            "FROM contacts WHERE station = ? GROUP BY day, hour ORDER BY day, hour", (st,)
+        ).fetchall()
+    days: dict[str, int] = {}
+    hours = [0] * 24
+    best_slot = {"day": "", "hour": "", "n": 0}
+    for row in rows:
+        days[row["day"]] = days.get(row["day"], 0) + int(row["n"])
+        try:
+            hour = int(row["hour"])
+        except (TypeError, ValueError):
+            continue
+        if 0 <= hour <= 23:
+            hours[hour] += int(row["n"])
+        if int(row["n"]) > best_slot["n"]:
+            best_slot = {"day": row["day"], "hour": row["hour"], "n": int(row["n"])}
+    total = sum(days.values())
+    by_day = [{"day": day, "n": n} for day, n in sorted(days.items())]
+    best_day = max(by_day, key=lambda d: d["n"], default=None)
+    best_hour_n = max(hours, default=0)
+    active_hours = len(rows)
+    return {
+        "by_day": by_day,
+        "by_hour": hours,
+        "best_day": best_day,
+        "best_hour": {"hour": hours.index(best_hour_n) if best_hour_n else 0, "n": best_hour_n},
+        "best_slot": best_slot,
+        "active_hours": active_hours,
+        "per_hour": round(total / active_hours, 1) if active_hours else 0.0,
+        "days": len(by_day),
+        "total": total,
+    }
+
+
 def dxcc_table(station: str | None = None) -> dict[str, Any]:
     """Entités DXCC contactées : stations et QSO par entité.
 

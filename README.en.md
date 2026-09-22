@@ -21,6 +21,9 @@ from a phone or a PC, while hunters follow the activation live on a public page.
   in.
 - **ADIF**: import with a preview, full or selective export, ready for
   TQSL / LoTW.
+- **A one-page PDF report** for the administrator: counters, pace day by day and
+  hour by hour, bands, modes, DXCC entities and top hunters — generated without
+  any dependency, so it works offline too.
 - **Public page** for hunters: current and upcoming activations, **a contacts
   map coloured by mode and shaped by band, filtered with tick boxes**, a DXCC
   table with flags (no QRZ account needed), points ranking and an "am I in the
@@ -57,15 +60,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.27.2.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.27.2.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.28.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.28.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.27.2.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.28.0.tar.gz
 ```
 
 ## Features
@@ -186,6 +189,7 @@ is forced on you.
 | Create and extend slots from the log | on | catches forgotten bookings |
 | Realign slots on the log now | button | immediate catch-up, even when unticked |
 | Slot cards shown | all | or a maximum number on the public page |
+| PDF activity report | button | illustrated one-page summary, to print or attach |
 | Refuse logging on a booked band and mode | on | avoids two stations at once |
 | Show the contact list | your choice | "Latest contacts" on the public page |
 | Show map, DXCC and ranking | your choice | the "hunters" part of the public page |
@@ -241,22 +245,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.27.2.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.28.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.27.2.tar.gz
-   cd tm-activation-1.27.2
+   tar xzf tm-activation-1.28.0.tar.gz
+   cd tm-activation-1.28.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.27.2.zip
-   cd tm-activation-1.27.2
+   unzip tm-activation-1.28.0.zip
+   cd tm-activation-1.28.0
    sudo bash install.sh --lan
    ```
 
@@ -339,8 +343,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.27.2.tar.gz
-cd tm-activation-1.27.2
+tar xzf tm-activation-1.28.0.tar.gz
+cd tm-activation-1.28.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
