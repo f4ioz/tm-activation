@@ -424,6 +424,32 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 
 /* ── Réglages : règle de points ───────────────────────────────────────── */
 .act-card-wide { grid-column: 1 / -1; }
+
+/* Carte mise en avant (ex. « Réserver un créneau ») : c'est là qu'on agit.
+   Cadre d'accent, léger halo et bandeau de titre pour attirer l'œil sans
+   crier — le reste de la page garde ses cartes sobres. */
+.act-card-focus {
+  position: relative;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 7%, transparent) 0 3.2rem, var(--panel) 3.2rem);
+}
+.act-card-focus > h2 {
+  color: var(--accent);
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.act-card-focus > h2::before {
+  content: "▶"; font-size: 0.7em; line-height: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Un seul battement à l'arrivée sur la page, puis plus rien. */
+  .act-card-focus { animation: act-focus-in 1.4s ease-out 1; }
+  @keyframes act-focus-in {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+    100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
+  }
+}
 .act-fieldset {
   border: 1px solid var(--border); border-radius: 3px; margin: 0;
   padding: 0.5rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem;

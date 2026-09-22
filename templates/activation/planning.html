@@ -26,7 +26,9 @@
 {% endif %}
 
 <div class="act-grid act-grid-2">
-  <div class="act-card">
+  {# Le geste principal de la page : la carte est encadrée en couleur d'accent
+     pour qu'on la trouve sans chercher. #}
+  <div class="act-card act-card-focus">
     <h2>{{ _("Réserver un créneau") }}</h2>
     <form method="post" action="/activation/slots" class="act-form">
       {% if locked_op %}

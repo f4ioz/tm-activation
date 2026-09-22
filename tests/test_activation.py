@@ -1806,6 +1806,15 @@ def test_password_rule_is_enforced_at_account_creation() -> None:
         activation.set_operator_password_for("F5WEAK", "faible")
 
 
+def test_planning_highlights_the_booking_form(monkeypatch) -> None:
+    """La carte « Réserver un créneau » est encadrée : c'est le geste principal
+    de la page, il ne doit pas se confondre avec « Ajouter un opérateur »."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    page = _private_client().get("/activation/planning").text
+    assert 'class="act-card act-card-focus"' in page
+    assert page.index("act-card-focus") < page.index("Réserver un créneau")
+
+
 def test_password_requirements_are_adjustable(monkeypatch) -> None:
     """Réglages → Comptes opérateurs : longueur, majuscules, chiffres et
     caractères spéciaux exigés (0 = pas d'exigence)."""
