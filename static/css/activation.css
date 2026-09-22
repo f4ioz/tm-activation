@@ -130,8 +130,12 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-hero-logo { align-self: stretch; height: auto; min-height: 76px; max-height: 150px;
   width: auto; max-width: 30%; object-fit: contain; flex: none; }
 @media (max-width: 640px) {
-  .act-hero.has-logo { flex-direction: column; text-align: center; gap: 0.4rem; }
-  .act-hero-logo { height: 64px; max-width: 60%; }
+  /* Téléphone : le logo passe AU-DESSUS du titre et se recentre. Sans
+     align-self, le « stretch » du grand écran le collait à gauche. */
+  .act-hero.has-logo { flex-direction: column; text-align: center; gap: 0.5rem; }
+  .act-hero-logo {
+    align-self: center; height: 74px; min-height: 0; max-height: 74px; max-width: 62%;
+  }
 }
 .act-hero .act-hero-text { width: 100%; }
 
