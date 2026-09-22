@@ -2123,6 +2123,7 @@ DEFAULT_REPORT: dict[str, Any] = {
     "dxcc_all": True,    # toutes les entités avec leur drapeau (sinon : les dix premières)
     "hunters": 10,       # nombre de chasseurs listés (0 = pas de palmarès)
     "sats": True,        # « Satellites » : masqué de toute façon sans QSO satellite
+    "one_page": False,   # tout tenir sur une page, quitte à couper les listes
 }
 REPORT_HUNTERS_MAX = 100
 
@@ -2140,6 +2141,7 @@ def get_report_options() -> dict[str, Any]:
         "dxcc_all": bool(saved.get("dxcc_all", d["dxcc_all"])),
         "hunters": _clamp_int(saved.get("hunters"), 0, REPORT_HUNTERS_MAX, d["hunters"]),
         "sats": bool(saved.get("sats", d["sats"])),
+        "one_page": bool(saved.get("one_page", d["one_page"])),
     }
 
 
@@ -2151,6 +2153,7 @@ def set_report_options(form: dict[str, Any]) -> dict[str, Any]:
         "hunters": _clamp_int(form.get("hunters"), 0, REPORT_HUNTERS_MAX,
                               DEFAULT_REPORT["hunters"]),
         "sats": bool(form.get("sats")),
+        "one_page": bool(form.get("one_page")),
     }
     _save_settings(data)
     return get_report_options()

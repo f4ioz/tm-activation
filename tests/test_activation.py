@@ -1851,7 +1851,7 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
                    data={"hours": "1", "dxcc_all": "", "hunters": "0"})
     assert r.status_code == 303 and "rp=ok" in r.headers["location"]
     assert activation.get_report_options() == {"hours": True, "dxcc_all": False, "hunters": 0,
-                                               "sats": False}
+                                               "sats": False, "one_page": False}
     tuned = admin.get("/activation/report.pdf").content
     assert b"RYTHME, HEURE PAR HEURE" in tuned
     assert b"MEILLEURS CHASSEURS" not in tuned         # palmarès retiré
@@ -1863,6 +1863,47 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
     # Valeur absurde : bornée, jamais d'erreur.
     admin.post("/activation/settings/report", data={"hunters": "5000"})
     assert activation.get_report_options()["hunters"] == activation.REPORT_HUNTERS_MAX
+
+
+def _pages(pdf_bytes: bytes) -> int:
+    return pdf_bytes.count(b"/Type /Page ")
+
+
+def test_report_fits_one_page_on_demand(monkeypatch, tmp_path) -> None:
+    """Option « une seule page » : le rapport se resserre, puis coupe les listes."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    # Un log copieux : beaucoup d'entités et de chasseurs, deux pages au large.
+    prefixes = ("F", "ON", "PA", "DL", "G", "EA", "I", "CT", "OE", "HB9", "SP", "OK", "OM",
+                "HA", "S5", "9A", "YU", "SV", "LZ", "YO", "OH", "SM", "LA", "OZ", "ES",
+                "LY", "YL", "UR", "RA", "K", "VE", "PY", "JA", "VK", "ZS")
+    calls = [f"{prefix}{n}AB" for prefix in prefixes for n in range(1, 4)]
+    for i, call in enumerate(calls):
+        activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="2026091%d" % (i % 10), time_on=f"{8 + i % 12:02d}30")
+    admin = _private_client()
+    admin.post("/activation/settings/report", data={"dxcc_all": "1", "hunters": "100", "sats": "1"})
+    large = admin.get("/activation/report.pdf").content
+    assert _pages(large) >= 2
+
+    admin.post("/activation/settings/report",
+               data={"dxcc_all": "1", "hunters": "100", "sats": "1", "one_page": "1"})
+    assert activation.get_report_options()["one_page"] is True
+    one = admin.get("/activation/report.pdf").content
+    assert _pages(one) == 1
+    assert b"ENTIT" in one and b"MEILLEURS CHASSEURS" in one   # les sections restent
+    assert len(one) < len(large)                    # coupé, pas déplacé sur une 2e page
+
+
+def test_report_footer_is_signed(monkeypatch, tmp_path) -> None:
+    """Pied de page : la signature du logiciel, sur chaque page."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    body = _private_client().get("/activation/report.pdf").content
+    assert body.count(b"TM-Activation") >= 1
+    assert b"F4IOZ" in body
 
 
 def test_report_details_satellite_qsos(monkeypatch, tmp_path) -> None:

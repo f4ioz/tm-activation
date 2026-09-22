@@ -24,6 +24,9 @@ en direct sur une page publique.
 - **Rapport PDF** pour l'administrateur : compteurs, rythme jour par jour,
   bandes, modes, **entités DXCC avec leurs drapeaux** et palmarès des chasseurs.
   Les QSO passés par **satellite** y ont leur section, détaillée par satellite.
+  Le document tient **sur une page** si on le demande — et même sans l'option, un
+  débordement de trois lignes est rattrapé en resserrant plutôt qu'en imprimant
+  une page de plus.
   Chaque section s'active ou se retire dans les Réglages, et les autres occupent
   la place libérée. Un **logo de club** peut être déposé : il apparaît en haut du
   rapport, dans le bandeau des pages et en tête du site. Tout est généré sans
@@ -65,15 +68,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.30.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.30.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.31.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.31.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.30.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.31.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -206,6 +209,7 @@ n'est imposé.
 | Entités DXCC avec drapeaux dans le PDF | oui | toutes les entités (sinon les dix premières) |
 | Chasseurs listés dans le PDF | 10 | 0 pour retirer le palmarès |
 | Détail des satellites dans le PDF | oui | QSO par satellite, après les modes |
+| PDF sur une seule page | non | resserre, et coupe les listes s'il le faut |
 | Logo du club | facultatif | bandeau des pages, en-tête du site et rapport PDF |
 | Interdire de loguer sur une bande et un mode réservés | oui | évite deux stations à la fois |
 | Afficher la liste des contacts | au choix | « Derniers contacts » sur la page publique |
@@ -263,22 +267,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.30.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.31.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.30.0.tar.gz
-   cd tm-activation-1.30.0
+   tar xzf tm-activation-1.31.0.tar.gz
+   cd tm-activation-1.31.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.30.0.zip
-   cd tm-activation-1.30.0
+   unzip tm-activation-1.31.0.zip
+   cd tm-activation-1.31.0
    sudo bash install.sh --lan
    ```
 
@@ -365,8 +369,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.30.0.tar.gz
-cd tm-activation-1.30.0
+tar xzf tm-activation-1.31.0.tar.gz
+cd tm-activation-1.31.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

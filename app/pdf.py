@@ -170,8 +170,11 @@ def read_png(data: bytes) -> tuple[int, int, bytes]:
                 rgb = (values[x * channels], values[x * channels + 1], values[x * channels + 2])
                 if color == 6:
                     alpha = values[x * channels + 3]
-            if alpha != 255:       # aplati sur blanc
-                rgb = tuple(round(v * alpha / 255 + 255 * (255 - alpha) / 255) for v in rgb)
+            if alpha != 255:       # aplati sur blanc (entiers : c'est un point chaud)
+                rest = 255 * (255 - alpha)
+                rgb = ((rgb[0] * alpha + rest) // 255,
+                       (rgb[1] * alpha + rest) // 255,
+                       (rgb[2] * alpha + rest) // 255)
             out += bytes(rgb)
     return width, height, bytes(out)
 
@@ -202,6 +205,35 @@ def read_jpeg(data: bytes) -> tuple[int, int, int]:
     raise ValueError("JPEG illisible")
 
 
+def downsample(width: int, height: int, rgb: bytes, max_side: int) -> tuple[int, int, bytes]:
+    """Réduit une image RGB d'un facteur entier (moyenne des blocs).
+
+    Suffisant pour un logo : pas de rééchantillonnage savant, mais pas d'effet
+    d'escalier non plus, et aucune dépendance."""
+    longest = max(width, height)
+    if longest <= max_side:
+        return width, height, rgb
+    factor = -(-longest // max_side)            # arrondi au supérieur
+    new_w, new_h = max(width // factor, 1), max(height // factor, 1)
+    out = bytearray(new_w * new_h * 3)
+    pixels = factor * factor
+    for y in range(new_h):
+        for x in range(new_w):
+            r = g = b = 0
+            for dy in range(factor):
+                row = ((y * factor + dy) * width + x * factor) * 3
+                for dx in range(factor):
+                    at = row + dx * 3
+                    r += rgb[at]
+                    g += rgb[at + 1]
+                    b += rgb[at + 2]
+            at = (y * new_w + x) * 3
+            out[at] = r // pixels
+            out[at + 1] = g // pixels
+            out[at + 2] = b // pixels
+    return new_w, new_h, bytes(out)
+
+
 def image_size(data: bytes) -> tuple[int, int]:
     """Dimensions d'une image PNG ou JPEG."""
     if data[:8] == b"\x89PNG\r\n\x1a\n":
@@ -228,6 +260,12 @@ def _unpack(line: bytearray, depth: int, count: int) -> list[int]:
             if len(values) >= count:
                 return values
     return values
+
+
+# Images déjà décodées (et réduites) : le rapport peut être recomposé plusieurs
+# fois pour tenir en une page, inutile de refaire le travail à chaque essai.
+_PREPARED: dict[tuple[str, int], tuple[int, int, bytes, bytes, bytes]] = {}
+_PREPARED_MAX = 64
 
 
 def _escape(s: str) -> bytes:
@@ -305,11 +343,15 @@ class Page:
         self._ops.append(b"BT %.3f %.3f %.3f rg %s %.2f Tf %.2f %.2f Td (%s) Tj ET" % (
             *color, font, size, at, self._y(y + size), _escape(drawn)))
 
-    def image(self, x: float, y: float, w: float, h: float, png: bytes) -> None:
-        """Image PNG dessinée dans le rectangle (x, y, w, h)."""
+    def image(self, x: float, y: float, w: float, h: float, png: bytes,
+              max_side: int = 0) -> None:
+        """Image PNG ou JPEG dessinée dans le rectangle (x, y, w, h).
+
+        ``max_side`` : réduit un PNG trop grand avant de l'embarquer — un logo
+        de 700 pixels imprimé sur 2 cm n'a pas besoin de peser 800 ko."""
         if self.doc is None:
             raise RuntimeError("page détachée du document")
-        name = self.doc.add_image(png)
+        name = self.doc.add_image(png, max_side=max_side)
         self._ops.append(b"q %.2f 0 0 %.2f %.2f %.2f cm %s Do Q" % (
             w, h, x, self._y(y + h), name))
 
@@ -334,7 +376,7 @@ class Pdf:
         self.pages.append(page)
         return page
 
-    def add_image(self, data: bytes) -> bytes:
+    def add_image(self, data: bytes, max_side: int = 0) -> bytes:
         """Enregistre une image PNG ou JPEG, renvoie son nom de ressource (/Im3).
 
         Le PNG est décodé puis recompressé ; le JPEG part tel quel (DCTDecode),
@@ -344,16 +386,23 @@ class Pdf:
         if known is not None:
             return known[0]
         name = b"/Im%d" % (len(self._images) + 1)
-        if data[:8] == b"\x89PNG\r\n\x1a\n":
-            width, height, rgb = read_png(data)
-            self._images[key] = (name, width, height, zlib.compress(rgb, 6), b"FlateDecode",
-                                 b"DeviceRGB")
-        else:
-            width, height, components = read_jpeg(data)
-            space = b"DeviceGray" if components == 1 else b"DeviceRGB"
-            if components not in (1, 3):
-                raise ValueError("JPEG en CMJN non géré")
-            self._images[key] = (name, width, height, data, b"DCTDecode", space)
+        prepared = _PREPARED.get((key, max_side))
+        if prepared is None:
+            if data[:8] == b"\x89PNG\r\n\x1a\n":
+                width, height, rgb = read_png(data)
+                if max_side:
+                    width, height, rgb = downsample(width, height, rgb, max_side)
+                prepared = (width, height, zlib.compress(rgb, 6), b"FlateDecode", b"DeviceRGB")
+            else:
+                width, height, components = read_jpeg(data)
+                if components not in (1, 3):
+                    raise ValueError("JPEG en CMJN non géré")
+                space = b"DeviceGray" if components == 1 else b"DeviceRGB"
+                prepared = (width, height, data, b"DCTDecode", space)
+            if len(_PREPARED) >= _PREPARED_MAX:
+                _PREPARED.clear()
+            _PREPARED[(key, max_side)] = prepared
+        self._images[key] = (name, *prepared)
         return name
 
     def output(self) -> bytes:

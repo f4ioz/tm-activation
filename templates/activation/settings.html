@@ -286,6 +286,7 @@
             <label class="act-check"><input type="checkbox" name="hours" value="1"{% if report_options.hours %} checked{% endif %}> {{ _("Inclure le rythme heure par heure (UTC)") }}</label>
             <label class="act-check"><input type="checkbox" name="dxcc_all" value="1"{% if report_options.dxcc_all %} checked{% endif %}> {{ _("Toutes les entités DXCC avec leur drapeau (sinon : les dix premières)") }}</label>
             <label class="act-check"><input type="checkbox" name="sats" value="1"{% if report_options.sats %} checked{% endif %}> {{ _("Détailler les QSO par satellite (à la suite des modes)") }}</label>
+            <label class="act-check"><input type="checkbox" name="one_page" value="1"{% if report_options.one_page %} checked{% endif %}> {{ _("Tout tenir sur une seule page") }}</label>
             <label>{{ _("Chasseurs listés") }}
               <input type="number" name="hunters" min="0" max="{{ report_hunters_max }}" value="{{ report_options.hunters }}">
               <span class="act-muted">{{ _("0 = pas de palmarès") }}</span>

@@ -30,8 +30,20 @@ BAND_COLOR = pdf.hex_color("#2f7fd1")
 KPI_COLORS = ["#1e5fbf", "#0f9d8f", "#c2632a", "#7048a8", "#2f8f4e"]
 
 MARGIN = 38.0
-TOP_BAND = 104.0
 FOOT_ROOM = 48.0      # place réservée au pied de page
+SIGNATURE = "TM-Activation · F4IOZ"
+
+# Trois densités : on compose au large, et si le document déborde de peu (ou si
+# « une seule page » est demandé), on recommence en resserrant — d'abord les
+# barres du rythme et les interlignes, puis le bandeau de titre.
+DENSITIES: list[dict[str, float]] = [
+    {"band": 104, "kpi": 54, "day": 118, "day_hours": 92, "hour": 74,
+     "grid": 15.0, "row": 14.0, "gap": 14.0, "title": 30, "kpi_value": 21},
+    {"band": 88, "kpi": 46, "day": 88, "day_hours": 68, "hour": 58,
+     "grid": 13.5, "row": 12.5, "gap": 9.0, "title": 26, "kpi_value": 18},
+    {"band": 74, "kpi": 40, "day": 66, "day_hours": 52, "hour": 46,
+     "grid": 12.5, "row": 11.5, "gap": 6.0, "title": 22, "kpi_value": 16},
+]
 FLAGS_DIR = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flags"
 
 
@@ -93,8 +105,9 @@ def flag_bytes(code: str) -> bytes | None:
 class _Sheet:
     """Une page du rapport, avec un curseur vertical et les blocs de dessin."""
 
-    def __init__(self, doc: pdf.Pdf) -> None:
+    def __init__(self, doc: pdf.Pdf, m: dict[str, float]) -> None:
         self.page = doc.page()
+        self.m = m
         self.y = MARGIN
         self.width = self.page.width - 2 * MARGIN
 
@@ -102,37 +115,42 @@ class _Sheet:
     def title_band(self, callsign: str, label: str, period: str, club: str,
                    logo: bytes | None = None) -> None:
         page = self.page
-        page.rect(0, 0, page.width, TOP_BAND, fill=ACCENT)
-        page.rect(0, TOP_BAND - 6, page.width, 6, fill=ACCENT_DARK)
+        band_h = self.m["band"]
+        page.rect(0, 0, page.width, band_h, fill=ACCENT)
+        page.rect(0, band_h - 6, page.width, 6, fill=ACCENT_DARK)
         text_left = MARGIN
         if logo:
             # Le logo occupe la gauche du bandeau, à hauteur fixe et sans
             # déformation ; le titre se décale d'autant.
             try:
-                lw, lh, _rgb = pdf.read_png(logo) if logo[:4] == b"\x89PNG" else (0, 0, b"")
-            except ValueError:
+                # Dimensions lues dans l'en-tête (PNG comme JPEG) : décoder
+                # l'image entière juste pour ses proportions coûterait cher, et
+                # le rapport est composé plusieurs fois.
+                lw, lh = pdf.image_size(logo)
+            except (ValueError, IndexError):
                 lw = lh = 0
             if lw and lh:
-                box_h = 54.0
+                box_h = band_h - 50
                 box_w = min(box_h * lw / lh, 150.0)
-                page.rect(MARGIN - 6, 18, box_w + 12, box_h + 8, fill=pdf.mix(ACCENT, WHITE, 0.12),
-                          radius=5)
-                page.image(MARGIN, 22, box_w, box_h, logo)
+                page.rect(MARGIN - 6, band_h / 2 - box_h / 2 - 10, box_w + 12, box_h + 8,
+                          fill=pdf.mix(ACCENT, WHITE, 0.12), radius=5)
+                # 300 pixels suffisent pour 2 cm de haut, même à 300 dpi.
+                page.image(MARGIN, band_h / 2 - box_h / 2 - 6, box_w, box_h, logo, max_side=300)
                 text_left = MARGIN + box_w + 18
-        page.text(text_left, 22, callsign, size=30, bold=True, color=WHITE,
+        page.text(text_left, band_h * 0.20, callsign, size=self.m["title"], bold=True, color=WHITE,
                   width=self.width * 0.62 - (text_left - MARGIN))
         if label:
-            page.text(text_left, 58, label, size=12.5, color=WHITE,
+            page.text(text_left, band_h * 0.56, label, size=12.5, color=WHITE,
                       width=self.width * 0.62 - (text_left - MARGIN))
         line = " · ".join(bit for bit in (period, club) if bit)
-        page.text(text_left, 78, line, size=9.5, color=pdf.mix(WHITE, ACCENT, 0.35),
+        page.text(text_left, band_h - 26, line, size=9.5, color=pdf.mix(WHITE, ACCENT, 0.35),
                   width=self.width * 0.66 - (text_left - MARGIN))
         stamp = datetime.now(UTC).strftime("%d/%m/%Y %H:%M")
-        page.text(MARGIN, 26, _("Rapport d'activité"), size=11, bold=True, color=WHITE,
+        page.text(MARGIN, band_h * 0.24, _("Rapport d'activité"), size=11, bold=True, color=WHITE,
                   align="right", width=self.width)
-        page.text(MARGIN, 44, _("établi le {when} UTC", when=stamp), size=9,
+        page.text(MARGIN, band_h * 0.42, _("établi le {when} UTC", when=stamp), size=9,
                   color=pdf.mix(WHITE, ACCENT, 0.35), align="right", width=self.width)
-        self.y = TOP_BAND + 24
+        self.y = band_h + self.m["gap"] + 10
 
     def section(self, title: str, hint: str = "", icon: str = "") -> None:
         left = MARGIN
@@ -145,7 +163,7 @@ class _Sheet:
                            align="right", width=self.width)
         self.y += 15
         self.page.line(MARGIN, self.y, MARGIN + self.width, self.y, color=LINE, width=0.8)
-        self.y += 12
+        self.y += min(12.0, self.m["gap"])
 
     def kpis(self, items: list[tuple[str, str]]) -> None:
         """Bandeau de compteurs : un pavé coloré par chiffre clé."""
@@ -155,14 +173,15 @@ class _Sheet:
         for i, (value, label) in enumerate(items):
             color = pdf.hex_color(KPI_COLORS[i % len(KPI_COLORS)])
             x = MARGIN + i * (w + gap)
-            self.page.rect(x, self.y, w, 54, fill=pdf.mix(WHITE, color, 0.10),
+            h = self.m["kpi"]
+            self.page.rect(x, self.y, w, h, fill=pdf.mix(WHITE, color, 0.10),
                            stroke=pdf.mix(WHITE, color, 0.35), radius=5)
-            self.page.rect(x, self.y, 3.5, 54, fill=color)
-            self.page.text(x + 10, self.y + 9, value, size=21, bold=True, color=color,
+            self.page.rect(x, self.y, 3.5, h, fill=color)
+            self.page.text(x + 10, self.y + h * 0.16, value, size=self.m["kpi_value"], bold=True,
+                           color=color, width=w - 16)
+            self.page.text(x + 10, self.y + h - 18, label.upper(), size=7.5, color=MUTED,
                            width=w - 16)
-            self.page.text(x + 10, self.y + 36, label.upper(), size=7.5, color=MUTED,
-                           width=w - 16)
-        self.y += 54 + 18
+        self.y += self.m["kpi"] + self.m["gap"] + 4
 
     def columns(self, values: list[float], labels: list[str], height: float,
                 color: pdf.Color, every: int = 1, value_labels: bool = True) -> None:
@@ -218,16 +237,17 @@ class _Sheet:
         self.page.line(x, y - 2, x + width, y - 2, color=LINE, width=0.7)
         for i, row in enumerate(rows):
             if i % 2 == 1:
-                self.page.rect(x - 3, y - 2, width + 6, 14, fill=PANEL)
+                self.page.rect(x - 3, y - 2, width + 6, self.m["row"], fill=PANEL)
             cx = x
             for cell, w in zip(row, widths):
                 align = "left" if w == widths[0] else "right"
                 self.page.text(cx, y, cell, size=8.5, color=INK, align=align, width=w)
                 cx += w
-            y += 14
+            y += self.m["row"]
         return y
 
-    def flag_grid(self, entities: list[dict[str, Any]], columns: int = 3) -> None:
+    def flag_grid(self, entities: list[dict[str, Any]], columns: int = 3,
+                  more: int = 0) -> None:
         """Toutes les entités contactées : drapeau, nom et nombre de QSO.
 
         Disposées en colonnes pour qu'une centaine d'entités tienne sans
@@ -235,7 +255,7 @@ class _Sheet:
         gap = 14.0
         col_w = (self.width - gap * (columns - 1)) / columns
         rows = (len(entities) + columns - 1) // columns
-        line_h = 15.0
+        line_h = self.m["grid"]
         for i, entity in enumerate(entities):
             col, row = i // rows, i % rows
             x = MARGIN + col * (col_w + gap)
@@ -250,6 +270,10 @@ class _Sheet:
             self.page.text(x + col_w - 30, y, str(entity.get("qsos") or 0), size=8.5,
                            bold=True, color=ACCENT, align="right", width=30)
         self.y += rows * line_h + 6
+        if more:
+            self.page.text(MARGIN, self.y, _("… et {n} autres entités", n=more), size=8,
+                           color=MUTED)
+            self.y += 12
 
     def room_left(self) -> float:
         """Hauteur disponible avant le pied de page."""
@@ -261,7 +285,8 @@ class _Sheet:
         width = page.width - 2 * MARGIN
         y = page.height - 26
         page.line(MARGIN, y - 8, MARGIN + width, y - 8, color=LINE, width=0.7)
-        page.text(MARGIN, y, text, size=7.5, color=MUTED, width=width * 0.7)
+        page.text(MARGIN, y, text, size=7.5, color=MUTED, width=width * 0.45)
+        page.text(MARGIN, y, SIGNATURE, size=7.5, color=MUTED, align="center", width=width)
         page.text(MARGIN, y, _("Page {n}/{total}", n=page_no, total=pages), size=7.5,
                   color=MUTED, align="right", width=width)
 
@@ -269,12 +294,13 @@ class _Sheet:
 class _Book:
     """Suite de pages : ``room(n)`` renvoie une page où il reste la place voulue."""
 
-    def __init__(self, doc: pdf.Pdf) -> None:
+    def __init__(self, doc: pdf.Pdf, m: dict[str, float]) -> None:
         self.doc = doc
-        self.sheet = _Sheet(doc)
+        self.m = m
+        self.sheet = _Sheet(doc, m)
 
     def new_sheet(self) -> _Sheet:
-        self.sheet = _Sheet(self.doc)
+        self.sheet = _Sheet(self.doc, self.m)
         self.sheet.y = MARGIN + 4
         return self.sheet
 
@@ -284,24 +310,189 @@ class _Book:
         return self.sheet
 
 
+def _gather(call: str) -> dict[str, Any]:
+    """Toutes les données du rapport, lues une seule fois.
+
+    La composition peut être rejouée à plusieurs densités pour tenir en une
+    page : inutile d'interroger la base à chaque essai."""
+    return {
+        "station": activation.get_station(call),
+        "stats": activation.stats(call),
+        "timeline": activation.qso_timeline(call),
+        "dxcc": activation.dxcc_table(call),
+        "hunters": activation.hunters_ranking(None, call),
+        "map_data": activation.map_data(call),
+        "style": activation.get_map_style(call),
+        "sats": activation.satellite_stats(call),
+    }
+
+
+def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str, float],
+             logo: bytes | None, club_line: str, single: bool) -> pdf.Pdf:
+    """Compose le document à une densité donnée.
+
+    ``single`` : on s'interdit la deuxième page — les listes sont coupées à ce
+    qui tient, avec la mention du reste."""
+    st, stats = data["station"], data["stats"]
+    timeline, dxcc, hunters = data["timeline"], data["dxcc"], data["hunters"]
+    doc = pdf.Pdf()
+    doc.title = _("{call} — rapport d'activité", call=call)
+    doc.author = club_line or call
+    book = _Book(doc, m)
+    sheet = book.sheet
+    sheet.title_band(call, st.get("label") or "", _period(st, timeline), club_line, logo)
+
+    sheet.kpis([
+        (str(stats["total"]), _("QSO")),
+        (str(dxcc["count"]), _("entités DXCC")),
+        (str(len({h["call"] for h in hunters})), _("stations")),
+        (str(len(stats["by_op"])), _("opérateurs")),
+        (f"{timeline['per_hour']:g}", _("QSO/h en trafic")),
+    ])
+
+    # ── Rythme jour par jour (les barres rétrécissent quand on resserre) ──
+    best_day = timeline["best_day"]
+    hint = _("Meilleure journée : {day} ({n} QSO)",
+             day=_date_fr(best_day["day"]), n=best_day["n"]) if best_day else ""
+    sheet.section(_("Rythme, jour par jour"), hint)
+    days = timeline["by_day"]
+    if days:
+        sheet.columns([d["n"] for d in days], [_date_fr(d["day"]) for d in days],
+                      height=m["day_hours"] if opts["hours"] else m["day"], color=ACCENT,
+                      every=max(1, len(days) // 14))
+    else:
+        sheet.page.text(MARGIN, sheet.y, _("Aucun QSO enregistré."), size=9, color=MUTED)
+        sheet.y += 20
+
+    if opts["hours"]:
+        slot = timeline["best_slot"]
+        hint = _("Heure la plus forte : {day} à {hour} h UTC ({n} QSO)",
+                 day=_date_fr(slot["day"]), hour=slot["hour"], n=slot["n"]) if slot["n"] else ""
+        sheet.y += 4
+        sheet.section(_("Rythme, heure par heure (UTC)"), hint)
+        sheet.columns(timeline["by_hour"], [f"{h:02d}" for h in range(24)],
+                      height=m["hour"], color=pdf.hex_color("#0f9d8f"), every=2,
+                      value_labels=False)
+    sheet.page.text(MARGIN, sheet.y,
+                    _("{n} heures d'horloge avec du trafic, {rate} QSO/h en moyenne sur ces heures-là.",
+                      n=timeline["active_hours"], rate=f"{timeline['per_hour']:g}"),
+                    size=8.5, color=MUTED, width=sheet.width)
+    sheet.y += m["gap"] + 8
+
+    # ── Bandes et modes ───────────────────────────────────────────────────
+    lines = max(len(stats["by_band"][:8]), len(stats["by_mode"][:8]))
+    sheet = book.room(34 + 17 * lines) if not single else book.sheet
+    sheet.section(_("Bandes et modes"),
+                  _("{located} / {total} stations localisées",
+                    located=data["map_data"]["located"], total=data["map_data"]["stations"]))
+    half = (sheet.width - 26) / 2
+    start_y = sheet.y
+    bands = [(b["band"] or "?", b["n"], BAND_COLOR) for b in stats["by_band"][:8]]
+    end_left = sheet.bars(MARGIN, half, bands, stats["total"])
+    modes = [(mo["mode"] or "?", mo["n"],
+              pdf.hex_color(data["style"]["mode_colors"].get(mo["mode"],
+                                                             data["style"]["mode_default"])))
+             for mo in stats["by_mode"][:8]]
+    sheet.y = start_y
+    end_right = sheet.bars(MARGIN + half + 26, half, modes, stats["total"])
+    sheet.y = max(end_left, end_right) + m["gap"]
+
+    # ── Satellites (à la suite des modes) ─────────────────────────────────
+    sats = data["sats"] if opts["sats"] else {"by_sat": [], "total": 0, "share": 0}
+    if sats["by_sat"]:
+        shown = sats["by_sat"][:8]
+        sheet = book.room(34 + 17 * len(shown)) if not single else book.sheet
+        sheet.section(_("Satellites"),
+                      _("{n} QSO par satellite · {share} % du log",
+                        n=sats["total"], share=f"{sats['share']:g}"), icon="sat")
+        sheet.y = sheet.bars(MARGIN, sheet.width * 0.58,
+                             [(item["sat"], item["n"], pdf.hex_color("#7048a8"))
+                              for item in shown],
+                             max(sats["total"], 1)) + m["gap"]
+
+    # ── Entités DXCC ──────────────────────────────────────────────────────
+    entities = dxcc["entities"]
+    if entities:
+        if opts["dxcc_all"]:
+            columns = 3
+            sheet = book.room(34 + m["grid"] * 6) if not single else book.sheet
+            sheet.section(_("Entités DXCC contactées"), _("{n} entités", n=dxcc["count"]))
+            start = 0
+            while start < len(entities):
+                room = sheet.room_left() - 10
+                per_col = max(int(room // m["grid"]), 3)
+                chunk = entities[start:start + per_col * columns]
+                if single and start + len(chunk) < len(entities):
+                    # Une seule page : on garde ce qui tient et on annonce le reste.
+                    keep = max(per_col * columns - columns, columns)
+                    chunk = entities[start:start + keep]
+                    sheet.flag_grid(chunk, columns=columns,
+                                    more=len(entities) - start - len(chunk))
+                    start = len(entities)
+                    break
+                sheet.flag_grid(chunk, columns=columns)
+                start += len(chunk)
+                if start < len(entities):
+                    sheet = book.new_sheet()
+        else:
+            sheet = book.room(34 + m["row"] * 10) if not single else book.sheet
+            sheet.section(_("Entités DXCC contactées"), _("Les dix premières"))
+            sheet.y = sheet.table(MARGIN, sheet.width * 0.58,
+                                  (_("Entité"), _("Stations"), _("QSO")),
+                                  [(e["dxcc_name"], str(e["stations"]), str(e["qsos"]))
+                                   for e in entities[:10]],
+                                  (sheet.width * 0.58 - 96, 56, 40)) + m["gap"]
+
+    # ── Chasseurs (facultatif) ────────────────────────────────────────────
+    top = hunters[:opts["hunters"]] if opts["hunters"] else []
+    if top:
+        columns = 2 if len(top) > 8 else 1
+        rows = (len(top) + columns - 1) // columns
+        if single:
+            sheet = book.sheet
+            fits = max(int((sheet.room_left() - 26) // m["row"]), 0)
+            if fits < rows:
+                rows = fits
+                top = top[:rows * columns]
+        else:
+            sheet = book.room(30 + m["row"] * min(rows, 16))
+        if top:
+            sheet.section(_("Meilleurs chasseurs"), _("Les {n} premiers", n=len(top)))
+            col_w = (sheet.width - 26) / columns if columns > 1 else sheet.width * 0.58
+            start_y, lowest = sheet.y, sheet.y
+            for col in range(columns):
+                part = top[col * rows:(col + 1) * rows]
+                if not part:
+                    continue
+                sheet.y = start_y
+                lowest = max(lowest, sheet.table(
+                    MARGIN + col * (col_w + 26), col_w,
+                    (_("Indicatif"), _("Pays"), _("QSO")),
+                    [(h["call"], h["dxcc_name"], str(h["qsos"])) for h in part],
+                    (68, col_w - 108, 40),
+                ))
+            sheet.y = lowest
+
+    stamp = _("{call} · {club}", call=call, club=club_line) if club_line else call
+    for number, page in enumerate(doc.pages, start=1):
+        _Sheet.footer_on(page, stamp, number, len(doc.pages))
+    return doc
+
+
 def build_report(station: str | None = None) -> bytes:
     """PDF du bilan d'une activation (défaut : l'indicatif en cours).
 
-    Le contenu suit les options des Réglages : le rythme horaire est
-    facultatif, les entités s'affichent toutes avec leur drapeau ou en tableau
-    court, et le palmarès des chasseurs peut être limité ou retiré. Les
-    sections restantes occupent la place libérée."""
+    Le contenu suit les options des Réglages. Le document est composé au large ;
+    s'il ne déborde que d'un cheveu — ou si « une seule page » est demandé — il
+    est recomposé plus serré (barres du rythme, interlignes, puis bandeau de
+    titre) avant, en dernier recours, de couper les listes.
+    """
     st = activation.get_station(station) if station else activation.current_station()
     if st is None:
         raise ValueError(_("indicatif inconnu"))
     call = st["callsign"]
     opts = activation.get_report_options()
-    stats = activation.stats(call)
-    timeline = activation.qso_timeline(call)
-    dxcc = activation.dxcc_table(call)
-    hunters = activation.hunters_ranking(None, call)
-    map_data = activation.map_data(call)
-    style = activation.get_map_style(call)
+    data = _gather(call)
     club = club_config()
     name, sign = (club.get("name") or "").strip(), (club.get("callsign") or "").strip()
     # « Radioclub F6ABC · F6ABC » : on ne répète pas l'indicatif déjà dans le nom.
@@ -315,137 +506,39 @@ def build_report(station: str | None = None) -> bytes:
         except OSError:
             logo = None
 
-    doc = pdf.Pdf()
-    doc.title = _("{call} — rapport d'activité", call=call)
-    doc.author = club_line or call
-    book = _Book(doc)
-    sheet = book.sheet
-    sheet.title_band(call, st.get("label") or "", _period(st, timeline), club_line, logo)
+    def compose(level: int, single: bool = False) -> pdf.Pdf:
+        return _compose(call, data, opts, DENSITIES[level], logo, club_line, single)
 
-    # ── Compteurs ─────────────────────────────────────────────────────────
-    sheet.kpis([
-        (str(stats["total"]), _("QSO")),
-        (str(dxcc["count"]), _("entités DXCC")),
-        (str(len({h["call"] for h in hunters})), _("stations")),
-        (str(len(stats["by_op"])), _("opérateurs")),
-        (f"{timeline['per_hour']:g}", _("QSO/h en trafic")),
-    ])
-
-    # ── Rythme jour par jour (le graphique respire si l'horaire est coupé) ─
-    best_day = timeline["best_day"]
-    hint = ""
-    if best_day:
-        hint = _("Meilleure journée : {day} ({n} QSO)",
-                 day=_date_fr(best_day["day"]), n=best_day["n"])
-    sheet.section(_("Rythme, jour par jour"), hint)
-    days = timeline["by_day"]
-    if days:
-        sheet.columns([d["n"] for d in days], [_date_fr(d["day"]) for d in days],
-                      height=92 if opts["hours"] else 118, color=ACCENT,
-                      every=max(1, len(days) // 14))
-    else:
-        sheet.page.text(MARGIN, sheet.y, _("Aucun QSO enregistré."), size=9, color=MUTED)
-        sheet.y += 20
-
-    # ── Rythme heure par heure (facultatif) ───────────────────────────────
-    if opts["hours"]:
-        slot = timeline["best_slot"]
-        hint = ""
-        if slot["n"]:
-            hint = _("Heure la plus forte : {day} à {hour} h UTC ({n} QSO)",
-                     day=_date_fr(slot["day"]), hour=slot["hour"], n=slot["n"])
-        sheet.y += 6
-        sheet.section(_("Rythme, heure par heure (UTC)"), hint)
-        sheet.columns(timeline["by_hour"], [f"{h:02d}" for h in range(24)],
-                      height=74, color=pdf.hex_color("#0f9d8f"), every=2, value_labels=False)
-    active = _("{n} heures d'horloge avec du trafic, {rate} QSO/h en moyenne sur ces heures-là.",
-               n=timeline["active_hours"], rate=f"{timeline['per_hour']:g}")
-    sheet.page.text(MARGIN, sheet.y, active, size=8.5, color=MUTED, width=sheet.width)
-    sheet.y += 22
-
-    # ── Bandes et modes ───────────────────────────────────────────────────
-    lines = max(len(stats["by_band"][:8]), len(stats["by_mode"][:8]))
-    sheet = book.room(34 + 17 * lines)
-    sheet.section(_("Bandes et modes"),
-                  _("{located} / {total} stations localisées",
-                    located=map_data["located"], total=map_data["stations"]))
-    half = (sheet.width - 26) / 2
-    start_y = sheet.y
-    bands = [(b["band"] or "?", b["n"], BAND_COLOR) for b in stats["by_band"][:8]]
-    end_left = sheet.bars(MARGIN, half, bands, stats["total"])
-    modes = [(m["mode"] or "?", m["n"],
-              pdf.hex_color(style["mode_colors"].get(m["mode"], style["mode_default"])))
-             for m in stats["by_mode"][:8]]
-    sheet.y = start_y
-    end_right = sheet.bars(MARGIN + half + 26, half, modes, stats["total"])
-    sheet.y = max(end_left, end_right) + 14
-
-    # ── Satellites (à la suite des modes, si on en a travaillé) ───────────
-    sats = activation.satellite_stats(call) if opts["sats"] else {"by_sat": [], "total": 0}
-    if sats["by_sat"]:
-        shown = sats["by_sat"][:8]
-        sheet = book.room(34 + 17 * len(shown))
-        sheet.section(_("Satellites"),
-                      _("{n} QSO par satellite · {share} % du log",
-                        n=sats["total"], share=f"{sats['share']:g}"), icon="sat")
-        sat_color = pdf.hex_color("#7048a8")
-        sheet.y = sheet.bars(MARGIN, sheet.width * 0.58,
-                             [(item["sat"], item["n"], sat_color) for item in shown],
-                             max(sats["total"], 1)) + 14
-
-    # ── Entités DXCC ──────────────────────────────────────────────────────
-    entities = dxcc["entities"]
-    if entities:
-        if opts["dxcc_all"]:
-            columns = 3
-            sheet = book.room(34 + 15 * 6)     # de quoi commencer : la suite déborde
-            sheet.section(_("Entités DXCC contactées"),
-                          _("{n} entités", n=dxcc["count"]))
-            # Par paquets : une grille entière sur ce qui reste de la page.
-            start = 0
-            while start < len(entities):
-                room = sheet.room_left() - 10
-                per_col = max(int(room // 15), 4)
-                chunk = entities[start:start + per_col * columns]
-                sheet.flag_grid(chunk, columns=columns)
-                start += len(chunk)
-                if start < len(entities):
-                    sheet = book.new_sheet()
-        else:
-            sheet = book.room(34 + 14 * min(len(entities), 10))
-            sheet.section(_("Entités DXCC contactées"), _("Les dix premières"))
-            sheet.y = sheet.table(MARGIN, sheet.width * 0.58,
-                                  (_("Entité"), _("Stations"), _("QSO")),
-                                  [(e["dxcc_name"], str(e["stations"]), str(e["qsos"]))
-                                   for e in entities[:10]],
-                                  (sheet.width * 0.58 - 96, 56, 40)) + 14
-
-    # ── Chasseurs (facultatif, nombre réglable) ───────────────────────────
-    top = hunters[:opts["hunters"]] if opts["hunters"] else []
-    if top:
-        columns = 2 if len(top) > 8 else 1      # deux colonnes : deux fois moins haut
-        rows = (len(top) + columns - 1) // columns
-        sheet = book.room(34 + 14 * min(rows, 16))
-        sheet.section(_("Meilleurs chasseurs"),
-                      _("Les {n} premiers", n=len(top)))
-        col_w = (sheet.width - 26) / columns if columns > 1 else sheet.width * 0.58
-        start_y = sheet.y
-        lowest = start_y
-        for col in range(columns):
-            part = top[col * rows:(col + 1) * rows]
-            if not part:
-                continue
-            sheet.y = start_y
-            end = sheet.table(
-                MARGIN + col * (col_w + 26), col_w,
-                (_("Indicatif"), _("Pays"), _("QSO")),
-                [(h["call"], h["dxcc_name"], str(h["qsos"])) for h in part],
-                (68, col_w - 108, 40),
-            )
-            lowest = max(lowest, end)
-        sheet.y = lowest
-
-    stamp = _("{call} · {club}", call=call, club=club_line) if club_line else call
-    for number, page in enumerate(doc.pages, start=1):
-        _Sheet.footer_on(page, stamp, number, len(doc.pages))
+    doc = compose(0)
+    if len(doc.pages) == 1:
+        return doc.output()
+    if opts["one_page"]:
+        for level in range(len(DENSITIES)):
+            tried = compose(level)
+            if len(tried.pages) == 1:
+                return tried.output()
+        return compose(len(DENSITIES) - 1, single=True).output()
+    # Débordement minime (la deuxième page est presque vide) : on resserre d'un
+    # cran plutôt que d'imprimer une page pour trois lignes.
+    if len(doc.pages) == 2 and _tail_height(doc) < 230:
+        for level in (1, 2):
+            tried = compose(level)
+            if len(tried.pages) == 1:
+                return tried.output()
     return doc.output()
+
+
+def _tail_height(doc: pdf.Pdf) -> float:
+    """Hauteur occupée sur la dernière page (repère du « ça déborde de peu »)."""
+    page = doc.pages[-1]
+    stream = page.stream()
+    lowest = 0.0
+    for chunk in stream.split(b"\n"):
+        for token in chunk.replace(b"(", b" ").split():
+            try:
+                value = float(token)
+            except ValueError:
+                continue
+            if 0 < value < page.height:
+                lowest = max(lowest, page.height - value)
+    return lowest

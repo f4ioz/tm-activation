@@ -560,12 +560,13 @@ async def change_scoring(request: Request) -> Response:
 @router.post("/settings/report")
 async def change_report_options(
     request: Request, hours: str = Form(""), dxcc_all: str = Form(""),
-    hunters: str = Form(""),
+    hunters: str = Form(""), sats: str = Form(""), one_page: str = Form(""),
 ) -> Response:
     """Contenu du rapport PDF (sections facultatives)."""
     if (g := _require_admin(request)) is not None:
         return g
-    activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters})
+    activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters,
+                                   "sats": sats, "one_page": one_page})
     return RedirectResponse("/activation/settings?rp=ok#rapport", status_code=303)
 
 
