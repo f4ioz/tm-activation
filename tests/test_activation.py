@@ -1638,21 +1638,52 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
                                qso_date="20260907", time_on=time_on)
     qso("DL1ABC")
     qso("DL2ABC", time_on="1159")
-    qso("DL3ABC", time_on="1200")          # après la fin
-    qso("DL4ABC", time_on="0959")          # avant le début
-    qso("DL5ABC", band="40M")              # autre bande
-    qso("DL6ABC", mode="CW")               # autre mode
-    qso("DL7ABC", op="F5RRO")              # autre opérateur
-    qso("DL8ABC", op="F5RRO", band="40M", mode="CW")
+    qso("DL3ABC", time_on="1200")          # minute de fin : compté (voir ci-dessous)
+    qso("DL4ABC", time_on="1201")          # après la fin
+    qso("DL5ABC", time_on="0959")          # avant le début
+    qso("DL6ABC", band="40M")              # autre bande
+    qso("DL7ABC", mode="CW")               # autre mode
+    qso("DL8ABC", op="F5RRO")              # autre opérateur
+    qso("DL9ABC", op="F5RRO", band="40M", mode="CW")
     counts = activation.slot_qso_counts()
-    assert counts[sid] == 2 and counts[other] == 1
+    assert counts[sid] == 3 and counts[other] == 1
     admin = _private_client()
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(auth_mod, "auth_password", lambda: "secret")
         planning = admin.get("/activation/planning").text
-    assert ">2</td>" in planning or ">2<" in planning
+    assert ">3</td>" in planning or ">3<" in planning
     _public()
-    assert "2 QSO" in TestClient(app).get("/tm25test").text
+    assert "3 QSO" in TestClient(app).get("/tm25test").text
+
+
+def test_qso_logged_on_the_last_minute_of_a_slot_counts() -> None:
+    """Cas vécu (TM25TEST, passage FO-29) : créneau 18:59→19:15, cinq QSO dont
+    un à 19:15 pile — la vignette n'en affichait que quatre.
+
+    Les QSO sont horodatés à la minute : celui de 19:15 a eu lieu PENDANT la
+    minute de fin, et c'est même le dernier contact du passage."""
+    activation.set_flag("auto_slots", False)
+    sid = activation.add_slot("F4IOZ", "2026-09-14T18:59", "2026-09-14T19:15", "2M", "SSB",
+                              note="SAT FO-29")
+    for call, time_on in (("PA3ANG", "1903"), ("F5RRS", "1905"), ("PE1NIL", "1906"),
+                          ("F4JFZ", "1910"), ("9A2U", "1915")):
+        activation.add_contact(call=call, band="2M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260914", time_on=time_on, sat_name="FO-29")
+    assert activation.slot_qso_counts()[sid] == 5
+
+
+def test_qso_at_the_hinge_of_two_slots_counts_once() -> None:
+    """Deux créneaux qui se touchent : le QSO de la charnière va au plus récent,
+    jamais aux deux (sinon le total dépasserait le nombre de QSO)."""
+    activation.set_flag("auto_slots", False)
+    first = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T11:00", "20M", "SSB")
+    second = activation.add_slot("F4IOZ", "2026-09-07T11:00", "2026-09-07T12:00", "20M", "SSB")
+    for call, time_on in (("DL1ABC", "1030"), ("DL2ABC", "1100"), ("DL3ABC", "1130")):
+        activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260907", time_on=time_on)
+    counts = activation.slot_qso_counts()
+    assert (counts[first], counts[second]) == (1, 2)
+    assert counts[first] + counts[second] == 3
 
 
 def test_slot_without_qso_shows_nothing_rather_than_zero() -> None:

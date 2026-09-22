@@ -1063,19 +1063,37 @@ _SQL_QSO_UTC = (
 
 
 def slot_qso_counts(station: str | None = None) -> dict[int, int]:
-    """QSO loggés par créneau : même opérateur, même bande, même mode, entre le
-    début et la fin du créneau. Renvoie {id du créneau: nombre de QSO}."""
+    """QSO loggés par créneau : même opérateur, même bande, même mode, du début
+    à la fin **incluse**. Renvoie {id du créneau: nombre de QSO}.
+
+    Les QSO sont horodatés à la minute : un contact noté à 19:15 a eu lieu
+    pendant la minute 19:15, donc il appartient au créneau qui finit à 19:15
+    (c'est souvent le dernier QSO du passage satellite, celui qui clôt la
+    séance). Si deux créneaux du même opérateur se touchent à cette
+    minute-là, le QSO est compté dans le plus récent — celui qui vient de
+    commencer — et jamais deux fois.
+    """
+    st = _st(station)
     init_db()
     with conn() as c:
-        rows = c.execute(
-            "SELECT s.id AS sid, COUNT(c.id) AS n FROM slots s "
-            "LEFT JOIN contacts c ON c.station = s.station AND c.operator_call = s.operator_call "
-            f"  AND c.band = s.band AND c.mode = s.mode AND {_SQL_QSO_UTC} >= s.start_utc "
-            f"  AND {_SQL_QSO_UTC} < s.end_utc "
-            "WHERE s.station = ? GROUP BY s.id",
-            (_st(station),),
+        slots = c.execute(
+            "SELECT id, operator_call, band, mode, start_utc, end_utc FROM slots WHERE station = ?",
+            (st,),
         ).fetchall()
-    return {int(r["sid"]): int(r["n"]) for r in rows}
+        contacts = c.execute(
+            f"SELECT operator_call, band, mode, {_SQL_QSO_UTC} AS utc FROM contacts c WHERE c.station = ?",
+            (st,),
+        ).fetchall()
+    counts = {int(s["id"]): 0 for s in slots}
+    by_key: dict[tuple[str, str, str], list[Any]] = {}
+    for slot in slots:
+        by_key.setdefault((slot["operator_call"], slot["band"], slot["mode"]), []).append(slot)
+    for qso in contacts:
+        holding = [s for s in by_key.get((qso["operator_call"], qso["band"], qso["mode"]), [])
+                   if s["start_utc"] <= qso["utc"] <= s["end_utc"]]
+        if holding:
+            counts[int(max(holding, key=lambda s: s["start_utc"])["id"])] += 1
+    return counts
 
 
 # ── Créneaux déduits du log ────────────────────────────────────────────────
