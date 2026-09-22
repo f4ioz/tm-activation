@@ -56,6 +56,29 @@ def _iso_fr(iso: str) -> str:
     return f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else iso
 
 
+def sat_icon(page: pdf.Page, x: float, y: float, size: float, color: pdf.Color) -> None:
+    """Petit satellite vectoriel : deux panneaux, un corps, une antenne.
+
+    Helvetica n'a pas de symbole satellite et on n'embarque pas de police
+    supplémentaire : quelques rectangles suffisent, et restent nets à
+    l'impression comme à l'écran."""
+    u = size / 14.0                      # le dessin est pensé sur une grille de 14
+    panel = pdf.mix(WHITE, color, 0.55)
+    body_w, body_h = 4 * u, 7 * u
+    cx = x + size / 2
+    top = y + 3 * u                      # 3 unités réservées à l'antenne
+    # Panneaux solaires de part et d'autre, avec leurs cellules.
+    for left in (cx - body_w / 2 - 1 * u - 4 * u, cx + body_w / 2 + 1 * u):
+        page.rect(left, top + 1 * u, 4 * u, 5 * u, fill=panel)
+        for k in (1, 2, 3):
+            page.line(left + k * u, top + 1 * u, left + k * u, top + 6 * u, color=WHITE, width=0.4)
+    # Corps.
+    page.rect(cx - body_w / 2, top, body_w, body_h, fill=color, radius=0.8 * u)
+    # Antenne et son petit réflecteur.
+    page.line(cx, top, cx, y + 0.8 * u, color=color, width=0.9)
+    page.line(cx - 1.6 * u, y + 0.9 * u, cx + 1.6 * u, y + 0.9 * u, color=color, width=0.9)
+
+
 def flag_bytes(code: str) -> bytes | None:
     """Vignette PNG d'une entité DXCC (None si elle manque)."""
     if not code:
@@ -111,8 +134,12 @@ class _Sheet:
                   color=pdf.mix(WHITE, ACCENT, 0.35), align="right", width=self.width)
         self.y = TOP_BAND + 24
 
-    def section(self, title: str, hint: str = "") -> None:
-        self.page.text(MARGIN, self.y, title.upper(), size=10.5, bold=True, color=ACCENT)
+    def section(self, title: str, hint: str = "", icon: str = "") -> None:
+        left = MARGIN
+        if icon == "sat":
+            sat_icon(self.page, MARGIN, self.y - 1.5, 14, ACCENT)
+            left = MARGIN + 19
+        self.page.text(left, self.y, title.upper(), size=10.5, bold=True, color=ACCENT)
         if hint:
             self.page.text(MARGIN, self.y + 1, hint, size=8.5, color=MUTED,
                            align="right", width=self.width)
@@ -353,6 +380,19 @@ def build_report(station: str | None = None) -> bytes:
     end_right = sheet.bars(MARGIN + half + 26, half, modes, stats["total"])
     sheet.y = max(end_left, end_right) + 14
 
+    # ── Satellites (à la suite des modes, si on en a travaillé) ───────────
+    sats = activation.satellite_stats(call) if opts["sats"] else {"by_sat": [], "total": 0}
+    if sats["by_sat"]:
+        shown = sats["by_sat"][:8]
+        sheet = book.room(34 + 17 * len(shown))
+        sheet.section(_("Satellites"),
+                      _("{n} QSO par satellite · {share} % du log",
+                        n=sats["total"], share=f"{sats['share']:g}"), icon="sat")
+        sat_color = pdf.hex_color("#7048a8")
+        sheet.y = sheet.bars(MARGIN, sheet.width * 0.58,
+                             [(item["sat"], item["n"], sat_color) for item in shown],
+                             max(sats["total"], 1)) + 14
+
     # ── Entités DXCC ──────────────────────────────────────────────────────
     entities = dxcc["entities"]
     if entities:
@@ -374,12 +414,11 @@ def build_report(station: str | None = None) -> bytes:
         else:
             sheet = book.room(34 + 14 * min(len(entities), 10))
             sheet.section(_("Entités DXCC contactées"), _("Les dix premières"))
-            sheet.table(MARGIN, sheet.width * 0.58,
-                        (_("Entité"), _("Stations"), _("QSO")),
-                        [(e["dxcc_name"], str(e["stations"]), str(e["qsos"]))
-                         for e in entities[:10]],
-                        (sheet.width * 0.58 - 96, 56, 40))
-            sheet.y += 14
+            sheet.y = sheet.table(MARGIN, sheet.width * 0.58,
+                                  (_("Entité"), _("Stations"), _("QSO")),
+                                  [(e["dxcc_name"], str(e["stations"]), str(e["qsos"]))
+                                   for e in entities[:10]],
+                                  (sheet.width * 0.58 - 96, 56, 40)) + 14
 
     # ── Chasseurs (facultatif, nombre réglable) ───────────────────────────
     top = hunters[:opts["hunters"]] if opts["hunters"] else []

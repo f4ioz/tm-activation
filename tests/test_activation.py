@@ -1850,7 +1850,8 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
     r = admin.post("/activation/settings/report",
                    data={"hours": "1", "dxcc_all": "", "hunters": "0"})
     assert r.status_code == 303 and "rp=ok" in r.headers["location"]
-    assert activation.get_report_options() == {"hours": True, "dxcc_all": False, "hunters": 0}
+    assert activation.get_report_options() == {"hours": True, "dxcc_all": False, "hunters": 0,
+                                               "sats": False}
     tuned = admin.get("/activation/report.pdf").content
     assert b"RYTHME, HEURE PAR HEURE" in tuned
     assert b"MEILLEURS CHASSEURS" not in tuned         # palmarès retiré
@@ -1862,6 +1863,29 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
     # Valeur absurde : bornée, jamais d'erreur.
     admin.post("/activation/settings/report", data={"hunters": "5000"})
     assert activation.get_report_options()["hunters"] == activation.REPORT_HUNTERS_MAX
+
+
+def test_report_details_satellite_qsos(monkeypatch, tmp_path) -> None:
+    """Section « Satellites » : présente dès qu'il y a des QSO satellite,
+    désactivable, et absente quand la station n'a rien fait par satellite."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    admin = _private_client()
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    assert b"SATELLITES" not in admin.get("/activation/report.pdf").content   # rien en sat
+    for call, sat in (("ON4ZZ", "FO-29"), ("G0XYZ", "FO-29"), ("EA5QQ", "SO-50")):
+        activation.add_contact(call=call, band="2M", mode="SSB", operator_call="F4IOZ",
+                               sat_name=sat)
+    sats = activation.satellite_stats()
+    assert [s["sat"] for s in sats["by_sat"]] == ["FO-29", "SO-50"]
+    assert sats["total"] == 3 and sats["count"] == 2 and sats["share"] == 75.0
+    body = admin.get("/activation/report.pdf").content
+    assert b"SATELLITES" in body and b"(FO-29)" in body and b"(SO-50)" in body
+    # Décochée dans les Réglages : la section disparaît.
+    admin.post("/activation/settings/report", data={"dxcc_all": "1", "hunters": "10"})
+    assert activation.get_report_options()["sats"] is False
+    assert b"SATELLITES" not in admin.get("/activation/report.pdf").content
 
 
 def test_club_logo_upload_and_use(monkeypatch, tmp_path) -> None:

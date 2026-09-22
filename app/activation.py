@@ -2006,6 +2006,29 @@ def _entity_name(call: str) -> str:
     return dxcc_flags.entity_for_call(call)[1]
 
 
+def satellite_stats(station: str | None = None) -> dict[str, Any]:
+    """QSO passés par satellite, détaillés par satellite.
+
+    ``by_sat`` : [{"sat", "n", "stations"}] du plus travaillé au moins
+    travaillé ; ``total`` : nombre de QSO satellite ; ``share`` : leur part du
+    log. Le nom est celui saisi dans le log (une coquille comme « F0-29 »
+    apparaît donc telle quelle — c'est ainsi qu'on la repère).
+    """
+    st = _st(station)
+    init_db()
+    with conn() as c:
+        rows = c.execute(
+            "SELECT upper(trim(sat_name)) AS sat, COUNT(*) AS n, COUNT(DISTINCT call) AS stations "
+            "FROM contacts WHERE station = ? AND trim(sat_name) != '' "
+            "GROUP BY sat ORDER BY n DESC, sat", (st,)
+        ).fetchall()
+        total_log = c.execute("SELECT COUNT(*) FROM contacts WHERE station = ?", (st,)).fetchone()[0]
+    by_sat = [{"sat": r["sat"], "n": int(r["n"]), "stations": int(r["stations"])} for r in rows]
+    total = sum(item["n"] for item in by_sat)
+    return {"by_sat": by_sat, "total": total, "count": len(by_sat),
+            "share": round(100 * total / total_log, 1) if total_log else 0.0}
+
+
 def qso_timeline(station: str | None = None) -> dict[str, Any]:
     """Rythme de l'activité : QSO par jour et par heure UTC.
 
@@ -2099,6 +2122,7 @@ DEFAULT_REPORT: dict[str, Any] = {
     "hours": False,      # « Rythme, heure par heure » : hors du rapport par défaut
     "dxcc_all": True,    # toutes les entités avec leur drapeau (sinon : les dix premières)
     "hunters": 10,       # nombre de chasseurs listés (0 = pas de palmarès)
+    "sats": True,        # « Satellites » : masqué de toute façon sans QSO satellite
 }
 REPORT_HUNTERS_MAX = 100
 
@@ -2115,6 +2139,7 @@ def get_report_options() -> dict[str, Any]:
         "hours": bool(saved.get("hours", d["hours"])),
         "dxcc_all": bool(saved.get("dxcc_all", d["dxcc_all"])),
         "hunters": _clamp_int(saved.get("hunters"), 0, REPORT_HUNTERS_MAX, d["hunters"]),
+        "sats": bool(saved.get("sats", d["sats"])),
     }
 
 
@@ -2125,6 +2150,7 @@ def set_report_options(form: dict[str, Any]) -> dict[str, Any]:
         "dxcc_all": bool(form.get("dxcc_all")),
         "hunters": _clamp_int(form.get("hunters"), 0, REPORT_HUNTERS_MAX,
                               DEFAULT_REPORT["hunters"]),
+        "sats": bool(form.get("sats")),
     }
     _save_settings(data)
     return get_report_options()
