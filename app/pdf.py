@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import unicodedata
 import zlib
+from typing import Any
 A4 = (595.28, 841.89)          # points
 Color = tuple[float, float, float]
 
@@ -82,13 +83,14 @@ def fit(s: str, size: float, max_width: float, bold: bool = False) -> str:
     return s + ell if s else ""
 
 
-def read_png(data: bytes) -> tuple[int, int, bytes]:
-    """PNG → (largeur, hauteur, pixels RGB bruts, 8 bits par composante).
+def read_png(data: bytes) -> tuple[int, int, bytes, bytes | None]:
+    """PNG → (largeur, hauteur, pixels RGB, couche alpha ou None).
 
     Gère les images non entrelacées en niveaux de gris, RGB, palette (1, 2, 4
-    ou 8 bits) et leurs variantes avec transparence — l'alpha est aplati sur
-    du blanc, la page du rapport étant blanche. De quoi afficher les drapeaux
-    DXCC et le logo du club sans Pillow.
+    ou 8 bits) et leurs variantes avec transparence. L'alpha est RENDU tel
+    quel : dans le PDF il devient un masque, donc un logo détouré reste détouré
+    sur le bandeau de couleur (l'aplatir sur du blanc lui collait un rectangle
+    blanc). De quoi afficher les drapeaux DXCC et le logo du club sans Pillow.
     """
     if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise ValueError("ce n'est pas une image PNG")
@@ -151,6 +153,8 @@ def read_png(data: bytes) -> tuple[int, int, bytes]:
         previous = line
 
     out = bytearray()
+    mask = bytearray()
+    has_alpha = color in (4, 6) or (color == 3 and trans)
     for line in lines:
         values = _unpack(line, depth, width * channels)
         for x in range(width):
@@ -170,13 +174,10 @@ def read_png(data: bytes) -> tuple[int, int, bytes]:
                 rgb = (values[x * channels], values[x * channels + 1], values[x * channels + 2])
                 if color == 6:
                     alpha = values[x * channels + 3]
-            if alpha != 255:       # aplati sur blanc (entiers : c'est un point chaud)
-                rest = 255 * (255 - alpha)
-                rgb = ((rgb[0] * alpha + rest) // 255,
-                       (rgb[1] * alpha + rest) // 255,
-                       (rgb[2] * alpha + rest) // 255)
             out += bytes(rgb)
-    return width, height, bytes(out)
+            if has_alpha:
+                mask.append(alpha)
+    return width, height, bytes(out), bytes(mask) if has_alpha else None
 
 
 def read_jpeg(data: bytes) -> tuple[int, int, int]:
@@ -205,33 +206,40 @@ def read_jpeg(data: bytes) -> tuple[int, int, int]:
     raise ValueError("JPEG illisible")
 
 
-def downsample(width: int, height: int, rgb: bytes, max_side: int) -> tuple[int, int, bytes]:
+def downsample(width: int, height: int, rgb: bytes, max_side: int,
+               alpha: bytes | None = None) -> tuple[int, int, bytes, bytes | None]:
     """Réduit une image RGB d'un facteur entier (moyenne des blocs).
 
     Suffisant pour un logo : pas de rééchantillonnage savant, mais pas d'effet
     d'escalier non plus, et aucune dépendance."""
     longest = max(width, height)
     if longest <= max_side:
-        return width, height, rgb
+        return width, height, rgb, alpha
     factor = -(-longest // max_side)            # arrondi au supérieur
     new_w, new_h = max(width // factor, 1), max(height // factor, 1)
     out = bytearray(new_w * new_h * 3)
+    mask = bytearray(new_w * new_h) if alpha else None
     pixels = factor * factor
     for y in range(new_h):
         for x in range(new_w):
-            r = g = b = 0
+            r = g = b = a = 0
             for dy in range(factor):
-                row = ((y * factor + dy) * width + x * factor) * 3
+                start = (y * factor + dy) * width + x * factor
+                row = start * 3
                 for dx in range(factor):
                     at = row + dx * 3
                     r += rgb[at]
                     g += rgb[at + 1]
                     b += rgb[at + 2]
+                    if mask is not None:
+                        a += alpha[start + dx]
             at = (y * new_w + x) * 3
             out[at] = r // pixels
             out[at + 1] = g // pixels
             out[at + 2] = b // pixels
-    return new_w, new_h, bytes(out)
+            if mask is not None:
+                mask[y * new_w + x] = a // pixels
+    return new_w, new_h, bytes(out), bytes(mask) if mask is not None else None
 
 
 def image_size(data: bytes) -> tuple[int, int]:
@@ -264,7 +272,7 @@ def _unpack(line: bytearray, depth: int, count: int) -> list[int]:
 
 # Images déjà décodées (et réduites) : le rapport peut être recomposé plusieurs
 # fois pour tenir en une page, inutile de refaire le travail à chaque essai.
-_PREPARED: dict[tuple[str, int], tuple[int, int, bytes, bytes, bytes]] = {}
+_PREPARED: dict[tuple[str, int], tuple[Any, ...]] = {}
 _PREPARED_MAX = 64
 
 
@@ -369,7 +377,7 @@ class Pdf:
         self.author = ""
         # Images embarquées, dédoublonnées par empreinte : un drapeau répété
         # n'alourdit le fichier qu'une fois.
-        self._images: dict[str, tuple[bytes, int, int, bytes, bytes, bytes]] = {}
+        self._images: dict[str, tuple[Any, ...]] = {}
 
     def page(self) -> Page:
         page = Page(*self.size, doc=self)
@@ -389,16 +397,17 @@ class Pdf:
         prepared = _PREPARED.get((key, max_side))
         if prepared is None:
             if data[:8] == b"\x89PNG\r\n\x1a\n":
-                width, height, rgb = read_png(data)
+                width, height, rgb, alpha = read_png(data)
                 if max_side:
-                    width, height, rgb = downsample(width, height, rgb, max_side)
-                prepared = (width, height, zlib.compress(rgb, 6), b"FlateDecode", b"DeviceRGB")
+                    width, height, rgb, alpha = downsample(width, height, rgb, max_side, alpha)
+                prepared = (width, height, zlib.compress(rgb, 6), b"FlateDecode", b"DeviceRGB",
+                            zlib.compress(alpha, 6) if alpha else None)
             else:
                 width, height, components = read_jpeg(data)
                 if components not in (1, 3):
                     raise ValueError("JPEG en CMJN non géré")
                 space = b"DeviceGray" if components == 1 else b"DeviceRGB"
-                prepared = (width, height, data, b"DCTDecode", space)
+                prepared = (width, height, data, b"DCTDecode", space, None)
             if len(_PREPARED) >= _PREPARED_MAX:
                 _PREPARED.clear()
             _PREPARED[(key, max_side)] = prepared
@@ -417,10 +426,18 @@ class Pdf:
         font_bold = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold "
                         b"/Encoding /WinAnsiEncoding >>")
         image_refs = []
-        for name, width, height, blob, filt, space in self._images.values():
+        for name, width, height, blob, filt, space, smask in self._images.values():
+            mask_ref = b""
+            if smask:
+                mask_obj = add(b"<< /Type /XObject /Subtype /Image /Width %d /Height %d "
+                               b"/ColorSpace /DeviceGray /BitsPerComponent 8 "
+                               b"/Filter /FlateDecode /Length %d >>\nstream\n"
+                               % (width, height, len(smask)) + smask + b"\nendstream")
+                mask_ref = b" /SMask %d 0 R" % mask_obj
             obj = add(b"<< /Type /XObject /Subtype /Image /Width %d /Height %d "
-                      b"/ColorSpace /%s /BitsPerComponent 8 /Filter /%s "
-                      b"/Length %d >>\nstream\n" % (width, height, space, filt, len(blob))
+                      b"/ColorSpace /%s /BitsPerComponent 8 /Filter /%s%s "
+                      b"/Length %d >>\nstream\n"
+                      % (width, height, space, filt, mask_ref, len(blob))
                       + blob + b"\nendstream")
             image_refs.append(b"%s %d 0 R" % (name, obj))
         xobjects = (b" /XObject << %s >>" % b" ".join(image_refs)) if image_refs else b""

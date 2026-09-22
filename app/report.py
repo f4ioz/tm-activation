@@ -130,13 +130,12 @@ class _Sheet:
             except (ValueError, IndexError):
                 lw = lh = 0
             if lw and lh:
-                box_h = band_h - 50
-                box_w = min(box_h * lw / lh, 150.0)
-                page.rect(MARGIN - 6, band_h / 2 - box_h / 2 - 10, box_w + 12, box_h + 8,
-                          fill=pdf.mix(ACCENT, WHITE, 0.12), radius=5)
-                # 300 pixels suffisent pour 2 cm de haut, même à 300 dpi.
-                page.image(MARGIN, band_h / 2 - box_h / 2 - 6, box_w, box_h, logo, max_side=300)
-                text_left = MARGIN + box_w + 18
+                # Presque toute la hauteur du bandeau, sans cadre : le PNG est
+                # détouré, sa transparence est conservée par le masque PDF.
+                box_h = band_h - 22
+                box_w = min(box_h * lw / lh, 170.0)
+                page.image(MARGIN, (band_h - box_h) / 2, box_w, box_h, logo, max_side=340)
+                text_left = MARGIN + box_w + 16
         page.text(text_left, band_h * 0.20, callsign, size=self.m["title"], bold=True, color=WHITE,
                   width=self.width * 0.62 - (text_left - MARGIN))
         if label:

@@ -1896,6 +1896,35 @@ def test_report_fits_one_page_on_demand(monkeypatch, tmp_path) -> None:
     assert len(one) < len(large)                    # coupé, pas déplacé sur une 2e page
 
 
+def test_logo_keeps_its_transparency_in_the_pdf(monkeypatch, tmp_path) -> None:
+    """Un logo détouré doit le rester sur le bandeau : le PDF porte un masque
+    (avant, l'alpha était aplati sur du blanc — rectangle blanc sur fond bleu)."""
+    from app import pdf as pdf_mod
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    # Petit PNG rond détouré : 8 pixels, deux opaques, deux transparents.
+    import zlib
+    width = height = 2
+    raw = b"".join(b"\x00" + bytes((255, 0, 0, 255, 0, 255, 0, 0)) for _ in range(height))
+    def chunk(name: bytes, body: bytes) -> bytes:
+        return (len(body).to_bytes(4, "big") + name + body
+                + zlib.crc32(name + body).to_bytes(4, "big"))
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", width.to_bytes(4, "big") + height.to_bytes(4, "big")
+                   + bytes((8, 6, 0, 0, 0)))
+           + chunk(b"IDAT", zlib.compress(raw))
+           + chunk(b"IEND", b""))
+    w, h, rgb, alpha = pdf_mod.read_png(png)
+    assert (w, h) == (2, 2) and alpha == bytes((255, 0, 255, 0))
+    assert rgb[:3] == bytes((255, 0, 0))          # la couleur n'est pas délavée
+
+    activation.set_logo(png)
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    body = _private_client().get("/activation/report.pdf").content
+    assert b"/SMask" in body                      # transparence conservée
+
+
 def test_report_footer_is_signed(monkeypatch, tmp_path) -> None:
     """Pied de page : la signature du logiciel, sur chaque page."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
