@@ -21,8 +21,9 @@ en direct sur une page publique.
   fil des QSO.
 - **ADIF** : import avec aperçu, export complet ou d'une sélection, prêt pour
   TQSL / LoTW.
-- **Page publique** pour les chasseurs : activations en cours et à venir, carte
-  des contacts, tableau DXCC avec les drapeaux (sans compte QRZ), classement aux
+- **Page publique** pour les chasseurs : activations en cours et à venir,
+  **carte des contacts en couleurs (mode) et en formes (bande), filtrable à la
+  coche**, tableau DXCC avec les drapeaux (sans compte QRZ), classement aux
   points et recherche « suis-je dans le log ? ».
 - **Comptes opérateurs** au choix : un mot de passe commun, ou un par opérateur
   avec validation facultative et plusieurs administrateurs.
@@ -45,6 +46,9 @@ du moment, pays déjà contactés et carnet à côté de la saisie.
 
 ![DXCC contactés et classement des chasseurs](docs/images/dxcc.png)
 
+La carte des contacts : une couleur par mode, une forme par bande, et la
+légende sert de filtre.
+
 ![Carte des contacts](docs/images/map.jpg)
 
 Développée par Olivier F4IOZ, puis extraite de son site pour être partagée
@@ -54,15 +58,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.tar.gz
 ```
 
 ## Fonctionnalités
@@ -99,7 +103,11 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26
   - **Le log rattrape les oublis** : un opérateur qui trafique sans avoir
     réservé voit son créneau créé d'après ses QSO, et celui qui dépasse l'heure
     prévue voit le sien prolongé. La page de log affiche les **créneaux du
-    moment**, celui de l'opérateur connecté mis en avant.
+    moment**, celui de l'opérateur connecté mis en avant. Le rattrapage se fait
+    à l'enregistrement d'un QSO et à l'import ADIF ; un bouton des Réglages le
+    déclenche à la demande (utile après un import fait ailleurs) et rend compte
+    de ce qu'il a créé ou prolongé. Un créneau n'est jamais raccourci ni
+    supprimé.
   - **Pas deux stations à la fois** sur la même bande et le même mode : si un
     autre opérateur a réservé, la saisie est signalée en rouge et le QSO est
     refusé (réglage désactivable).
@@ -142,6 +150,16 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26
   et les drapeaux sont justes dès le premier QSO, **même sans compte QRZ** —
   QRZ, quand il est configuré, précise le nom officiel de l'entité. Les noms
   des stations contactées ne sont jamais publiés.
+- **Carte qui se lit d'un coup d'œil** : un point par carré locator, bande et
+  mode — la **couleur dit le mode**, la **forme dit la bande**. Les points d'un
+  même carré sont écartés en couronne pour rester tous cliquables, et une
+  **légende à cocher** sous la carte permet de n'afficher que le 40 m, que la
+  télégraphie, ou n'importe quelle combinaison (« Tout » / « Aucun »). Couleurs
+  et formes se règlent dans les Réglages ; les filtres se désactivent si on
+  préfère une carte figée.
+- **Toutes les vignettes de créneaux**, à venir comme passées, sauf si on
+  préfère en limiter le nombre (Réglages). Chaque vignette porte son bilan de
+  QSO, recalculé à chaque affichage.
 - **Plusieurs indicatifs spéciaux** : un seul « en cours » à la fois, les
   précédents restent consultables (`/activations`).
 - **Chacun à son heure** : « Locale » affiche les heures dans le fuseau du
@@ -230,22 +248,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.26.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.26.1.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.26.0.tar.gz
-   cd tm-activation-1.26.0
+   tar xzf tm-activation-1.26.1.tar.gz
+   cd tm-activation-1.26.1
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.26.0.zip
-   cd tm-activation-1.26.0
+   unzip tm-activation-1.26.1.zip
+   cd tm-activation-1.26.1
    sudo bash install.sh --lan
    ```
 
@@ -332,8 +350,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.26.0.tar.gz
-cd tm-activation-1.26.0
+tar xzf tm-activation-1.26.1.tar.gz
+cd tm-activation-1.26.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

@@ -21,9 +21,10 @@ from a phone or a PC, while hunters follow the activation live on a public page.
   in.
 - **ADIF**: import with a preview, full or selective export, ready for
   TQSL / LoTW.
-- **Public page** for hunters: current and upcoming activations, contacts map,
-  DXCC table with flags (no QRZ account needed), points ranking and an "am I in
-  the log?" search.
+- **Public page** for hunters: current and upcoming activations, **a contacts
+  map coloured by mode and shaped by band, filtered with tick boxes**, a DXCC
+  table with flags (no QRZ account needed), points ranking and an "am I in the
+  log?" search.
 - **Operator accounts**, your choice: one shared password, or one per operator
   with optional approval and several administrators.
 - **French and English**, picked by the visitor.
@@ -44,6 +45,9 @@ countries already worked, and the log book right next to the entry form.
 
 ![DXCC worked and hunter ranking](docs/images/dxcc.png)
 
+The contact map: one colour per mode, one shape per band, and the legend
+doubles as a filter.
+
 ![Contacts map](docs/images/map.jpg)
 
 Developed by Olivier F4IOZ, then extracted from his website to be shared with
@@ -53,15 +57,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.tar.gz
 ```
 
 ## Features
@@ -95,7 +99,10 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26
   - **The log catches what was forgotten**: an operator who goes on air without
     booking gets their slot created from their QSOs, and one who runs over the
     planned time gets theirs extended. The log page shows the **slots right
-    now**, with the logged-in operator's one highlighted.
+    now**, with the logged-in operator's one highlighted. The catch-up runs when
+    a QSO is logged and on ADIF import; a Settings button triggers it on demand
+    (handy after an import made elsewhere) and reports what it created or
+    extended. A slot is never shortened or deleted.
   - **Never two stations at once** on the same band and mode: if another
     operator has booked it, the entry is flagged in red and the QSO is refused
     (can be switched off).
@@ -137,6 +144,14 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26
   the very first QSO, **even without a QRZ account** — QRZ, when configured,
   refines the official name of the entity. The names of the stations worked are
   never published.
+- **A map you can read at a glance**: one dot per grid square, band and mode —
+  the **colour is the mode**, the **shape is the band**. Dots sharing a square
+  are spread in a ring so they all stay clickable, and a **tick-box legend**
+  under the map shows only 40 m, only CW, or any combination ("All" / "None").
+  Colours and shapes are set in Settings; the filters can be switched off for a
+  fixed map.
+- **Every slot card**, upcoming and past, unless you'd rather cap how many
+  (Settings). Each card carries its QSO tally, recomputed on every page view.
 - **Several special callsigns**: only one "current" at a time, the previous ones
   remain available to view (`/activations`).
 - **Everyone at their own time**: "Local" shows times in the **visitor's** time
@@ -224,22 +239,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.26.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.26.1.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.26.0.tar.gz
-   cd tm-activation-1.26.0
+   tar xzf tm-activation-1.26.1.tar.gz
+   cd tm-activation-1.26.1
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.26.0.zip
-   cd tm-activation-1.26.0
+   unzip tm-activation-1.26.1.zip
+   cd tm-activation-1.26.1
    sudo bash install.sh --lan
    ```
 
@@ -322,8 +337,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.26.0.tar.gz
-cd tm-activation-1.26.0
+tar xzf tm-activation-1.26.1.tar.gz
+cd tm-activation-1.26.1
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
