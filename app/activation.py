@@ -433,23 +433,73 @@ def operator_approval() -> bool:
     return get_flag("operator_approval", False)
 
 
-# Exigences du mot de passe d'un compte opérateur (création et remise à zéro).
-PASSWORD_MIN_LEN = 8
+# Exigences du mot de passe d'un compte opérateur (création et remise à zéro),
+# réglables dans les Réglages : longueur minimale et nombre de majuscules, de
+# chiffres et de caractères spéciaux exigés (0 = pas d'exigence).
+PASSWORD_MIN_LEN = 8              # défaut historique
+PASSWORD_LEN_MAX = 64             # borne haute du réglage de longueur
+PASSWORD_COUNT_MAX = 8            # borne haute des compteurs (majuscules…)
+DEFAULT_PASSWORD_RULE: dict[str, int] = {
+    "min_length": PASSWORD_MIN_LEN, "min_upper": 1, "min_digits": 1, "min_special": 1,
+}
 _RE_UPPER = re.compile(r"[A-ZÀ-Þ]")
 _RE_DIGIT = re.compile(r"[0-9]")
 _RE_SPECIAL = re.compile(r"[^0-9A-Za-zÀ-ÿ]")
 
 
+def get_password_rule() -> dict[str, int]:
+    """Exigences en vigueur pour les mots de passe opérateurs."""
+    saved = load_settings().get("password_rule") or {}
+    d = DEFAULT_PASSWORD_RULE
+    return {
+        "min_length": _clamp_int(saved.get("min_length"), 4, PASSWORD_LEN_MAX, d["min_length"]),
+        "min_upper": _clamp_int(saved.get("min_upper"), 0, PASSWORD_COUNT_MAX, d["min_upper"]),
+        "min_digits": _clamp_int(saved.get("min_digits"), 0, PASSWORD_COUNT_MAX, d["min_digits"]),
+        "min_special": _clamp_int(saved.get("min_special"), 0, PASSWORD_COUNT_MAX, d["min_special"]),
+    }
+
+
+def set_password_rule(form: dict[str, Any]) -> dict[str, int]:
+    """Enregistre les exigences (valeurs hors bornes ramenées au défaut)."""
+    d = DEFAULT_PASSWORD_RULE
+    rule = {
+        "min_length": _clamp_int(form.get("min_length"), 4, PASSWORD_LEN_MAX, d["min_length"]),
+        "min_upper": _clamp_int(form.get("min_upper"), 0, PASSWORD_COUNT_MAX, d["min_upper"]),
+        "min_digits": _clamp_int(form.get("min_digits"), 0, PASSWORD_COUNT_MAX, d["min_digits"]),
+        "min_special": _clamp_int(form.get("min_special"), 0, PASSWORD_COUNT_MAX, d["min_special"]),
+    }
+    data = load_settings()
+    data["password_rule"] = rule
+    _save_settings(data)
+    return rule
+
+
 def password_rule() -> str:
-    """Règle affichée sur la page de connexion."""
-    return _("Au moins {n} caractères, dont une majuscule, un chiffre et un caractère spécial.",
-             n=PASSWORD_MIN_LEN)
+    """Règle affichée sur la page de connexion, d'après le réglage en vigueur."""
+    rule = get_password_rule()
+    bits = []
+    if rule["min_upper"]:
+        bits.append(_("{n} majuscule", n=rule["min_upper"]) if rule["min_upper"] == 1
+                    else _("{n} majuscules", n=rule["min_upper"]))
+    if rule["min_digits"]:
+        bits.append(_("{n} chiffre", n=rule["min_digits"]) if rule["min_digits"] == 1
+                    else _("{n} chiffres", n=rule["min_digits"]))
+    if rule["min_special"]:
+        bits.append(_("{n} caractère spécial", n=rule["min_special"]) if rule["min_special"] == 1
+                    else _("{n} caractères spéciaux", n=rule["min_special"]))
+    if not bits:
+        return _("Au moins {n} caractères.", n=rule["min_length"])
+    return _("Au moins {n} caractères, dont {details}.",
+             n=rule["min_length"], details=", ".join(bits))
 
 
 def password_is_strong(password: str) -> bool:
     pw = password or ""
-    return bool(len(pw) >= PASSWORD_MIN_LEN and _RE_UPPER.search(pw)
-                and _RE_DIGIT.search(pw) and _RE_SPECIAL.search(pw))
+    rule = get_password_rule()
+    return bool(len(pw) >= rule["min_length"]
+                and len(_RE_UPPER.findall(pw)) >= rule["min_upper"]
+                and len(_RE_DIGIT.findall(pw)) >= rule["min_digits"]
+                and len(_RE_SPECIAL.findall(pw)) >= rule["min_special"])
 
 
 # ── Question anti-robot (sans service extérieur, sans état serveur) ────────

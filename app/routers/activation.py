@@ -401,6 +401,10 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             callbook=activation.callbook_progress(),
             per_operator_auth=activation.per_operator_auth(),
             operator_approval=activation.operator_approval(),
+            password_rule_values=activation.get_password_rule(),
+            password_rule_text=activation.password_rule(),
+            password_len_max=activation.PASSWORD_LEN_MAX,
+            password_count_max=activation.PASSWORD_COUNT_MAX,
             accounts=activation.list_operators(active_only=False),
             au_flash=request.query_params.get("au"),
             ac_flash=request.query_params.get("ac"),
@@ -459,12 +463,17 @@ async def change_flags(
 @router.post("/settings/auth")
 async def change_auth_mode(
     request: Request, per_operator: str = Form(""), approval: str = Form(""),
+    min_length: str = Form(""), min_upper: str = Form(""), min_digits: str = Form(""),
+    min_special: str = Form(""),
 ) -> Response:
-    """Mot de passe commun ou un mot de passe par opérateur (+ validation)."""
+    """Mot de passe commun ou un mot de passe par opérateur (+ validation), et
+    exigences des mots de passe individuels."""
     if (g := _require_admin(request)) is not None:
         return g
     activation.set_flag("per_operator_auth", bool(per_operator))
     activation.set_flag("operator_approval", bool(approval))
+    activation.set_password_rule({"min_length": min_length, "min_upper": min_upper,
+                                  "min_digits": min_digits, "min_special": min_special})
     return RedirectResponse("/activation/settings?au=ok#comptes", status_code=303)
 
 

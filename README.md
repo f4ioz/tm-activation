@@ -58,15 +58,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.27.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.27.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.27.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -75,8 +75,9 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26
   chaque opérateur se connecte avec son indicatif.
   - **Comptes opérateurs (au choix)** : mot de passe commun à tous, ou **un mot
     de passe par opérateur**, créé à sa première connexion (l'indicatif suffit).
-    Le mot de passe doit faire 8 caractères avec une majuscule, un chiffre et un
-    caractère spécial, et une **question anti-robot** (calcul simple, sans service
+    Les exigences du mot de passe se règlent (longueur, majuscules, chiffres,
+    caractères spéciaux ; 8/1/1/1 par défaut, 0 = pas d'exigence) et la règle en
+    vigueur est rappelée sur la page de connexion. Une **question anti-robot** (calcul simple, sans service
     extérieur) protège la création de comptes. La validation des nouveaux comptes
     par un administrateur est facultative, et plusieurs opérateurs peuvent être
     **administrateurs**. Réglages → Comptes opérateurs.
@@ -189,6 +190,7 @@ n'est imposé.
 |---|---|---|
 | Un mot de passe par opérateur | non | chacun son compte au lieu du mot de passe commun |
 | Valider les nouveaux comptes | non | un administrateur approuve avant la première connexion |
+| Exigences du mot de passe | 8 car., 1 maj., 1 chiffre, 1 spécial | chaque seuil réglable (0 = pas d'exigence) |
 | Créer et prolonger les créneaux d'après le log | oui | rattrape les oublis de réservation |
 | Recaler les créneaux sur le log maintenant | bouton | rattrapage immédiat, même option décochée |
 | Vignettes de créneaux affichées | toutes | ou un nombre maximum sur la page publique |
@@ -248,22 +250,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.26.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.27.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.26.1.tar.gz
-   cd tm-activation-1.26.1
+   tar xzf tm-activation-1.27.0.tar.gz
+   cd tm-activation-1.27.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.26.1.zip
-   cd tm-activation-1.26.1
+   unzip tm-activation-1.27.0.zip
+   cd tm-activation-1.27.0
    sudo bash install.sh --lan
    ```
 
@@ -350,8 +352,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.26.1.tar.gz
-cd tm-activation-1.26.1
+tar xzf tm-activation-1.27.0.tar.gz
+cd tm-activation-1.27.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

@@ -92,6 +92,16 @@
       <form method="post" action="/activation/settings/auth" class="act-form">
         <label class="act-check"><input type="checkbox" name="per_operator" value="1"{% if per_operator_auth %} checked{% endif %}> {{ _("Un mot de passe par opérateur (au lieu du mot de passe commun)") }}</label>
         <label class="act-check"><input type="checkbox" name="approval" value="1"{% if operator_approval %} checked{% endif %}> {{ _("Valider les nouveaux comptes avant de les laisser loguer") }}</label>
+        <fieldset class="act-fieldset">
+          <legend>{{ _("Exigences du mot de passe") }}</legend>
+          <div class="act-mode-grid">
+            <label>{{ _("Caractères") }} <input type="number" name="min_length" min="4" max="{{ password_len_max }}" value="{{ password_rule_values.min_length }}"></label>
+            <label>{{ _("Majuscules") }} <input type="number" name="min_upper" min="0" max="{{ password_count_max }}" value="{{ password_rule_values.min_upper }}"></label>
+            <label>{{ _("Chiffres") }} <input type="number" name="min_digits" min="0" max="{{ password_count_max }}" value="{{ password_rule_values.min_digits }}"></label>
+            <label>{{ _("Spéciaux") }} <input type="number" name="min_special" min="0" max="{{ password_count_max }}" value="{{ password_rule_values.min_special }}"></label>
+          </div>
+          <p class="act-muted act-map-note">{{ _("Règle actuelle : {rule}", rule=password_rule_text) }} {{ _("0 = pas d'exigence. Elle s'applique aux mots de passe individuels, à leur création et après une remise à zéro ; les mots de passe déjà en place ne sont pas touchés.") }}</p>
+        </fieldset>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
       <p class="act-muted act-map-note">{{ _("Avec les comptes individuels, chaque opérateur crée son mot de passe à sa première connexion (son indicatif suffit). Un opérateur déjà inscrit dans la liste des opérateurs n'a pas besoin d'être validé : il a été ajouté par un administrateur.") }}</p>

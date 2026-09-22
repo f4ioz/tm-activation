@@ -1798,11 +1798,47 @@ def test_password_rule_is_enforced_at_account_creation() -> None:
         assert "majuscule" in r.text and activation.get_operator("F5WEAK") is None, weak
     assert _login(_op_client(), "F5WEAK", PW).status_code == 303
     assert activation.get_operator("F5WEAK")["password_hash"]
-    # La règle est affichée sur la page de connexion.
-    assert "une majuscule, un chiffre et un caractère spécial" in _op_client().get("/activation/login").text
+    # La règle en vigueur est affichée sur la page de connexion.
+    assert "Au moins 8 caractères, dont 1 majuscule, 1 chiffre, 1 caractère spécial." \
+        in _op_client().get("/activation/login").text
     # Un administrateur ne peut pas poser un mot de passe trop simple non plus.
     with pytest.raises(ValueError, match="majuscule"):
         activation.set_operator_password_for("F5WEAK", "faible")
+
+
+def test_password_requirements_are_adjustable(monkeypatch) -> None:
+    """Réglages → Comptes opérateurs : longueur, majuscules, chiffres et
+    caractères spéciaux exigés (0 = pas d'exigence)."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("per_operator_auth", True)
+    assert activation.get_password_rule() == activation.DEFAULT_PASSWORD_RULE
+    admin = _private_client()
+    r = admin.post("/activation/settings/auth",
+                   data={"per_operator": "1", "min_length": "12", "min_upper": "2",
+                         "min_digits": "0", "min_special": "3"})
+    assert r.status_code == 303
+    assert activation.get_password_rule() == {"min_length": 12, "min_upper": 2,
+                                              "min_digits": 0, "min_special": 3}
+    assert activation.password_rule() == "Au moins 12 caractères, dont 2 majuscules, 3 caractères spéciaux."
+    assert not activation.password_is_strong("Abcdef1!")          # trop court, une seule majuscule
+    assert not activation.password_is_strong("ABcdefgh!$")        # deux spéciaux sur trois
+    assert activation.password_is_strong("ABcdefghi!$%")          # 12 car., 2 maj., 3 spéciaux
+    # Le refus de connexion reprend la règle réglée.
+    assert "2 majuscules" in _login(_op_client(), "F5NEW", "Abcdef1!").text
+    assert _login(_op_client(), "F5NEW", "ABcdefghi!$%").status_code == 303
+    # Aucune exigence de caractères : seule la longueur compte.
+    admin.post("/activation/settings/auth",
+               data={"per_operator": "1", "min_length": "6", "min_upper": "0",
+                     "min_digits": "0", "min_special": "0"})
+    assert activation.password_rule() == "Au moins 6 caractères."
+    assert activation.password_is_strong("abcdef") and not activation.password_is_strong("abcde")
+    # Valeurs bricolées : on retombe sur le défaut plutôt que d'ouvrir la porte.
+    admin.post("/activation/settings/auth",
+               data={"per_operator": "1", "min_length": "1", "min_upper": "99",
+                     "min_digits": "n'importe quoi", "min_special": "-3"})
+    rule = activation.get_password_rule()
+    assert rule["min_length"] == 4 and rule["min_upper"] == activation.PASSWORD_COUNT_MAX
+    assert rule["min_digits"] == 1 and rule["min_special"] == 0
 
 
 def test_robot_signups_are_blocked() -> None:
