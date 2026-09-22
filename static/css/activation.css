@@ -15,7 +15,6 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-bar-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
 .act-bar-flags { display: inline-flex; align-items: center; gap: 0.25rem; }
 .act-bar-flags .flag { width: 18px; height: 12px; }
-.act-bar-logo { height: 26px; width: auto; border-radius: 3px; }
 .act-bar-call {
   font-family: var(--font-display, 'Orbitron', sans-serif); font-weight: 900;
   letter-spacing: 0.12em; color: var(--accent); font-size: 1.05rem;
@@ -121,6 +120,21 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
     radial-gradient(120% 140% at 100% 0%, rgba(214,40,40,0.18), transparent 55%),
     var(--panel);
 }
+/* Avec un logo : il occupe toute la hauteur du bandeau, à gauche du texte,
+   qui reste centré dans la place restante. Sous 640 px, il repasse au-dessus. */
+.act-hero.has-logo { flex-direction: row; align-items: center; gap: 1.1rem; text-align: left; }
+.act-hero.has-logo .act-hero-text {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+}
+/* Étiré sur la hauteur du bandeau (qui dépend du texte), jamais déformé. */
+.act-hero-logo { align-self: stretch; height: auto; min-height: 76px; max-height: 150px;
+  width: auto; max-width: 30%; object-fit: contain; flex: none; }
+@media (max-width: 640px) {
+  .act-hero.has-logo { flex-direction: column; text-align: center; gap: 0.4rem; }
+  .act-hero-logo { height: 64px; max-width: 60%; }
+}
+.act-hero .act-hero-text { width: 100%; }
+
 .act-hero::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
   background: linear-gradient(90deg, #0055A4 0 33%, #fff 33% 50%, #FDDA24 50% 66%, #EF3340 66% 100%);

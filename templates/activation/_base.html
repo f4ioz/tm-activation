@@ -43,8 +43,6 @@
 <body class="scanlines act-site">
   <header class="act-bar">
     <a class="act-bar-brand" href="{% block brand_href %}/activation{% endblock %}">
-      {% set _logo = logo_version() %}
-      {% if _logo %}<img class="act-bar-logo" src="/logo?v={{ _logo }}" alt="">{% endif %}
       <span class="act-bar-flags">
         {%- if station is defined and station %}{% for f in station.flags.split(',') if f %}<span class="flag flag-{{ f }}"></span>{% endfor %}{% endif -%}
       </span>

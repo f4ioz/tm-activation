@@ -2159,6 +2159,11 @@ def set_report_options(form: dict[str, Any]) -> dict[str, Any]:
     return get_report_options()
 
 
+def logo_on_pages() -> bool:
+    """Le logo est-il affiché sur les pages web (bandeau des indicatifs) ?"""
+    return get_flag("logo_on_pages", True)
+
+
 def logo_path() -> Path | None:
     """Fichier du logo du club (None s'il n'y en a pas)."""
     for ext in LOGO_TYPES:

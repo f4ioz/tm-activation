@@ -400,6 +400,7 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             report_options=activation.get_report_options(),
             report_hunters_max=activation.REPORT_HUNTERS_MAX,
             logo=activation.logo_info(),
+            logo_on_pages=activation.logo_on_pages(),
             public_slots_max=activation.public_slots_max(),
             public_slots_cap=activation.PUBLIC_SLOTS_MAX,
             slot_lock=activation.slot_lock(),
@@ -581,6 +582,15 @@ async def upload_logo(request: Request, logo: UploadFile | None = File(None)) ->
     except ValueError as exc:
         return RedirectResponse(f"/activation/settings?lg={quote(str(exc))}#rapport",
                                 status_code=303)
+    return RedirectResponse("/activation/settings?lg=ok#rapport", status_code=303)
+
+
+@router.post("/settings/logo/show")
+async def toggle_logo_on_pages(request: Request, show: str = Form("")) -> Response:
+    """Afficher ou non le logo dans le bandeau des pages (le PDF le garde)."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    activation.set_flag("logo_on_pages", bool(show))
     return RedirectResponse("/activation/settings?lg=ok#rapport", status_code=303)
 
 

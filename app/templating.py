@@ -46,7 +46,9 @@ templates.env.globals["flag_prefixes"] = activation.FLAG_PREFIXES
 templates.env.globals["note_is_sat"] = activation.note_is_sat
 # Logo du club (Réglages) : 0 s'il n'y en a pas, sinon la date du fichier, qui
 # sert aussi de numéro de version pour le cache du navigateur.
-templates.env.globals["logo_version"] = lambda: (activation.logo_info() or {}).get("mtime", 0)
+templates.env.globals["logo_version"] = lambda: (
+    (activation.logo_info() or {}).get("mtime", 0) if activation.logo_on_pages() else 0
+)
 templates.env.globals["dxcc_entity"] = dxcc_flags.entity_for_call
 templates.env.globals["dxcc_flag_file"] = dxcc_flags.flag_file
 i18n.install(templates.env)

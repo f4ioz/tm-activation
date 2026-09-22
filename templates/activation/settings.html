@@ -310,6 +310,10 @@
             {% else %}
               <p class="act-muted">{{ _("Aucun logo pour l'instant.") }}</p>
             {% endif %}
+            <form method="post" action="/activation/settings/logo/show" class="act-form">
+              <label class="act-check"><input type="checkbox" name="show" value="1"{% if logo_on_pages %} checked{% endif %} onchange="this.form.submit()"> {{ _("Afficher le logo sur les pages (bandeau des indicatifs)") }}</label>
+              <noscript><button type="submit">{{ _("Enregistrer") }}</button></noscript>
+            </form>
             <form method="post" action="/activation/settings/logo" enctype="multipart/form-data" class="act-form">
               <label>{{ _("Image PNG ou JPEG (2 Mo maximum)") }} <input type="file" name="logo" accept="image/png,image/jpeg" required></label>
               <div class="act-acct-actions">
