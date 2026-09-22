@@ -209,7 +209,7 @@
  "Langue": "Language",
  "Le classement s'ouvrira avec les premiers QSO.": "The ranking will open with the first QSOs.",
  "Le log s'ouvrira au lancement de l'activation.": "The log will open when the activation starts.",
- "Le logo apparaît dans le bandeau des pages, en tête du site et en haut du rapport PDF.": "The logo appears in the callsign banner, in the site header and at the top of the PDF report.",
+ "Le logo apparaît dans le bandeau des indicatifs et en haut du rapport PDF, jamais sur les autres pages du site.": "The logo appears in the callsign banner and at the top of the PDF report, never on the other pages of the site.",
  "Le mot de passe ne peut pas être vide.": "The password cannot be empty.",
  "Le rattrapage se fait normalement à l'enregistrement d'un QSO ou à l'import d'un ADIF. Ce bouton le déclenche tout de suite — utile après un import fait ailleurs, ou quand l'option ci-dessus était décochée. Les créneaux ne sont jamais raccourcis ni supprimés, et le nombre de QSO d'une vignette est recalculé à chaque affichage.": "Slots are normally caught up when a QSO is logged or an ADIF is imported. This button does it right away — handy after an import made elsewhere, or when the option above was unticked. Slots are never shortened or deleted, and a card's QSO count is recomputed on every page view.",
  "Le téléchargement récupère une copie de la base à conserver hors serveur.": "The download gets a copy of the database to keep off the server.",

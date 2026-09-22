@@ -2006,9 +2006,9 @@ def test_club_logo_upload_and_use(monkeypatch, tmp_path) -> None:
     served = client.get("/logo")
     assert served.status_code == 200 and served.headers["content-type"] == "image/png"
     assert activation.logo_info()["kind"] == "png"
-    home = client.get("/").text
-    if "site-header" in home:        # en-tête du site (absent du package autonome)
-        assert "/logo?v=" in home
+    # Le logo est celui du module d'activation : il ne s'invite pas sur les
+    # pages du site qui l'héberge (accueil, articles…).
+    assert "/logo?v=" not in client.get("/").text
     # Grand bandeau de l'indicatif : le logo y est dimensionné sur la hauteur.
     _public()
     assert "act-hero-logo" in client.get("/tm25test").text
@@ -2016,7 +2016,6 @@ def test_club_logo_upload_and_use(monkeypatch, tmp_path) -> None:
     assert admin.post("/activation/settings/logo/show", data={}).status_code == 303
     assert activation.logo_on_pages() is False
     assert "act-hero-logo" not in client.get("/tm25test").text
-    assert "/logo?v=" not in client.get("/").text
     assert b"/Subtype /Image" in admin.get("/activation/report.pdf").content  # le PDF le garde
     admin.post("/activation/settings/logo/show", data={"show": "1"})
     assert "act-hero-logo" in client.get("/tm25test").text
