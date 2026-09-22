@@ -2093,6 +2093,92 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
     return {"entities": entities, "count": len(entities), "unidentified": unidentified}
 
 
+# ── Rapport PDF et logo du club (réglables dans les Réglages) ─────────────
+
+DEFAULT_REPORT: dict[str, Any] = {
+    "hours": False,      # « Rythme, heure par heure » : hors du rapport par défaut
+    "dxcc_all": True,    # toutes les entités avec leur drapeau (sinon : les dix premières)
+    "hunters": 10,       # nombre de chasseurs listés (0 = pas de palmarès)
+}
+REPORT_HUNTERS_MAX = 100
+
+LOGO_DIR = ROOT / "var" / "branding"
+LOGO_MAX_BYTES = 2 * 1024 * 1024
+LOGO_TYPES = {"png": "image/png", "jpg": "image/jpeg"}
+
+
+def get_report_options() -> dict[str, Any]:
+    """Contenu du rapport PDF (sections facultatives)."""
+    saved = load_settings().get("report") or {}
+    d = DEFAULT_REPORT
+    return {
+        "hours": bool(saved.get("hours", d["hours"])),
+        "dxcc_all": bool(saved.get("dxcc_all", d["dxcc_all"])),
+        "hunters": _clamp_int(saved.get("hunters"), 0, REPORT_HUNTERS_MAX, d["hunters"]),
+    }
+
+
+def set_report_options(form: dict[str, Any]) -> dict[str, Any]:
+    data = load_settings()
+    data["report"] = {
+        "hours": bool(form.get("hours")),
+        "dxcc_all": bool(form.get("dxcc_all")),
+        "hunters": _clamp_int(form.get("hunters"), 0, REPORT_HUNTERS_MAX,
+                              DEFAULT_REPORT["hunters"]),
+    }
+    _save_settings(data)
+    return get_report_options()
+
+
+def logo_path() -> Path | None:
+    """Fichier du logo du club (None s'il n'y en a pas)."""
+    for ext in LOGO_TYPES:
+        candidate = LOGO_DIR / f"logo.{ext}"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def logo_info() -> dict[str, Any] | None:
+    """Logo publié : chemin, type, taille et date (pour l'aperçu des Réglages)."""
+    path = logo_path()
+    if path is None:
+        return None
+    stat = path.stat()
+    return {"path": path, "kind": path.suffix.lstrip("."), "bytes": stat.st_size,
+            "mtime": int(stat.st_mtime), "media_type": LOGO_TYPES[path.suffix.lstrip(".")]}
+
+
+def _image_kind(data: bytes) -> str:
+    """« png », « jpg » ou "" : on se fie au CONTENU, pas au nom du fichier."""
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if data[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    return ""
+
+
+def set_logo(data: bytes) -> str:
+    """Enregistre le logo (PNG ou JPEG). Renvoie le type ; ValueError sinon."""
+    if not data:
+        raise ValueError(_("fichier vide"))
+    if len(data) > LOGO_MAX_BYTES:
+        raise ValueError(_("image trop lourde (2 Mo maximum)"))
+    kind = _image_kind(data)
+    if not kind:
+        raise ValueError(_("format non reconnu : attendu PNG ou JPEG"))
+    LOGO_DIR.mkdir(parents=True, exist_ok=True)
+    for ext in LOGO_TYPES:          # un seul logo à la fois
+        (LOGO_DIR / f"logo.{ext}").unlink(missing_ok=True)
+    (LOGO_DIR / f"logo.{kind}").write_bytes(data)
+    return kind
+
+
+def clear_logo() -> None:
+    for ext in LOGO_TYPES:
+        (LOGO_DIR / f"logo.{ext}").unlink(missing_ok=True)
+
+
 # ── Style de la carte publique (réglable par l'admin dans les Réglages) ────
 # Un point par locator × bande × mode : la COULEUR dit le mode, la FORME dit la
 # bande. Les deux tables sont modifiables ; un mode ou une bande absent de la

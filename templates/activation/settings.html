@@ -273,6 +273,58 @@
       <p class="act-muted act-map-note">{{ _("Règle actuelle : {rule}.", rule=scoring_summary) }} {{ _("Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).") }}</p>
     </div>
 
+    <div class="act-card act-card-wide" id="rapport">
+      <h2>{{ _("Rapport PDF et logo") }} — {{ callsign }}</h2>
+      {% if rp_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Contenu du rapport enregistré.") }}</p>
+      {% elif rp_flash == 'unknown' %}<p class="act-alert act-alert-err">{{ _("Indicatif inconnu.") }}</p>{% endif %}
+      {% if lg_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Logo enregistré.") }}</p>
+      {% elif lg_flash == 'gone' %}<p class="act-alert act-alert-ok">{{ _("Logo retiré.") }}</p>
+      {% elif lg_flash %}<p class="act-alert act-alert-err">⚠ {{ lg_flash }}</p>{% endif %}
+      <div class="act-grid act-grid-2">
+        <div>
+          <form method="post" action="/activation/settings/report" class="act-form">
+            <label class="act-check"><input type="checkbox" name="hours" value="1"{% if report_options.hours %} checked{% endif %}> {{ _("Inclure le rythme heure par heure (UTC)") }}</label>
+            <label class="act-check"><input type="checkbox" name="dxcc_all" value="1"{% if report_options.dxcc_all %} checked{% endif %}> {{ _("Toutes les entités DXCC avec leur drapeau (sinon : les dix premières)") }}</label>
+            <label>{{ _("Chasseurs listés") }}
+              <input type="number" name="hunters" min="0" max="{{ report_hunters_max }}" value="{{ report_options.hunters }}">
+              <span class="act-muted">{{ _("0 = pas de palmarès") }}</span>
+            </label>
+            <button type="submit">{{ _("Enregistrer") }}</button>
+          </form>
+          <p class="act-muted act-map-note">{{ _("Les sections retenues occupent la place libérée par les autres : sans le rythme horaire, le graphique des journées est plus grand.") }}</p>
+          <p><a class="act-cancel-btn" href="/activation/report.pdf">{{ _("Télécharger le rapport de {call}", call=callsign) }}</a></p>
+          {% if stations|length > 1 %}
+          <p class="act-muted act-map-note">{{ _("Autres indicatifs :") }}
+            {% for s in stations if s.callsign != callsign %}<a href="/activation/report.pdf?station={{ s.callsign }}">{{ s.callsign }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+          </p>
+          {% endif %}
+        </div>
+        <div>
+          <fieldset class="act-fieldset">
+            <legend>{{ _("Logo du club") }}</legend>
+            {% if logo %}
+              <p><img class="act-logo-preview" src="/logo?v={{ logo.mtime }}" alt="{{ _("Logo du club") }}"></p>
+              <p class="act-muted act-map-note">{{ logo.kind|upper }} · {{ (logo.bytes / 1024)|round|int }} ko</p>
+            {% else %}
+              <p class="act-muted">{{ _("Aucun logo pour l'instant.") }}</p>
+            {% endif %}
+            <form method="post" action="/activation/settings/logo" enctype="multipart/form-data" class="act-form">
+              <label>{{ _("Image PNG ou JPEG (2 Mo maximum)") }} <input type="file" name="logo" accept="image/png,image/jpeg" required></label>
+              <div class="act-acct-actions">
+                <button type="submit">{{ _("Envoyer") }}</button>
+              </div>
+            </form>
+            {% if logo %}
+            <form method="post" action="/activation/settings/logo/delete" class="act-form" onsubmit="return confirm({{ _("Retirer le logo ?")|tojson|forceescape }})">
+              <button type="submit" class="act-cancel-btn">{{ _("Retirer le logo") }}</button>
+            </form>
+            {% endif %}
+            <p class="act-muted act-map-note">{{ _("Le logo apparaît dans le bandeau des pages, en tête du site et en haut du rapport PDF.") }}</p>
+          </fieldset>
+        </div>
+      </div>
+    </div>
+
     <div class="act-card act-card-wide" id="carte">
       <h2>{{ _("Carte des contacts") }} — {{ callsign }}</h2>
       {% if mp_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Style de la carte enregistré.") }}</p>{% endif %}
@@ -312,18 +364,6 @@
         </div>
       </form>
       <p class="act-muted act-map-note">{{ _("Un point par locator, bande et mode : la couleur dit le mode, la forme dit la bande. Les points d'un même carré sont écartés en couronne, et la légende sous la carte ne montre que les bandes et modes travaillés.") }}</p>
-    </div>
-
-    <div class="act-card">
-      <h2>{{ _("Rapport d'activité") }}</h2>
-      {% if rp_flash == 'unknown' %}<p class="act-alert act-alert-err">{{ _("Indicatif inconnu.") }}</p>{% endif %}
-      <p class="act-muted">{{ _("Un PDF d'une page : compteurs, rythme jour par jour et heure par heure, bandes, modes, entités DXCC et meilleurs chasseurs. À imprimer ou à joindre au compte rendu du club.") }}</p>
-      <p><a class="act-cancel-btn" href="/activation/report.pdf">{{ _("Télécharger le rapport de {call}", call=callsign) }}</a></p>
-      {% if stations|length > 1 %}
-      <p class="act-muted act-map-note">{{ _("Autres indicatifs :") }}
-        {% for s in stations if s.callsign != callsign %}<a href="/activation/report.pdf?station={{ s.callsign }}">{{ s.callsign }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
-      </p>
-      {% endif %}
     </div>
 
     <div class="act-card">

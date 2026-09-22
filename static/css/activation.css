@@ -15,6 +15,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-bar-brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
 .act-bar-flags { display: inline-flex; align-items: center; gap: 0.25rem; }
 .act-bar-flags .flag { width: 18px; height: 12px; }
+.act-bar-logo { height: 26px; width: auto; border-radius: 3px; }
 .act-bar-call {
   font-family: var(--font-display, 'Orbitron', sans-serif); font-weight: 900;
   letter-spacing: 0.12em; color: var(--accent); font-size: 1.05rem;
@@ -461,6 +462,8 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-fieldset legend { padding: 0 0.3rem; }
 .act-mode-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
 /* Réglages de la carte : une case « libellé + couleur/forme » par mode et par bande. */
+.act-logo-preview { max-height: 70px; max-width: 100%; border: 1px solid var(--border);
+  border-radius: 4px; background: #fff; padding: 4px; }
 .act-style-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); }
 .act-style-cell { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
   font-family: var(--font-mono, monospace); font-size: 0.8rem; }

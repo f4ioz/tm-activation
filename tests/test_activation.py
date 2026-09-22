@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -1830,6 +1831,62 @@ def test_activity_report_pdf(monkeypatch) -> None:
     op = TestClient(app, follow_redirects=False)
     op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
     assert op.get("/activation/report.pdf").headers["location"].startswith("/login")
+
+
+def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
+    """Sections facultatives : rythme horaire, entités avec drapeaux, chasseurs."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    for i, call in enumerate(("DL1ABC", "ON4ZZ", "G0XYZ", "EA5QQ", "I2WWW")):
+        activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260910", time_on=f"10{i:02d}")
+    admin = _private_client()
+    assert activation.get_report_options() == activation.DEFAULT_REPORT
+    base = admin.get("/activation/report.pdf").content
+    assert b"RYTHME, HEURE PAR HEURE" not in base      # coupé par défaut (titres en capitales)
+    assert b"/Subtype /Image" in base                  # les drapeaux des entités
+
+    r = admin.post("/activation/settings/report",
+                   data={"hours": "1", "dxcc_all": "", "hunters": "0"})
+    assert r.status_code == 303 and "rp=ok" in r.headers["location"]
+    assert activation.get_report_options() == {"hours": True, "dxcc_all": False, "hunters": 0}
+    tuned = admin.get("/activation/report.pdf").content
+    assert b"RYTHME, HEURE PAR HEURE" in tuned
+    assert b"MEILLEURS CHASSEURS" not in tuned         # palmarès retiré
+    assert b"/Subtype /Image" not in tuned             # tableau court, sans drapeau
+
+    admin.post("/activation/settings/report", data={"dxcc_all": "1", "hunters": "3"})
+    short = admin.get("/activation/report.pdf").content
+    assert b"MEILLEURS CHASSEURS" in short
+    # Valeur absurde : bornée, jamais d'erreur.
+    admin.post("/activation/settings/report", data={"hunters": "5000"})
+    assert activation.get_report_options()["hunters"] == activation.REPORT_HUNTERS_MAX
+
+
+def test_club_logo_upload_and_use(monkeypatch, tmp_path) -> None:
+    """Logo : déposé dans les Réglages, servi sur /logo, repris dans le PDF."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    client = TestClient(app)
+    assert client.get("/logo").status_code == 404
+    png = (Path(__file__).resolve().parent.parent / "static" / "vendor" / "flags" / "fr.png")
+    admin = _private_client()
+    r = admin.post("/activation/settings/logo",
+                   files={"logo": ("logo.png", png.read_bytes(), "image/png")})
+    assert r.status_code == 303 and "lg=ok" in r.headers["location"]
+    served = client.get("/logo")
+    assert served.status_code == 200 and served.headers["content-type"] == "image/png"
+    assert activation.logo_info()["kind"] == "png"
+    assert "/logo?v=" in client.get("/").text            # en-tête du site
+    assert b"/Subtype /Image" in admin.get("/activation/report.pdf").content
+    # Fichier qui n'est pas une image : refusé avec un message.
+    bad = admin.post("/activation/settings/logo",
+                     files={"logo": ("notes.txt", b"bonjour", "text/plain")})
+    assert "lg=format" in bad.headers["location"] or "PNG" in bad.headers["location"]
+    assert activation.logo_info() is not None            # l'ancien logo est gardé
+    assert admin.post("/activation/settings/logo/delete").status_code == 303
+    assert activation.logo_info() is None and client.get("/logo").status_code == 404
 
 
 def test_activity_report_survives_an_empty_log(monkeypatch) -> None:

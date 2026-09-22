@@ -164,6 +164,9 @@ a:hover, a:focus { color: var(--accent-hover); text-decoration: underline; }
 }
 .title-block:hover, .title-block:focus { text-decoration: none; }
 
+/* Logo du club déposé dans les Réglages : il remplace la pastille décorative. */
+.site-logo { height: 38px; width: auto; border-radius: 4px; display: block; }
+
 .logo {
   width: 32px;
   height: 32px;

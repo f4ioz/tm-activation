@@ -23,7 +23,7 @@ from fastapi.responses import (
 )
 from starlette.concurrency import run_in_threadpool
 
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from starlette.convertors import Convertor, register_url_convertor
 
@@ -396,6 +396,10 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             auto_slots=activation.auto_slots(),
             sl_flash=request.query_params.get("sl"),
             rp_flash=request.query_params.get("rp"),
+            lg_flash=request.query_params.get("lg"),
+            report_options=activation.get_report_options(),
+            report_hunters_max=activation.REPORT_HUNTERS_MAX,
+            logo=activation.logo_info(),
             public_slots_max=activation.public_slots_max(),
             public_slots_cap=activation.PUBLIC_SLOTS_MAX,
             slot_lock=activation.slot_lock(),
@@ -551,6 +555,40 @@ async def change_scoring(request: Request) -> Response:
     form = await request.form()
     activation.set_scoring(dict(form))
     return RedirectResponse("/activation/settings?sc=ok#points", status_code=303)
+
+
+@router.post("/settings/report")
+async def change_report_options(
+    request: Request, hours: str = Form(""), dxcc_all: str = Form(""),
+    hunters: str = Form(""),
+) -> Response:
+    """Contenu du rapport PDF (sections facultatives)."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters})
+    return RedirectResponse("/activation/settings?rp=ok#rapport", status_code=303)
+
+
+@router.post("/settings/logo")
+async def upload_logo(request: Request, logo: UploadFile | None = File(None)) -> Response:
+    """Logo du club : bandeau du site, en-tête des pages et rapport PDF."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    data = await logo.read() if logo is not None else b""
+    try:
+        activation.set_logo(data)
+    except ValueError as exc:
+        return RedirectResponse(f"/activation/settings?lg={quote(str(exc))}#rapport",
+                                status_code=303)
+    return RedirectResponse("/activation/settings?lg=ok#rapport", status_code=303)
+
+
+@router.post("/settings/logo/delete")
+async def delete_logo(request: Request) -> Response:
+    if (g := _require_admin(request)) is not None:
+        return g
+    activation.clear_logo()
+    return RedirectResponse("/activation/settings?lg=gone#rapport", status_code=303)
 
 
 @router.get("/report.pdf")
@@ -1268,6 +1306,18 @@ def _public_stats(station: str, search_call: str = "") -> dict:
         "scoring_summary": activation.scoring_summary(rule),
         "home": {"call": station, "grid": grid, "pos": activation.locator_center(grid)},
     }
+
+
+@public_router.get("/logo")
+async def club_logo(request: Request) -> Response:
+    """Logo du club, déposé dans les Réglages (404 tant qu'il n'y en a pas)."""
+    info = activation.logo_info()
+    if info is None:
+        return Response(status_code=404)
+    return FileResponse(
+        info["path"], media_type=info["media_type"],
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @public_router.get("/activations", response_class=HTMLResponse)
