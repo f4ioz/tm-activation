@@ -53,15 +53,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.25.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.25.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.25.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.26.0.tar.gz
 ```
 
 ## Features
@@ -168,6 +168,7 @@ is forced on you.
 | Approve new accounts | off | an administrator approves before the first login |
 | Create and extend slots from the log | on | catches forgotten bookings |
 | Realign slots on the log now | button | immediate catch-up, even when unticked |
+| Slot cards shown | all | or a maximum number on the public page |
 | Refuse logging on a booked band and mode | on | avoids two stations at once |
 | Show the contact list | your choice | "Latest contacts" on the public page |
 | Show map, DXCC and ranking | your choice | the "hunters" part of the public page |
@@ -223,22 +224,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.25.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.26.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.25.0.tar.gz
-   cd tm-activation-1.25.0
+   tar xzf tm-activation-1.26.0.tar.gz
+   cd tm-activation-1.26.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.25.0.zip
-   cd tm-activation-1.25.0
+   unzip tm-activation-1.26.0.zip
+   cd tm-activation-1.26.0
    sudo bash install.sh --lan
    ```
 
@@ -321,8 +322,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.25.0.tar.gz
-cd tm-activation-1.25.0
+tar xzf tm-activation-1.26.0.tar.gz
+cd tm-activation-1.26.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

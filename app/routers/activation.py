@@ -328,6 +328,7 @@ async def dashboard(request: Request) -> Response:
             live=live,
             upcoming=upcoming,
             past=activation.past_slots(),
+            slots_max=activation.public_slots_max(),
             operator_count=len(activation.active_operators()),
             planned_count=len(live) + len(upcoming),
             recent=activation.list_contacts(limit=10),
@@ -394,6 +395,8 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             show_map_stats=activation.show_map_stats(),
             auto_slots=activation.auto_slots(),
             sl_flash=request.query_params.get("sl"),
+            public_slots_max=activation.public_slots_max(),
+            public_slots_cap=activation.PUBLIC_SLOTS_MAX,
             slot_lock=activation.slot_lock(),
             callbook=activation.callbook_progress(),
             per_operator_auth=activation.per_operator_auth(),
@@ -441,7 +444,7 @@ async def change_operator_password(
 @router.post("/settings/flags")
 async def change_flags(
     request: Request, show_contacts: str = Form(""), show_map_stats: str = Form(""),
-    auto_slots: str = Form(""), slot_lock: str = Form(""),
+    auto_slots: str = Form(""), slot_lock: str = Form(""), public_slots_max: str = Form("0"),
 ) -> Response:
     if (g := _require_admin(request)) is not None:
         return g
@@ -449,6 +452,7 @@ async def change_flags(
     activation.set_flag("show_map_stats", bool(show_map_stats))
     activation.set_flag("auto_slots", bool(auto_slots))
     activation.set_flag("slot_lock", bool(slot_lock))
+    activation.set_public_slots_max(public_slots_max)
     return RedirectResponse("/activation/settings?fl=ok", status_code=303)
 
 
@@ -1307,6 +1311,7 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
             "live": activation.live_slots(cs),
             "past": activation.past_slots(cs),
             "slot_qsos": activation.slot_qso_counts(cs),
+            "slots_max": activation.public_slots_max(),
             "recent": activation.list_contacts(limit=50, station=cs),
             "search": search,
             "search_call": call.strip().upper(),

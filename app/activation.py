@@ -1113,6 +1113,23 @@ def auto_slots() -> bool:
     return get_flag("auto_slots", True)
 
 
+# Vignettes de créneaux sur la page publique : 0 = toutes (défaut). Un chiffre
+# limite les « Prochaines activations » ET les « Activations passées ».
+PUBLIC_SLOTS_MAX = 200            # garde-fou : au-delà la page devient illisible
+
+
+def public_slots_max() -> int:
+    """Nombre de vignettes de créneaux montrées publiquement (0 = toutes)."""
+    return _clamp_int(load_settings().get("public_slots_max", 0), 0, PUBLIC_SLOTS_MAX, 0)
+
+
+def set_public_slots_max(value: Any) -> int:
+    data = load_settings()
+    data["public_slots_max"] = _clamp_int(value, 0, PUBLIC_SLOTS_MAX, 0)
+    _save_settings(data)
+    return data["public_slots_max"]
+
+
 def _minutes_to_iso(minutes: int) -> str:
     return datetime.fromtimestamp(minutes * 60, UTC).strftime("%Y-%m-%dT%H:%M")
 

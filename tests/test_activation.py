@@ -1656,6 +1656,33 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
     assert "3 QSO" in TestClient(app).get("/tm25test").text
 
 
+def test_public_shows_every_slot_card_by_default(monkeypatch) -> None:
+    """Par défaut, aucune vignette n'est coupée : dix créneaux à venir = dix
+    vignettes (avant, la page s'arrêtait à huit)."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    _public()
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M"
+    for i in range(10):
+        begin = now + timedelta(hours=2 + i)
+        activation.add_slot("F4IOZ", begin.strftime(fmt), (begin + timedelta(hours=1)).strftime(fmt),
+                            "20M", "SSB", note=f"passe {i}")
+    assert activation.public_slots_max() == 0
+    page = TestClient(app).get("/tm25test").text
+    assert page.count("act-next-card") == 10
+    # Limité à 4 depuis les Réglages.
+    admin = _private_client()
+    admin.post("/activation/settings/flags", data={"show_map_stats": "1", "public_slots_max": "4"})
+    assert activation.public_slots_max() == 4
+    assert TestClient(app).get("/tm25test").text.count("act-next-card") == 4
+    # Valeur absurde : bornée, jamais d'erreur.
+    admin.post("/activation/settings/flags", data={"public_slots_max": "n'importe quoi"})
+    assert activation.public_slots_max() == 0
+    admin.post("/activation/settings/flags", data={"public_slots_max": "99999"})
+    assert activation.public_slots_max() == activation.PUBLIC_SLOTS_MAX
+
+
 def test_settings_button_realigns_slots_on_the_log(monkeypatch) -> None:
     """Bouton « Mettre à jour les créneaux d'après le log » : marche même quand
     le rattrapage automatique est décoché (l'admin le demande explicitement)."""

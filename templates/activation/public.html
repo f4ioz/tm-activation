@@ -108,7 +108,7 @@
 <h2 class="act-next-title">{{ _("🛰️ Prochaines activations") }}</h2>
 {% if slots %}
   <div class="act-next">
-    {% for s in slots[:8] %}
+    {% for s in (slots[:slots_max] if slots_max else slots) %}
       {% set ps = to_disp(s.start_utc) %}{% set pe = to_disp(s.end_utc) %}
       <div class="act-next-card">
         <div class="act-next-when">{{ (dow(ps) ~ ' ' ~ day_month(ps)) if ps }} · {{ ps.strftime('%H:%M') if ps }}→{{ pe.strftime('%H:%M') if pe }} {{ tz_label }}</div>

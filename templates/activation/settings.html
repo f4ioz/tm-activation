@@ -148,6 +148,10 @@
         <label class="act-check"><input type="checkbox" name="slot_lock" value="1"{% if slot_lock %} checked{% endif %}> {{ _("Interdire de loguer sur une bande et un mode réservés par un autre opérateur") }}</label>
         <label class="act-check"><input type="checkbox" name="show_contacts" value="1"{% if show_contacts %} checked{% endif %}> {{ _("Afficher la liste des contacts (« Derniers contacts »)") }}</label>
         <label class="act-check"><input type="checkbox" name="show_map_stats" value="1"{% if show_map_stats %} checked{% endif %}> {{ _("Afficher la carte, le tableau DXCC et le classement des chasseurs") }}</label>
+        <label>{{ _("Vignettes de créneaux affichées") }}
+          <input type="number" name="public_slots_max" min="0" max="{{ public_slots_cap }}" value="{{ public_slots_max }}">
+          <span class="act-muted">{{ _("0 = toutes (défaut)") }}</span>
+        </label>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
       <p class="act-muted">{{ _("Liste décochée : les contacts ne sont pas listés (la recherche par indicatif reste possible). La carte et le classement montrent indicatif + locator, jamais le nom.") }}</p>
