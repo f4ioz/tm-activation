@@ -276,9 +276,17 @@ _PREPARED: dict[tuple[str, int], tuple[Any, ...]] = {}
 _PREPARED_MAX = 64
 
 
+# Caractères absents du jeu WinAnsi des polices de base : plutôt qu'un « ? »,
+# on écrit l'équivalent le plus proche (vu sur une flèche « → » dans un rapport).
+_SUBSTITUTES = str.maketrans({
+    "→": "-", "←": "-", "↔": "-", "⇒": "=>", "≥": ">=", "≤": "<=", "≠": "!=",
+    "–": "-", "—": "-", "•": "·", "∅": "0", "⚑": "!", "🛰": "", "☀": "",
+})
+
+
 def _escape(s: str) -> bytes:
     """Chaîne PDF : encodage WinAnsi (accents compris) et parenthèses échappées."""
-    raw = (s or "").encode("cp1252", "replace")
+    raw = (s or "").translate(_SUBSTITUTES).encode("cp1252", "replace")
     return raw.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
 
 

@@ -150,6 +150,8 @@ def _ctx(request: Request, **extra: object) -> dict:
         "operators": activation.list_operators(),
         "bands": activation.BANDS,
         "modes": activation.MODES,
+        "log_view": activation.get_log_view(),
+        "my_grid": activation.my_gridsquare(),
         "is_admin": _is_admin(request),
         "site_admin": is_private(request),     # journal des visites : admin du site seul
         "session_op": _session_op(request),
@@ -401,6 +403,9 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             report_hunters_max=activation.REPORT_HUNTERS_MAX,
             logo=activation.logo_info(),
             logo_on_pages=activation.logo_on_pages(),
+            log_view=activation.get_log_view(),
+            log_view_max=activation.LOG_VIEW_MAX,
+            lv_flash=request.query_params.get("lv"),
             public_slots_max=activation.public_slots_max(),
             public_slots_cap=activation.PUBLIC_SLOTS_MAX,
             slot_lock=activation.slot_lock(),
@@ -562,13 +567,24 @@ async def change_scoring(request: Request) -> Response:
 async def change_report_options(
     request: Request, hours: str = Form(""), dxcc_all: str = Form(""),
     hunters: str = Form(""), sats: str = Form(""), one_page: str = Form(""),
+    runs: str = Form(""),
 ) -> Response:
     """Contenu du rapport PDF (sections facultatives)."""
     if (g := _require_admin(request)) is not None:
         return g
     activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters,
-                                   "sats": sats, "one_page": one_page})
+                                   "sats": sats, "one_page": one_page, "runs": runs})
     return RedirectResponse("/activation/settings?rp=ok#rapport", status_code=303)
+
+
+@router.post("/settings/log-view")
+async def change_log_view(request: Request, photo: str = Form(""),
+                          compass: str = Form("")) -> Response:
+    """Tailles de la photo QRZ et de la boussole sur la page de log."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    activation.set_log_view({"photo": photo, "compass": compass})
+    return RedirectResponse("/activation/settings?lv=ok#log", status_code=303)
 
 
 @router.post("/settings/logo")
@@ -1023,11 +1039,16 @@ async def qrz_lookup_route(request: Request, call: str = "") -> Response:
     row = await run_in_threadpool(activation.qrz_lookup, cs, client)
     if row is None:
         return JSONResponse({"call": cs, "found": False, "configured": client is not None})
+    home = activation.my_gridsquare()
+    grid = row["grid"] or ""
     return JSONResponse(
         {
             "call": cs, "found": True,
-            "fname": row["fname"], "name": row["name"], "grid": row["grid"],
+            "fname": row["fname"], "name": row["name"], "grid": grid,
             "country": row["dxcc_name"] or row["country"],
+            "image": row["image"] if "image" in row.keys() else "",
+            "distance_km": activation.distance_km(home, grid),
+            "bearing": activation.bearing_deg(home, grid),
         },
         headers={"Cache-Control": "no-store"},
     )

@@ -818,8 +818,11 @@ def test_qrz_route_auth_and_json(monkeypatch) -> None:
     assert anon.get("/activation/qrz?call=DL1ABC").status_code == 303
     client = _private_client()
     d = client.get("/activation/qrz?call=dl1abc").json()
-    assert d == {"call": "DL1ABC", "found": True, "fname": "Hans", "name": "Muster",
-                 "grid": "JO31AB", "country": "Germany"}
+    assert {k: d[k] for k in ("call", "found", "fname", "name", "grid", "country")} == {
+        "call": "DL1ABC", "found": True, "fname": "Hans", "name": "Muster",
+        "grid": "JO31AB", "country": "Germany"}
+    # Pour la fiche du correspondant : photo, distance et azimut depuis chez nous.
+    assert d["image"] == "" and 300 < d["distance_km"] < 500 and 20 < d["bearing"] < 70
     d = client.get("/activation/qrz?call=ZZ9ZZZ").json()
     assert d["found"] is False and d["configured"] is True
     assert client.get("/activation/qrz?call=!!").status_code == 400
@@ -1850,8 +1853,10 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
     r = admin.post("/activation/settings/report",
                    data={"hours": "1", "dxcc_all": "", "hunters": "0"})
     assert r.status_code == 303 and "rp=ok" in r.headers["location"]
+    # « runs » n'était pas dans ce formulaire : la valeur par défaut est gardée,
+    # comme pour les autres nombres.
     assert activation.get_report_options() == {"hours": True, "dxcc_all": False, "hunters": 0,
-                                               "sats": False, "one_page": False}
+                                               "sats": False, "one_page": False, "runs": 3}
     tuned = admin.get("/activation/report.pdf").content
     assert b"RYTHME, HEURE PAR HEURE" in tuned
     assert b"MEILLEURS CHASSEURS" not in tuned         # palmarès retiré
@@ -1867,6 +1872,88 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
 
 def _pages(pdf_bytes: bytes) -> int:
     return pdf_bytes.count(b"/Type /Page ")
+
+
+def test_qrz_photo_is_kept_only_from_qrz(monkeypatch) -> None:
+    """La vignette du correspondant vient de la fiche QRZ — et de nulle part
+    ailleurs : une adresse hors qrz.com ou en http n'est pas retenue."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    bonne = "https://cdn-bio.qrz.com/z/dl1abc/portrait.jpg"
+    fake = _FakeQrz({
+        "DL1ABC": XmlLookup(call="DL1ABC", fname="Hans", lname="Muster", grid="JO31AB",
+                            land="Germany", image=bonne),
+        "ON4ZZ": XmlLookup(call="ON4ZZ", grid="JO20", land="Belgium",
+                           image="http://ailleurs.example/photo.jpg"),
+    })
+    monkeypatch.setattr(activation, "qrz_client", lambda: fake)
+    client = _private_client()
+    d = client.get("/activation/qrz?call=DL1ABC").json()
+    assert d["image"] == bonne
+    assert d["distance_km"] and d["bearing"] is not None
+    assert client.get("/activation/qrz?call=ON4ZZ").json()["image"] == ""
+
+
+def test_log_page_station_card_sizes(monkeypatch) -> None:
+    """Photo et boussole : tailles réglables, 0 = on n'affiche rien."""
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    admin = _private_client()
+    assert activation.get_log_view() == activation.DEFAULT_LOG_VIEW
+    page = admin.get("/activation/log").text
+    assert 'id="act-dir"' in page and 'data-compass="120"' in page and 'data-photo="96"' in page
+    assert "activation-station.js" in page
+    r = admin.post("/activation/settings/log-view", data={"photo": "150", "compass": "0"})
+    assert r.status_code == 303 and "lv=ok" in r.headers["location"]
+    assert activation.get_log_view() == {"photo": 150, "compass": 0}
+    page = admin.get("/activation/log").text
+    assert 'data-photo="150"' in page and 'data-compass="0"' in page
+    # Les deux à zéro : l'encart disparaît complètement.
+    admin.post("/activation/settings/log-view", data={"photo": "0", "compass": "0"})
+    assert 'id="act-dir"' not in admin.get("/activation/log").text
+    # Valeur absurde : bornée.
+    admin.post("/activation/settings/log-view", data={"photo": "9999", "compass": "abc"})
+    view = activation.get_log_view()
+    assert view["photo"] == activation.LOG_VIEW_MAX and view["compass"] == 120
+
+
+def test_bearing_points_the_right_way() -> None:
+    """Azimut : l'est à 90°, l'ouest à 270°, et rien sans locator."""
+    assert round(activation.bearing_deg("JN18", "JN28")) in (89, 90, 91)
+    assert round(activation.bearing_deg("JN18", "JN08")) in (269, 270, 271)
+    assert activation.bearing_deg("JN18", "") is None and activation.bearing_deg("", "JN18") is None
+
+
+def test_run_periods_spot_the_pile_up() -> None:
+    """Les « meilleurs moments » : une rafale serrée est retenue, pas un QSO
+    toutes les dix minutes."""
+    activation.set_flag("auto_slots", False)
+    for i in range(20):                       # rafale : un QSO par minute
+        activation.add_contact(call=f"DL{i}ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260910", time_on=f"10{i:02d}" if i < 60 else "1059")
+    for i in range(4):                        # trafic calme : un toutes les 20 min
+        activation.add_contact(call=f"ON{i}ZZ", band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260910", time_on=f"{14 + i}00")
+    runs = activation.run_periods()
+    assert runs["count"] == 1, runs
+    best = runs["best"]
+    assert best["qsos"] == 20 and best["rate"] > 50
+    assert best["start"].startswith("2026-09-10T10:00") and best["end"].endswith("10:19")
+    assert runs["total"] == 20 and 80 < runs["share"] <= 84   # 20 QSO sur 24
+    assert activation.run_periods(top=0)["periods"] == []
+
+
+def test_report_best_moments_section(monkeypatch, tmp_path) -> None:
+    """Section « Meilleurs moments » du PDF : réglable, retirée à 0."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    for i in range(20):
+        activation.add_contact(call=f"DL{i}ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260910", time_on=f"10{i:02d}")
+    admin = _private_client()
+    assert activation.get_report_options()["runs"] == 3
+    assert b"MEILLEURS MOMENTS" in admin.get("/activation/report.pdf").content
+    admin.post("/activation/settings/report", data={"dxcc_all": "1", "hunters": "5", "runs": "0"})
+    assert b"MEILLEURS MOMENTS" not in admin.get("/activation/report.pdf").content
 
 
 def test_report_fits_one_page_on_demand(monkeypatch, tmp_path) -> None:

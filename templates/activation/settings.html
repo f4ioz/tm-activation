@@ -273,6 +273,20 @@
       <p class="act-muted act-map-note">{{ _("Règle actuelle : {rule}.", rule=scoring_summary) }} {{ _("Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).") }}</p>
     </div>
 
+    <div class="act-card" id="log">
+      <h2>{{ _("Page de log") }}</h2>
+      {% if lv_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Affichage du log enregistré.") }}</p>{% endif %}
+      <p class="act-muted">{{ _("Pendant la saisie, sous l'indicatif : la photo de la fiche QRZ du correspondant et une boussole qui montre où tourner l'antenne, avec la distance.") }}</p>
+      <form method="post" action="/activation/settings/log-view" class="act-form">
+        <div class="act-mode-grid">
+          <label>{{ _("Photo (px)") }} <input type="number" name="photo" min="0" max="{{ log_view_max }}" value="{{ log_view.photo }}"></label>
+          <label>{{ _("Boussole (px)") }} <input type="number" name="compass" min="0" max="{{ log_view_max }}" value="{{ log_view.compass }}"></label>
+        </div>
+        <button type="submit">{{ _("Enregistrer") }}</button>
+      </form>
+      <p class="act-muted act-map-note">{{ _("0 = on n'affiche pas. La photo vient de la fiche QRZ (compte QRZ requis) ; la boussole et la distance se calculent dès qu'un locator est connu, saisi à la main ou venu de QRZ.") }}</p>
+    </div>
+
     <div class="act-card act-card-wide" id="rapport">
       <h2>{{ _("Rapport PDF et logo") }} — {{ callsign }}</h2>
       {% if rp_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Contenu du rapport enregistré.") }}</p>
@@ -287,6 +301,10 @@
             <label class="act-check"><input type="checkbox" name="dxcc_all" value="1"{% if report_options.dxcc_all %} checked{% endif %}> {{ _("Toutes les entités DXCC avec leur drapeau (sinon : les dix premières)") }}</label>
             <label class="act-check"><input type="checkbox" name="sats" value="1"{% if report_options.sats %} checked{% endif %}> {{ _("Détailler les QSO par satellite (à la suite des modes)") }}</label>
             <label class="act-check"><input type="checkbox" name="one_page" value="1"{% if report_options.one_page %} checked{% endif %}> {{ _("Tout tenir sur une seule page") }}</label>
+            <label>{{ _("Meilleurs moments listés (pile-up)") }}
+              <input type="number" name="runs" min="0" max="10" value="{{ report_options.runs }}">
+              <span class="act-muted">{{ _("0 = pas de section") }}</span>
+            </label>
             <label>{{ _("Chasseurs listés") }}
               <input type="number" name="hunters" min="0" max="{{ report_hunters_max }}" value="{{ report_options.hunters }}">
               <span class="act-muted">{{ _("0 = pas de palmarès") }}</span>

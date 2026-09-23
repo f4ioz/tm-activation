@@ -341,6 +341,7 @@ def _gather(call: str) -> dict[str, Any]:
         "map_data": activation.map_data(call),
         "style": activation.get_map_style(call),
         "sats": activation.satellite_stats(call),
+        "runs": activation.run_periods(call, top=10),
     }
 
 
@@ -395,6 +396,34 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
                       n=timeline["active_hours"], rate=f"{timeline['per_hour']:g}"),
                     size=8.5, color=MUTED, width=sheet.width)
     sheet.y += m["gap"] + 8
+
+    # ── Meilleurs moments (pile-up) ───────────────────────────────────────
+    runs = data["runs"]["periods"][:opts["runs"]] if opts["runs"] else []
+    if runs:
+        sheet = book.room(34 + m["row"] * (len(runs) + 1)) if not single else book.sheet
+        sheet.section(_("Meilleurs moments"),
+                      _("{n} QSO en run · {share} % du log",
+                        n=data["runs"]["total"], share=f"{data['runs']['share']:g}"))
+        peak = max(r["rate"] for r in runs)
+        width = sheet.width * 0.62
+        y = sheet.y
+        for run in runs:
+            when = _("{day} · {start}-{end} UTC",
+                     day=_date_fr(run["start"][:10].replace("-", "")[:8]),
+                     start=run["start"][11:], end=run["end"][11:])
+            sheet.page.text(MARGIN, y, when, size=8.5, color=INK, width=width * 0.52)
+            sheet.page.text(MARGIN + width * 0.52, y,
+                            _("{n} QSO en {minutes} min", n=run["qsos"], minutes=run["minutes"]),
+                            size=8.5, color=MUTED, align="right", width=width * 0.28)
+            bar_x = MARGIN + width * 0.82
+            bar_w = sheet.width - (bar_x - MARGIN) - 52
+            sheet.page.rect(bar_x, y + 1, bar_w, 8, fill=PANEL, radius=2)
+            sheet.page.rect(bar_x, y + 1, max(bar_w * run["rate"] / peak, 2), 8,
+                            fill=pdf.hex_color("#c2632a"), radius=2)
+            sheet.page.text(MARGIN + sheet.width - 50, y, f"{run['rate']:g} QSO/h", size=8.5,
+                            bold=True, color=pdf.hex_color("#c2632a"), align="right", width=50)
+            y += m["row"] + 2
+        sheet.y = y + m["gap"] - 4
 
     # ── Bandes et modes ───────────────────────────────────────────────────
     lines = max(len(stats["by_band"][:8]), len(stats["by_mode"][:8]))

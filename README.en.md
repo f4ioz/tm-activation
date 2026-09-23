@@ -24,7 +24,8 @@ from a phone or a PC, while hunters follow the activation live on a public page.
 - **A PDF report** for the administrator: counters, pace day by day, bands,
   modes, **DXCC entities with their flags** and a hunter ranking. Each section
   QSOs made through **satellites** get their own section, broken down per
-  satellite. The document can be forced onto **a single page** — and even
+  satellite, and the **best moments** (the pile-up periods, with their rate) are
+  listed. The document can be forced onto **a single page** — and even
   without that option, an overflow of three lines is absorbed by tightening the
   layout rather than printing another page. Each section can be switched on or off in Settings, and the others
   use the room freed up. A
@@ -67,15 +68,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.32.3.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.32.3.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.33.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.33.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.32.3.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.33.0.tar.gz
 ```
 
 ## Features
@@ -131,6 +132,11 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.32
   - **The log stays in sight**: on a wide screen, entry on the left and the
     latest QSOs on the right, visible while logging; the page is tightened so
     that about ten rows fit without scrolling.
+  - **Who is on the other end?**: as soon as the locator is known — typed in or
+    from QRZ — a **compass** shows where to turn the antenna, with the
+    **bearing and the distance**, next to the **photo from the station's QRZ
+    page**. Both sizes are adjustable (0 = hidden), and everything is worked out
+    in the browser: no waiting between two QSOs.
   - **Am I being spotted?**: the last three DX spots for the callsign **on the
     band and kind of traffic being worked** (DXWatch, with HamQTH as a fallback)
     are shown next to the gauges, with the frequency, the spotter and the age;
@@ -203,6 +209,8 @@ is forced on you.
 | Satellite breakdown in the PDF | on | QSOs per satellite, after the modes |
 | Single-page PDF | off | tightens up, and trims the lists if needed |
 | Club logo | optional | large page banner (display can be switched off) and PDF report |
+| QRZ photo and compass on the log | 96 and 120 px | adjustable size, 0 to hide |
+| Best moments in the PDF | 3 | pile-up periods listed, 0 to drop |
 | Refuse logging on a booked band and mode | on | avoids two stations at once |
 | Show the contact list | your choice | "Latest contacts" on the public page |
 | Show map, DXCC and ranking | your choice | the "hunters" part of the public page |
@@ -258,22 +266,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.32.3.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.33.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.32.3.tar.gz
-   cd tm-activation-1.32.3
+   tar xzf tm-activation-1.33.0.tar.gz
+   cd tm-activation-1.33.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.32.3.zip
-   cd tm-activation-1.32.3
+   unzip tm-activation-1.33.0.zip
+   cd tm-activation-1.33.0
    sudo bash install.sh --lan
    ```
 
@@ -356,8 +364,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.32.3.tar.gz
-cd tm-activation-1.32.3
+tar xzf tm-activation-1.33.0.tar.gz
+cd tm-activation-1.33.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

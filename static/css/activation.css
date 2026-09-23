@@ -534,6 +534,27 @@ a.act-station-card:hover { border-color: var(--accent); }
 .flatpickr-time input:hover, .flatpickr-time input:focus { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .flatpickr-innerContainer, .flatpickr-time { border-color: var(--border); }
 
+/* Fiche du correspondant pendant la saisie : photo QRZ, boussole, distance.
+   Les tailles viennent des Réglages (attributs data-photo / data-compass). */
+.act-dir {
+  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem;
+  margin: 0.2rem 0 0;
+}
+.act-dir[hidden] { display: none; }
+.act-dir-photo { border-radius: 4px; border: 1px solid var(--border); object-fit: cover; }
+.act-dir-compass { line-height: 0; }
+.act-dir-meta {
+  margin: 0; font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--accent);
+}
+.act-dir-dial { fill: color-mix(in srgb, var(--accent) 8%, transparent); stroke: var(--border); }
+.act-dir-tick { stroke: var(--text-muted); stroke-width: 1; }
+.act-dir-tick.is-main { stroke: var(--text); stroke-width: 1.6; }
+.act-dir-card { fill: var(--text-muted); font-size: 9px; text-anchor: middle;
+  font-family: var(--font-mono, monospace); }
+.act-dir-needle { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+.act-dir-head, .act-dir-pivot { fill: var(--accent); }
+
 /* Indication « station déjà contactée ? » pendant la saisie du log. */
 .act-worked-hint { margin: 0.2rem 0 0; min-height: 1.1em; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
 .act-worked-hint.is-fresh { color: var(--green, #2ecc71); }

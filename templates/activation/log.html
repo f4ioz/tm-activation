@@ -93,6 +93,17 @@
     <p id="act-block-hint" class="act-block-hint" aria-live="polite"></p>
     <p id="act-worked-hint" class="act-worked-hint" aria-live="polite"></p>
     <p id="act-qrz-hint" class="act-qrz-hint" aria-live="polite"></p>
+    {% if log_view.photo or log_view.compass %}
+    {# Fiche du correspondant : photo QRZ, boussole (où tourner l'antenne) et
+       distance. Tailles réglées dans Réglages → Page de log. #}
+    <div class="act-dir" id="act-dir" hidden
+         data-home="{{ my_grid }}" data-photo="{{ log_view.photo }}" data-compass="{{ log_view.compass }}">
+      <img class="act-dir-photo" id="act-dir-photo" alt="{{ _("Photo de la fiche QRZ") }}" hidden
+           style="max-height: {{ log_view.photo }}px; max-width: {{ (log_view.photo * 1.4)|round|int }}px">
+      <div class="act-dir-compass" id="act-dir-compass" hidden></div>
+      <p class="act-dir-meta" id="act-dir-meta"></p>
+    </div>
+    {% endif %}
     <div class="act-row">
       <div class="act-when">
         <label>{{ _("Date et heure ({tz})", tz=tz_label) }} <input type="datetime-local" name="when" value="{{ now_input }}" data-tz="{{ tz_mode }}"></label>
@@ -202,11 +213,13 @@
         if (!d || !d.found) {
           show(d && d.configured === false ? {{ _("⚠ Compte QRZ non configuré")|tojson }}
                                            : {{ _("✗ {call} introuvable sur QRZ")|tojson }}.replace('{call}', call), true);
+          if (window.actStationClear) window.actStationClear();
           return;
         }
         var who = [d.fname, (d.name || '').toUpperCase()].filter(Boolean).join(' ');
         show('✓ ' + ([who, d.grid, d.country].filter(Boolean).join(' · ') || call));
         if (d.grid && !gridInput.value.trim()) { gridInput.value = d.grid; autoGrid = d.grid; }
+        if (window.actStation) window.actStation(d);
       })
       .catch(function () { show(''); });
   }
@@ -291,6 +304,12 @@
   setInterval(checkSlot, 60000);      // un créneau peut commencer pendant la saisie
   checkSlot();
 
+  // Locator tapé à la main : la boussole suit sans attendre QRZ.
+  if (gridInput) {
+    gridInput.addEventListener('input', function () {
+      if (window.actStationGrid) window.actStationGrid(gridInput.value);
+    });
+  }
   callInput.addEventListener('change', lookup);
   callInput.addEventListener('blur', lookup);
   callInput.addEventListener('input', function () { if (!callInput.value) { show(''); lastCall = ''; } });
@@ -350,9 +369,11 @@
     applyPrefs();
     resetWhen();
     show(''); lastCall = ''; autoGrid = '';
+    if (window.actStationClear) window.actStationClear();
     workedData = null; workedCall = ''; showWorked();
     checkSlot();
   };
 })();
 </script>
+<script src="{{ asset('/static/js/activation-station.js') }}" defer></script>
 {% endblock %}

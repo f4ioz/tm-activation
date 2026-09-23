@@ -776,6 +776,9 @@ def init_db() -> None:
             c.execute("ALTER TABLE contacts ADD COLUMN sat_name TEXT DEFAULT ''")
         if "source" not in {row[1] for row in c.execute("PRAGMA table_info(slots)").fetchall()}:
             c.execute("ALTER TABLE slots ADD COLUMN source TEXT DEFAULT 'manual'")
+        # Photo de la fiche QRZ (vignette montrée pendant la saisie du log).
+        if "image" not in {row[1] for row in c.execute("PRAGMA table_info(callbook)").fetchall()}:
+            c.execute("ALTER TABLE callbook ADD COLUMN image TEXT DEFAULT ''")
         # Comptes opérateurs (mot de passe individuel, admin, validation).
         ops_cols = {row[1] for row in c.execute("PRAGMA table_info(operators)").fetchall()}
         for col, decl in (("password_hash", "TEXT DEFAULT ''"), ("is_admin", "INTEGER DEFAULT 0"),
@@ -1779,7 +1782,8 @@ def _callbook_put(call: str, status: str, rec: Any = None) -> None:
     with conn() as c:
         c.execute(
             "INSERT OR REPLACE INTO callbook(call, status, fname, name, grid, country, "
-            "dxcc, dxcc_name, cqzone, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "dxcc, dxcc_name, cqzone, image, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 call, status,
                 (getattr(rec, "fname", "") or "").strip(),
@@ -1788,9 +1792,23 @@ def _callbook_put(call: str, status: str, rec: Any = None) -> None:
                 _int_or_none(getattr(rec, "dxcc", None)),
                 land or country,
                 _int_or_none(getattr(rec, "cqzone", None)),
+                _photo_url(getattr(rec, "image", "")),
                 int(time.time()),
             ),
         )
+
+
+def _photo_url(url: str) -> str:
+    """Adresse de la photo QRZ, gardée seulement si elle est sûre.
+
+    On ne retient qu'une URL https vers qrz.com : la vignette est affichée dans
+    l'espace opérateurs, pas question d'y charger n'importe quel domaine."""
+    clean = (url or "").strip()
+    if not clean.lower().startswith("https://"):
+        return ""
+    host = clean.split("/", 3)[2].lower().split(":")[0]
+    ok = host == "qrz.com" or host.endswith(".qrz.com")
+    return clean[:300] if ok and len(clean) < 300 else ""
 
 
 def _callbook_fresh(row: dict[str, Any] | None) -> bool:
@@ -1919,6 +1937,22 @@ def stop_enricher() -> None:
 
 
 GRID_MISMATCH_KM = 500  # saisi à plus de 500 km de QRZ → saisie tenue pour fausse
+
+
+def bearing_deg(grid_from: str, grid_to: str) -> float | None:
+    """Azimut vrai (0 = nord, 90 = est) entre les centres de deux locators.
+
+    Sert à la boussole de la page de log : d'un coup d'œil, l'opérateur sait
+    où tourner l'antenne."""
+    start, end = locator_center(grid_from), locator_center(grid_to)
+    if start is None or end is None:
+        return None
+    lat1, lon1 = math.radians(start[0]), math.radians(start[1])
+    lat2, lon2 = math.radians(end[0]), math.radians(end[1])
+    dlon = lon2 - lon1
+    y = math.sin(dlon) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+    return (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
 
 
 def call_grids(station: str | None = None) -> dict[str, str]:
@@ -2075,6 +2109,97 @@ def qso_timeline(station: str | None = None) -> dict[str, Any]:
     }
 
 
+# ── Périodes de « run » (pile-up) ─────────────────────────────────────────
+# Un run, c'est le moment où ça décolle : les QSO s'enchaînent sans temps mort.
+# On repère les contacts dont la cadence LOCALE (fenêtre glissante) dépasse un
+# seuil, puis on recolle ceux qui se suivent. Le résultat dit quand la station
+# a le mieux tourné, et à quelle vitesse.
+
+RUN_WINDOW_MIN = 10        # fenêtre glissante d'observation
+RUN_MIN_RATE = 30          # QSO/h : en dessous, ce n'est pas un run
+RUN_MIN_QSOS = 5           # une pointe de deux contacts n'est pas un run
+
+
+def _qso_minutes(station: str) -> list[int]:
+    """Instants des QSO, en minutes depuis l'époque, dans l'ordre."""
+    init_db()
+    with conn() as c:
+        rows = c.execute(
+            "SELECT qso_date, time_on FROM contacts WHERE station = ? "
+            "ORDER BY qso_date, time_on", (station,)
+        ).fetchall()
+    out = []
+    for row in rows:
+        day, hhmm = (row["qso_date"] or ""), (row["time_on"] or "")
+        if len(day) != 8 or len(hhmm) < 4:
+            continue
+        try:
+            when = datetime(int(day[:4]), int(day[4:6]), int(day[6:8]),
+                            int(hhmm[:2]), int(hhmm[2:4]), tzinfo=UTC)
+        except ValueError:
+            continue
+        out.append(int(when.timestamp() // 60))
+    return sorted(out)
+
+
+def run_periods(station: str | None = None, top: int = 5) -> dict[str, Any]:
+    """Meilleurs moments de l'activation : périodes où la cadence s'emballe.
+
+    Renvoie ``periods`` (les ``top`` meilleures, cadence décroissante), chacune
+    avec son début, sa fin, sa durée, son nombre de QSO et sa cadence, plus
+    ``best`` (la meilleure) et le total de QSO passés en run.
+    """
+    minutes = _qso_minutes(_st(station))
+    if not minutes:
+        return {"periods": [], "best": None, "total": 0, "share": 0.0}
+    hot: list[bool] = []
+    half = RUN_WINDOW_MIN / 2.0
+    low = high = 0
+    for at in minutes:
+        # Fenêtre CENTRÉE sur le QSO : avec une fenêtre qui ne regarde que
+        # devant, les derniers contacts d'une rafale passaient pour calmes.
+        while minutes[low] < at - half:
+            low += 1
+        while high < len(minutes) and minutes[high] <= at + half:
+            high += 1
+        hot.append((high - low) * 60.0 / RUN_WINDOW_MIN >= RUN_MIN_RATE)
+    runs: list[dict[str, Any]] = []
+    current: list[int] = []
+    for at, is_hot in zip(minutes, hot):
+        if is_hot and (not current or at - current[-1] <= RUN_WINDOW_MIN):
+            current.append(at)
+            continue
+        if len(current) >= RUN_MIN_QSOS:
+            runs.append(_run_from(current))
+        current = [at] if is_hot else []
+    if len(current) >= RUN_MIN_QSOS:
+        runs.append(_run_from(current))
+    runs.sort(key=lambda r: (-r["rate"], -r["qsos"]))
+    in_runs = sum(r["qsos"] for r in runs)
+    return {
+        "periods": runs[:top] if top else [],
+        "best": runs[0] if runs else None,
+        "total": in_runs,
+        "count": len(runs),
+        "share": round(100 * in_runs / len(minutes), 1),
+    }
+
+
+def _run_from(minutes: list[int]) -> dict[str, Any]:
+    """Résumé d'une suite de QSO serrés : durée, cadence, début et fin (UTC)."""
+    start, end = minutes[0], minutes[-1]
+    # Un QSO isolé dure au moins la fenêtre d'observation : sinon la cadence
+    # d'une salve de trois contacts dans la même minute serait infinie.
+    span = max(end - start, RUN_WINDOW_MIN)
+    return {
+        "start": datetime.fromtimestamp(start * 60, UTC).strftime("%Y-%m-%dT%H:%M"),
+        "end": datetime.fromtimestamp(end * 60, UTC).strftime("%Y-%m-%dT%H:%M"),
+        "minutes": end - start,
+        "qsos": len(minutes),
+        "rate": round(len(minutes) * 60.0 / span, 1),
+    }
+
+
 def dxcc_table(station: str | None = None) -> dict[str, Any]:
     """Entités DXCC contactées : stations et QSO par entité.
 
@@ -2116,6 +2241,33 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
     return {"entities": entities, "count": len(entities), "unidentified": unidentified}
 
 
+# ── Fiche du correspondant sur la page de log (réglable) ──────────────────
+# Pendant la saisie : la photo de la fiche QRZ et une boussole qui montre où
+# tourner l'antenne. Chacune se règle en pixels, 0 = on ne l'affiche pas.
+
+DEFAULT_LOG_VIEW: dict[str, int] = {"photo": 96, "compass": 120}
+LOG_VIEW_MAX = 260
+
+
+def get_log_view() -> dict[str, int]:
+    saved = load_settings().get("log_view") or {}
+    d = DEFAULT_LOG_VIEW
+    return {
+        "photo": _clamp_int(saved.get("photo"), 0, LOG_VIEW_MAX, d["photo"]),
+        "compass": _clamp_int(saved.get("compass"), 0, LOG_VIEW_MAX, d["compass"]),
+    }
+
+
+def set_log_view(form: dict[str, Any]) -> dict[str, int]:
+    data = load_settings()
+    data["log_view"] = {
+        "photo": _clamp_int(form.get("photo"), 0, LOG_VIEW_MAX, DEFAULT_LOG_VIEW["photo"]),
+        "compass": _clamp_int(form.get("compass"), 0, LOG_VIEW_MAX, DEFAULT_LOG_VIEW["compass"]),
+    }
+    _save_settings(data)
+    return get_log_view()
+
+
 # ── Rapport PDF et logo du club (réglables dans les Réglages) ─────────────
 
 DEFAULT_REPORT: dict[str, Any] = {
@@ -2124,6 +2276,7 @@ DEFAULT_REPORT: dict[str, Any] = {
     "hunters": 10,       # nombre de chasseurs listés (0 = pas de palmarès)
     "sats": True,        # « Satellites » : masqué de toute façon sans QSO satellite
     "one_page": False,   # tout tenir sur une page, quitte à couper les listes
+    "runs": 3,           # meilleurs moments (pile-up) listés ; 0 = section retirée
 }
 REPORT_HUNTERS_MAX = 100
 
@@ -2142,6 +2295,7 @@ def get_report_options() -> dict[str, Any]:
         "hunters": _clamp_int(saved.get("hunters"), 0, REPORT_HUNTERS_MAX, d["hunters"]),
         "sats": bool(saved.get("sats", d["sats"])),
         "one_page": bool(saved.get("one_page", d["one_page"])),
+        "runs": _clamp_int(saved.get("runs"), 0, 10, d["runs"]),
     }
 
 
@@ -2154,6 +2308,7 @@ def set_report_options(form: dict[str, Any]) -> dict[str, Any]:
                               DEFAULT_REPORT["hunters"]),
         "sats": bool(form.get("sats")),
         "one_page": bool(form.get("one_page")),
+        "runs": _clamp_int(form.get("runs"), 0, 10, DEFAULT_REPORT["runs"]),
     }
     _save_settings(data)
     return get_report_options()
