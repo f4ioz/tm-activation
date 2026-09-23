@@ -127,10 +127,9 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
             "evenement": st.get("label") or target,
             "periode": _period(st),
             # L'indicatif spécial prend la place du gros titre, souligné de son
-            # propre morse. Pas de sous-titre : le nom de l'activation est déjà
-            # dans la phrase d'attribution, juste en dessous.
+            # propre morse ; le libellé de l'activation vient juste dessous.
             "titre": target,
-            "sous_titre": "",
+            "sous_titre": (st.get("label") or "").strip().upper(),
             "morse": target,
         },
         "options": {"max_qso": options["max_qso"], "annexe": options["annexe"]},

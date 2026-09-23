@@ -206,18 +206,23 @@ def page_principale(c, d):
         c.drawCentredString(X0 + BW / 2, H - 274, nom)
         ind, li = dest["indicatif"] + "   ", dest.get("locator", "")
     else:   # pas de nom : l'indicatif prend la place du nom
-        c.setFillColor(NAVY2); c.setFont("PopExtraBold", 40)
+        c.setFillColor(NAVY2); c.setFont("PopExtraBold", 44)
         c.drawCentredString(X0 + BW / 2, H - 278, dest["indicatif"])
         ind, li = "", dest.get("locator", "")
     c.setStrokeColor(NAVY3); c.setLineWidth(1); c.line(X0 + 10, H - 290, X0 + BW - 10, H - 290)
-    w1 = pdfmetrics.stringWidth(ind, "PopExtraBold", 20); w2 = pdfmetrics.stringWidth(li, "PopSemiBold", 10.5)
+    # L'indicatif du récipiendaire est ce qu'on lit en premier sur un mur :
+    # il est plus gros que le reste, le locator restant discret à côté.
+    fs = fit(ind + li, "PopExtraBold", 30, BW - 40, 18)
+    w1 = pdfmetrics.stringWidth(ind, "PopExtraBold", fs)
+    w2 = pdfmetrics.stringWidth(li, "PopSemiBold", fs * 0.42)
     xs = X0 + BW / 2 - (w1 + w2) / 2
-    c.setFont("PopExtraBold", 20); c.setFillColor(RED2); c.drawString(xs, H - 311, ind)
-    c.setFont("PopSemiBold", 10.5); c.setFillColor(NAVY); c.drawString(xs + w1, H - 311, li)
+    c.setFont("PopExtraBold", fs); c.setFillColor(RED2); c.drawString(xs, H - 318, ind)
+    c.setFont("PopSemiBold", fs * 0.42); c.setFillColor(NAVY)
+    c.drawString(xs + w1, H - 318, li)
 
     texte = d.get("texte") or (f"pour avoir contacté la station spéciale {act['indicatif']}, "
                                f"activée lors du {act['evenement']} {act.get('periode', '')}.").replace(" .", ".")
-    c.setFont("PopRegular", 9.5); c.setFillColor(GRIS); yy = H - 328
+    c.setFont("PopRegular", 9.5); c.setFillColor(GRIS); yy = H - 336
     for l in wrap(texte, "PopRegular", 9.5, BW)[:2]:
         c.drawCentredString(X0 + BW / 2, yy, l); yy -= 12.5
     deborde = tableau_p1(c, d, yy - 4)

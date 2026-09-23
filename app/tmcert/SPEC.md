@@ -27,12 +27,12 @@ Poppins (Regular, Medium, SemiBold, Bold, ExtraBold) ; Great Vibes pour le nom.
 |---|---|---|---|
 | Titre | 445 | Poppins ExtraBold 60 | défaut « CERTIFICAT » ; l'application y met l'indicatif spécial |
 | Souligné morse | 435 | pavés or, unité calculée | traduction du titre (ou `activation.morse`), calée sur sa largeur |
-| Sous-titre | 415 | Poppins SemiBold 20 | réduit jusqu'à 12 pt pour tenir en 400 pt |
+| Sous-titre | 415 | Poppins SemiBold 20 | réduit jusqu'à 12 pt ; l'application y met le libellé de l'activation, une chaîne vide le supprime |
 | Bandeau | 373–397 | SemiBold 10 blanc sur marine | texte fixe |
-| Nom | 319 | Great Vibes 44 | réduit jusqu'à 26 pt ; absent → indicatif en ExtraBold 40 |
+| Nom | 321 | Poppins SemiBold 30 | réduit jusqu'à 17 pt ; absent → indicatif en ExtraBold 44 |
 | Filet | 305 | — | |
-| Indicatif + locator | 284 | ExtraBold 20 rouge + SemiBold 10,5 | centrés ensemble |
-| Phrase d'attribution | 267 | Regular 9,5 | 2 lignes max, centrée |
+| Indicatif + locator | 277 | ExtraBold 30 rouge (réduit jusqu'à 18) + SemiBold 0,42× | centrés ensemble |
+| Phrase d'attribution | 259 | Regular 9,5 | 2 lignes max, centrée |
 | Tableau QSO | sous la phrase | en-tête 16 pt, lignes 13,5 pt | colonnes : date, UTC, bande, fréquence, mode (badge), RST env., RST reçu |
 | Synthèse | 18 pt sous le tableau | Medium 8 + ExtraBold 11 | QSO, bandes, modes, points (rouge) |
 | Pied | 56 / 50 / 37 | SemiBold 10,5 / filet / Medium 8,5 | gestionnaire (x 268), n° (x 585), date (x 735) — **pas de signature** |

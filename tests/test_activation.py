@@ -2021,7 +2021,8 @@ def test_certificate_flag_and_border(monkeypatch, tmp_path) -> None:
     data = certificate.hunter_data("ON4ZZ")
     assert data["drapeau"].endswith("/fr.png")          # TM25TEST → France
     assert data["liseret"] == ["#0055A4", "#FFFFFF", "#EF3340"]
-    assert data["activation"]["sous_titre"] == ""       # plus de répétition sous le titre
+    # Sous le gros indicatif : le libellé de l'activation, en capitales.
+    assert data["activation"]["sous_titre"] == activation.current_station()["label"].upper()
 
     admin.post("/activation/settings/certificate", data={"enabled": "1", "flag": "BE"})
     assert certificate.hunter_data("ON4ZZ")["drapeau"].endswith("/be.png")
