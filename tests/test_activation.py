@@ -2007,6 +2007,31 @@ def test_hunter_certificate(monkeypatch, tmp_path) -> None:
     assert "Pas de certificat" in TestClient(app).get("/tm25test?call=XX9ZZZ&cert=absent").text
 
 
+def test_admin_can_try_a_certificate_from_settings(monkeypatch, tmp_path) -> None:
+    """Champ d'essai des Réglages : un indicatif, un PDF — et un message clair
+    (sans quitter les Réglages) quand l'indicatif n'a pas de QSO."""
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    activation.add_contact(call="ON4ZZ", band="20M", mode="SSB", operator_call="F4IOZ")
+    admin = _private_client()
+    page = admin.get("/activation/settings").text
+    assert 'action="/tm25test/certificat"' in page and 'value="settings"' in page
+    assert 'value="ON4ZZ"' in page                 # pré-rempli avec le premier chasseur
+    r = admin.get("/tm25test/certificat?call=ON4ZZ&back=settings")
+    assert r.status_code == 200 and r.content.startswith(b"%PDF-")
+    r = admin.get("/tm25test/certificat?call=XX9ZZZ&back=settings")
+    assert r.status_code == 303 and "ce=absent" in r.headers["location"]
+    assert "cert_call=XX9ZZZ" in r.headers["location"]
+    assert "aucun QSO" in admin.get("/activation/settings?ce=absent&cert_call=XX9ZZZ").text
+    # « back=settings » ne sert qu'à l'admin : un visiteur revient au board.
+    activation.set_certificate_options({"enabled": "1"})
+    _public()
+    r = TestClient(app, follow_redirects=False).get(
+        "/tm25test/certificat?call=XX9ZZZ&back=settings")
+    assert r.status_code == 303 and r.headers["location"].startswith("/tm25test?call=")
+
+
 def test_certificate_name_is_opt_in(monkeypatch, tmp_path) -> None:
     """Le nom du chasseur n'apparaît que si l'admin l'a demandé (vie privée)."""
     from app import certificate

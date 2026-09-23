@@ -408,6 +408,8 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             certificate_options=activation.get_certificate_options(),
             certificate_engine=certificate.engine_ready(),
             ce_flash=request.query_params.get("ce"),
+            cert_call=(request.query_params.get("cert_call") or "").strip().upper()[:12],
+            cert_sample=next((h["call"] for h in activation.hunters_ranking(1)), ""),
             log_view_max=activation.LOG_VIEW_MAX,
             lv_flash=request.query_params.get("lv"),
             public_slots_max=activation.public_slots_max(),
@@ -1407,7 +1409,8 @@ register_url_convertor("callslug", _CallSlugConvertor())
 
 
 @public_router.get("/{slug:callslug}/certificat")
-async def hunter_certificate(request: Request, slug: str, call: str = "") -> Response:
+async def hunter_certificate(request: Request, slug: str, call: str = "",
+                             back: str = "") -> Response:
     """Certificat PDF d'un chasseur (page publique de l'indicatif).
 
     Ouvert aux chasseurs quand l'admin a activé les certificats ; un
@@ -1421,13 +1424,23 @@ async def hunter_certificate(request: Request, slug: str, call: str = "") -> Res
     if not admin and (not st["public"] or not activation.certificates_on()):
         return Response(status_code=404)
     cs = (call or "").strip().upper()
+    # Essai depuis les Réglages : on y revient (avec le message), plutôt que
+    # d'expédier l'administrateur sur la page publique.
+    settings_back = back == "settings" and admin
+
+    def failed(reason: str) -> Response:
+        if settings_back:
+            return RedirectResponse(f"/activation/settings?ce={reason}&cert_call={quote(cs)}"
+                                    "#certificats", status_code=303)
+        return RedirectResponse(f"/{slug}?call={quote(cs)}&cert={reason}", status_code=303)
+
     try:
         data = await run_in_threadpool(certificate.build_certificate, cs, st["callsign"])
     except certificate.CertificateUnavailable as exc:
         logging.getLogger(__name__).warning("certificat indisponible : %s", exc)
-        return RedirectResponse(f"/{slug}?call={quote(cs)}&cert=moteur", status_code=303)
+        return failed("moteur")
     if data is None:
-        return RedirectResponse(f"/{slug}?call={quote(cs)}&cert=absent", status_code=303)
+        return failed("absent")
     name = f"certificat-{activation.slugify_call(st['callsign'])}-{activation.slugify_call(cs)}.pdf"
     return Response(
         content=data, media_type="application/pdf",

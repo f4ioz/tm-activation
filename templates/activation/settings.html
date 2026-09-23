@@ -275,7 +275,9 @@
 
     <div class="act-card" id="certificats">
       <h2>{{ _("Certificats des chasseurs") }}</h2>
-      {% if ce_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Certificats enregistrés.") }}</p>{% endif %}
+      {% if ce_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Certificats enregistrés.") }}</p>
+      {% elif ce_flash == 'absent' %}<p class="act-alert act-alert-dupe">{{ _("{call} n'a aucun QSO avec {station} : pas de certificat à produire.", call=cert_call, station=callsign) }}</p>
+      {% elif ce_flash == 'moteur' %}<p class="act-alert act-alert-err">{{ _("Certificat impossible : le moteur n'est pas installé.") }}</p>{% endif %}
       {% if not certificate_engine %}
         <p class="act-alert act-alert-err">{{ _("Moteur de certificats absent : installez reportlab (pip install reportlab), puis redémarrez.") }}</p>
       {% endif %}
@@ -287,8 +289,18 @@
         <label>{{ _("Mention en bas de page") }} <input type="text" name="mention" maxlength="160" value="{{ certificate_options.mention }}" placeholder="{{ _("ex. Radio-club de Villeneuve — F6ABC") }}"></label>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
-      <p class="act-muted act-map-note">{{ _("Le gestionnaire affiché est le nom du club (config.yml), le numéro reprend l'indicatif spécial et celui du chasseur. Un administrateur peut toujours produire un certificat, même sans l'ouvrir au public :") }}
-        <a href="/{{ station.slug }}/certificat?call={{ current_op or 'F4XYZ' }}">{{ _("essayer") }}</a>.</p>
+      <fieldset class="act-fieldset">
+        <legend>{{ _("Essayer un certificat") }}</legend>
+        <form method="get" action="/{{ station.slug }}/certificat" class="act-inline">
+          <input type="hidden" name="back" value="settings">
+          <label>{{ _("Indicatif du chasseur") }}
+            <input type="text" name="call" required autocapitalize="characters" autocomplete="off"
+                   value="{{ cert_call or cert_sample }}" placeholder="F4XYZ"></label>
+          <button type="submit">{{ _("Générer le PDF") }}</button>
+        </form>
+        <p class="act-muted act-map-note">{{ _("Le certificat s'ouvre en téléchargement. Un administrateur peut en produire un même quand ils ne sont pas ouverts au public — de quoi relire avant d'ouvrir.") }}</p>
+      </fieldset>
+      <p class="act-muted act-map-note">{{ _("Le gestionnaire affiché est le nom du club (config.yml) et le numéro reprend l'indicatif spécial et celui du chasseur.") }}</p>
     </div>
 
     <div class="act-card" id="log">
