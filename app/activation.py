@@ -777,8 +777,13 @@ def init_db() -> None:
         if "source" not in {row[1] for row in c.execute("PRAGMA table_info(slots)").fetchall()}:
             c.execute("ALTER TABLE slots ADD COLUMN source TEXT DEFAULT 'manual'")
         # Photo de la fiche QRZ (vignette montrée pendant la saisie du log).
-        if "image" not in {row[1] for row in c.execute("PRAGMA table_info(callbook)").fetchall()}:
-            c.execute("ALTER TABLE callbook ADD COLUMN image TEXT DEFAULT ''")
+        # ``image_at`` : date du dernier passage CHERCHANT la photo. Les fiches
+        # d'avant cette fonction valent « ok » mais n'ont jamais eu de photo :
+        # sans ce repère, elles ne seraient plus jamais réinterrogées.
+        book_cols = {row[1] for row in c.execute("PRAGMA table_info(callbook)").fetchall()}
+        for col, decl in (("image", "TEXT DEFAULT ''"), ("image_at", "INTEGER DEFAULT 0")):
+            if col not in book_cols:
+                c.execute(f"ALTER TABLE callbook ADD COLUMN {col} {decl}")
         # Comptes opérateurs (mot de passe individuel, admin, validation).
         ops_cols = {row[1] for row in c.execute("PRAGMA table_info(operators)").fetchall()}
         for col, decl in (("password_hash", "TEXT DEFAULT ''"), ("is_admin", "INTEGER DEFAULT 0"),
@@ -1782,8 +1787,8 @@ def _callbook_put(call: str, status: str, rec: Any = None) -> None:
     with conn() as c:
         c.execute(
             "INSERT OR REPLACE INTO callbook(call, status, fname, name, grid, country, "
-            "dxcc, dxcc_name, cqzone, image, fetched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "dxcc, dxcc_name, cqzone, image, image_at, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 call, status,
                 (getattr(rec, "fname", "") or "").strip(),
@@ -1793,6 +1798,7 @@ def _callbook_put(call: str, status: str, rec: Any = None) -> None:
                 land or country,
                 _int_or_none(getattr(rec, "cqzone", None)),
                 _photo_url(getattr(rec, "image", "")),
+                int(time.time()),          # photo cherchée : on ne repassera pas
                 int(time.time()),
             ),
         )
@@ -1816,7 +1822,8 @@ def _callbook_fresh(row: dict[str, Any] | None) -> bool:
     if row is None:
         return False
     if row["status"] == "ok":
-        return True
+        # Fiche antérieure à la vignette : on la relit UNE fois pour la photo.
+        return bool(row.get("image_at"))
     ttl = CALLBOOK_RETRY_NOTFOUND if row["status"] == "notfound" else CALLBOOK_RETRY_ERROR
     return time.time() - (row["fetched_at"] or 0) < ttl
 
@@ -1842,7 +1849,10 @@ def qrz_lookup(call: str, client: Any) -> dict[str, Any] | None:
 
 
 def pending_callbook_calls(limit: int = 1) -> list[str]:
-    """Indicatifs contactés sans fiche callbook valable (jamais vus d'abord)."""
+    """Indicatifs contactés sans fiche callbook valable (jamais vus d'abord).
+
+    Comprend les fiches d'avant la vignette QRZ : elles sont correctes mais
+    n'ont jamais eu de photo, la tâche de fond les repasse une fois."""
     init_db()
     now = int(time.time())
     with conn() as c:
@@ -1851,6 +1861,7 @@ def pending_callbook_calls(limit: int = 1) -> list[str]:
             "WHERE cb.call IS NULL "
             "OR (cb.status = 'notfound' AND cb.fetched_at < ?) "
             "OR (cb.status = 'error' AND cb.fetched_at < ?) "
+            "OR (cb.status = 'ok' AND COALESCE(cb.image_at, 0) = 0) "
             "GROUP BY ct.call ORDER BY cb.call IS NOT NULL, MIN(ct.id) LIMIT ?",
             (now - CALLBOOK_RETRY_NOTFOUND, now - CALLBOOK_RETRY_ERROR, int(limit)),
         ).fetchall()

@@ -1893,6 +1893,29 @@ def test_qrz_photo_is_kept_only_from_qrz(monkeypatch) -> None:
     assert client.get("/activation/qrz?call=ON4ZZ").json()["image"] == ""
 
 
+def test_old_callbook_entries_get_their_photo(monkeypatch) -> None:
+    """Fiche mise en cache AVANT la vignette : elle vaut « ok » mais n'a pas de
+    photo. Sans repère, elle ne serait jamais réinterrogée — vécu sur F4IOZ."""
+    photo = "https://cdn-xml.qrz.com/z/dl1abc/portrait.jpg"
+    _qso("DL1ABC")            # la tâche de fond ne repasse que sur les stations contactées
+    fake = _FakeQrz({"DL1ABC": XmlLookup(call="DL1ABC", grid="JO31AB", land="Germany",
+                                         image=photo)})
+    activation.qrz_lookup("DL1ABC", fake)
+    assert activation.callbook_get("DL1ABC")["image"] == photo
+    # On simule l'ancienne fiche : photo jamais cherchée.
+    with activation.conn() as c:
+        c.execute("UPDATE callbook SET image = '', image_at = 0 WHERE call = 'DL1ABC'")
+    assert activation.callbook_get("DL1ABC")["image"] == ""
+    assert "DL1ABC" in activation.pending_callbook_calls(5)      # la tâche de fond la reprend
+    fake.asked.clear()
+    activation.qrz_lookup("DL1ABC", fake)
+    assert fake.asked == ["DL1ABC"] and activation.callbook_get("DL1ABC")["image"] == photo
+    # Une fois la photo cherchée, on ne redérange plus QRZ.
+    fake.asked.clear()
+    activation.qrz_lookup("DL1ABC", fake)
+    assert fake.asked == [] and "DL1ABC" not in activation.pending_callbook_calls(5)
+
+
 def test_log_page_station_card_sizes(monkeypatch) -> None:
     """Photo et boussole : tailles réglables, 0 = on n'affiche rien."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
