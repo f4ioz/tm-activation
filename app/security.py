@@ -137,7 +137,9 @@ def check_request(request: Any) -> Response | None:
             return PlainTextResponse("Accès temporairement bloqué.", status_code=403)
         if ban:
             del _bans[ip]
-        if not visits._SCAN_RE.search(path):
+        # /static/ exclu : les drapeaux DXCC sont servis depuis /static/vendor/flags/
+        # (« /vendor/ » est un motif de scan → bannissement des visiteurs de /tm25test)
+        if path.startswith("/static/") or not visits._SCAN_RE.search(path):
             return None
         q = _scan_hits.setdefault(ip, deque())
         q.append(now)

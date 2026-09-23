@@ -7,7 +7,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from app import activation, auth as auth_mod, config, templating
+from app import activation, auth as auth_mod, config, security, templating
 from app.main import app
 from app.routers import activation as activation_router
 
@@ -100,6 +100,16 @@ def test_trusted_proxy_forwards_real_ip_and_https(admin_pw) -> None:
     other = {"X-Forwarded-For": "198.51.100.8", "X-Forwarded-Proto": "https"}
     ok = client.post("/login", data={"password": "adminpw"}, headers=other)
     assert ok.status_code == 303 and "secure" in ok.headers["set-cookie"].lower()
+
+
+def test_local_web_assets_never_trigger_scan_ban() -> None:
+    """htmx, Leaflet, polices et drapeaux sont servis depuis /static/vendor/ :
+    « /vendor/ » est un motif de scan, un visiteur ne doit pas être banni."""
+    client = TestClient(app, follow_redirects=False, client=PUBLIC_PEER)
+    for name in ("htmx/a.js", "leaflet/b.js", "leaflet/c.css", "fonts/d.woff2", "flags/fr.png", "flags/de.png"):
+        client.get(f"/static/vendor/{name}")
+    assert client.get("/activations").status_code == 200
+    assert not security.banned_ips()
 
 
 def test_lan_is_never_blocked(admin_pw) -> None:
