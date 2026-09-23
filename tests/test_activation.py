@@ -2007,6 +2007,39 @@ def test_hunter_certificate(monkeypatch, tmp_path) -> None:
     assert "Pas de certificat" in TestClient(app).get("/tm25test?call=XX9ZZZ&cert=absent").text
 
 
+def test_certificate_points_match_the_ranking(monkeypatch, tmp_path) -> None:
+    """Les points du certificat sont CEUX de l'application : même règle, mêmes
+    doublons à zéro, même total que le classement public."""
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    activation.set_flag("auto_slots", False)
+    _public("JN18FS")
+    for call, band, mode, grid in (("ON4ZZ", "40M", "SSB", "JO20"),
+                                   ("ON4ZZ", "40M", "SSB", "JO20"),   # doublon : 0 point
+                                   ("ON4ZZ", "40M", "CW", "JO20"),
+                                   ("DL1ABC", "20M", "CW", "JO31")):
+        activation.add_contact(call=call, band=band, mode=mode, operator_call="F4IOZ",
+                               gridsquare=grid)
+    activation.set_scoring({"enabled": "1", "unique_band_mode": "1", "per_qso_on": "1",
+                            "per_qso": "3", "mode_on": "1", "mode_CW": "4", "mode_SSB": "2",
+                            "distance_on": "1", "km_per_point": "1000"})
+    ranking = {h["call"]: h for h in activation.hunters_ranking()}
+    for call in ("ON4ZZ", "DL1ABC"):
+        qso = certificate.hunter_data(call)["qso"]
+        assert sum(q["points"] for q in qso) == ranking[call]["points"], call
+    # Le doublon 40 m SSB ne rapporte rien, comme au classement.
+    points = [q["points"] for q in certificate.hunter_data("ON4ZZ")["qso"]]
+    assert points.count(0) == 1 and sum(points) == ranking["ON4ZZ"]["points"]
+
+    # Sans règle de points, le certificat compte les couples bande × mode —
+    # le critère du classement dans ce cas.
+    activation.set_scoring({"per_qso": "3"})          # enabled absent = désactivé
+    assert activation.get_scoring()["enabled"] is False
+    qso = certificate.hunter_data("ON4ZZ")["qso"]
+    assert sum(q["points"] for q in qso) == ranking["ON4ZZ"]["band_modes"] == 2
+
+
 def test_certificate_page_options(monkeypatch, tmp_path) -> None:
     """Nombre de contacts en page 1 et annexe : réglables dans les Réglages."""
     import re

@@ -87,6 +87,10 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
     rule = activation.get_scoring(target)
     bareme = {**rule["mode_points"], "*": rule["mode_default"]} if rule["enabled"] \
         else {"*": 1}
+    # Les points imprimés sont CEUX DE L'APPLICATION : même règle que le
+    # classement public, doublons bande×mode compris.
+    km = activation.distance_km(activation.my_gridsquare(target),
+                                activation.call_grids(target).get(cs, ""))
     club = club_config()
     manager = (club.get("name") or "").strip() or target
     options = activation.get_certificate_options()
@@ -112,7 +116,10 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
         }
         if c["freq_mhz"]:
             entry["freq_mhz"] = float(c["freq_mhz"])
+        entry["points"] = (activation.qso_points(entry["mode"], km, rule)
+                           if rule["enabled"] else 1)
         qso.append(entry)
+    _apply_best_per_pair(qso, rule)
 
     data: dict[str, Any] = {
         "activation": {
@@ -144,6 +151,29 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
     if logo:
         data["logo_path"] = str(logo)
     return data
+
+
+def _apply_best_per_pair(qso: list[dict[str, Any]], rule: dict[str, Any]) -> None:
+    """Un seul QSO compté par bande × mode, comme au classement.
+
+    Le meilleur de chaque couple garde ses points, les autres tombent à zéro :
+    le total du certificat colle alors au score affiché sur la page publique.
+    Sans règle de points, c'est le nombre de couples bande×mode qui fait foi —
+    c'est déjà le critère du classement.
+    """
+    if rule["enabled"] and not rule["unique_band_mode"]:
+        return
+    best: dict[tuple[str, str], int] = {}
+    for entry in qso:
+        key = (entry["bande"], entry["mode"])
+        best[key] = max(best.get(key, 0), entry["points"])
+    kept: set[tuple[str, str]] = set()
+    for entry in qso:
+        key = (entry["bande"], entry["mode"])
+        if key not in kept and entry["points"] == best[key]:
+            kept.add(key)
+        else:
+            entry["points"] = 0
 
 
 LOGO_SIDE = 420        # le logo est imprimé sur ~6 cm : 420 px suffisent

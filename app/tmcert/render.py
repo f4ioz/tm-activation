@@ -52,7 +52,9 @@ def normaliser(data):
         q = dict(q); q["mode"] = q["mode"].upper()
         freq = q.get("freq_mhz")
         q["bande"] = q.get("bande") or (bande_de(float(freq)) if freq else "?")
-        q["points"] = bar.get(q["mode"], bar["*"])
+        # L'appelant peut imposer les points d'un QSO (barème maison, doublons
+        # comptés zéro…) ; sinon on applique le barème par mode.
+        q["points"] = q.get("points", bar.get(q["mode"], bar["*"]))
         qso.append(q)
     qso.sort(key=lambda q: (q["date"], q["heure_utc"]))
     d["qso"] = qso

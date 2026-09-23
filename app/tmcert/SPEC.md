@@ -48,7 +48,8 @@ Poppins (Regular, Medium, SemiBold, Bold, ExtraBold) ; Great Vibes pour le nom.
 - QSO triés par date/heure UTC ; bande déduite de la fréquence si absente.
 - Fréquence affichée en MHz, 3 décimales, virgule décimale.
 - Dates affichées JJ/MM/AAAA (entrée ISO AAAA-MM-JJ).
-- Points = somme du barème par mode (`*` = défaut, 1 si absent).
+- Points = ceux fournis par l'appelant (`qso[].points`) s'ils sont là, sinon le barème
+  par mode (`*` = défaut, 1 si absent). Total = somme des points des QSO.
 - Suffixe de rang : 1 → « er », sinon « e ».
 
 ## Débordement
