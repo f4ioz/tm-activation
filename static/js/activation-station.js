@@ -80,13 +80,24 @@
         + (c + Math.sin(rad) * (r - 17) + 4).toFixed(1) + '" class="act-dir-card">'
         + letter + '</text>';
     });
+    /* Aiguille : un trait depuis la queue, terminé par une POINTE de flèche
+     * qui montre la direction sans ambiguïté. */
     var tip = toRad(deg - 90), tail = toRad(deg + 90);
-    var needle = '<line x1="' + (c + Math.cos(tail) * (r - 26)).toFixed(1) + '" y1="'
-      + (c + Math.sin(tail) * (r - 26)).toFixed(1) + '" x2="'
-      + (c + Math.cos(tip) * (r - 12)).toFixed(1) + '" y2="'
-      + (c + Math.sin(tip) * (r - 12)).toFixed(1) + '" class="act-dir-needle"/>'
-      + '<circle cx="' + (c + Math.cos(tip) * (r - 12)).toFixed(1) + '" cy="'
-      + (c + Math.sin(tip) * (r - 12)).toFixed(1) + '" r="3.5" class="act-dir-head"/>';
+    var head = Math.max(size * 0.13, 9);          // longueur de la pointe
+    var wing = Math.max(size * 0.052, 3.6);       // demi-largeur de la pointe
+    var tipR = r - 8, baseR = tipR - head;
+    var px = function (rad, radius) { return (c + Math.cos(rad) * radius).toFixed(1); };
+    var py = function (rad, radius) { return (c + Math.sin(rad) * radius).toFixed(1); };
+    var side = tip + Math.PI / 2;
+    var bx = c + Math.cos(tip) * baseR, by = c + Math.sin(tip) * baseR;
+    var arrow = [
+      px(tip, tipR) + ',' + py(tip, tipR),
+      (bx + Math.cos(side) * wing).toFixed(1) + ',' + (by + Math.sin(side) * wing).toFixed(1),
+      (bx - Math.cos(side) * wing).toFixed(1) + ',' + (by - Math.sin(side) * wing).toFixed(1)
+    ].join(' ');
+    var needle = '<line x1="' + px(tail, r - 22) + '" y1="' + py(tail, r - 22)
+      + '" x2="' + bx.toFixed(1) + '" y2="' + by.toFixed(1) + '" class="act-dir-needle"/>'
+      + '<polygon points="' + arrow + '" class="act-dir-head"/>';
     return '<svg viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size
       + '" role="img" aria-label="' + tr('Direction du correspondant', 'Direction du correspondant')
       + ' ' + Math.round(deg) + '°"><circle cx="' + c + '" cy="' + c + '" r="' + r
