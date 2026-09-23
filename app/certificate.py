@@ -119,7 +119,14 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
             "indicatif": target,
             "evenement": st.get("label") or target,
             "periode": _period(st),
+            # L'indicatif spécial prend la place du gros titre, souligné de son
+            # propre morse ; le mot « certificat » passe en sous-titre.
+            "titre": target,
+            "sous_titre": _("CERTIFICAT · {event}",
+                            event=(st.get("label") or target).upper()),
+            "morse": target,
         },
+        "options": {"max_qso": options["max_qso"], "annexe": options["annexe"]},
         "destinataire": {"indicatif": cs, "nom": name, "locator": grid},
         "classement": ({"position": place["rank"], "total": len(ranking)}
                        if place and options["ranking"] else None),

@@ -2007,6 +2007,40 @@ def test_hunter_certificate(monkeypatch, tmp_path) -> None:
     assert "Pas de certificat" in TestClient(app).get("/tm25test?call=XX9ZZZ&cert=absent").text
 
 
+def test_certificate_page_options(monkeypatch, tmp_path) -> None:
+    """Nombre de contacts en page 1 et annexe : réglables dans les Réglages."""
+    import re
+
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    for i in range(14):
+        activation.add_contact(call="ON4ZZ", band="20M", mode="SSB", operator_call="F4IOZ",
+                               qso_date="20260910", time_on=f"10{i:02d}")
+    assert activation.get_certificate_options()["max_qso"] == 10      # défaut demandé
+    data = certificate.hunter_data("ON4ZZ")
+    assert data["options"] == {"max_qso": 10, "annexe": True}
+    assert data["activation"]["titre"] == "TM25TEST"                  # l'indicatif en gros
+    assert data["activation"]["morse"] == "TM25TEST"
+
+    pages = lambda pdf: len(re.findall(rb"/Type\s*/Page[^s]", pdf))   # noqa: E731
+    with_annexe = certificate.build_certificate("ON4ZZ")
+    assert pages(with_annexe) == 2                                    # 14 QSO > 10
+
+    admin = _private_client()
+    admin.post("/activation/settings/certificate",
+               data={"enabled": "1", "max_qso": "14"})                # annexe décochée
+    assert activation.get_certificate_options() == {
+        "enabled": True, "names": False, "ranking": False, "mention": "",
+        "max_qso": 14, "annexe": False}
+    assert pages(certificate.build_certificate("ON4ZZ")) == 1         # tout tient, pas d'annexe
+    # Valeur absurde : bornée.
+    admin.post("/activation/settings/certificate", data={"enabled": "1", "max_qso": "99"})
+    assert activation.get_certificate_options()["max_qso"] == 14
+
+
 def test_admin_can_try_a_certificate_from_settings(monkeypatch, tmp_path) -> None:
     """Champ d'essai des Réglages : un indicatif, un PDF — et un message clair
     (sans quitter les Réglages) quand l'indicatif n'a pas de QSO."""

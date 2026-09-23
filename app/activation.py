@@ -2262,6 +2262,8 @@ DEFAULT_CERTIFICATE: dict[str, Any] = {
     "names": False,      # inscrire le nom du chasseur (sinon : son seul indicatif)
     "ranking": True,     # médaille avec la place au classement
     "mention": "",       # petite ligne libre en bas de page
+    "max_qso": 10,       # contacts listés sur la page principale
+    "annexe": True,      # page(s) annexe avec le journal complet
 }
 CERTIFICATE_MENTION_MAX = 160
 
@@ -2274,6 +2276,8 @@ def get_certificate_options() -> dict[str, Any]:
         "names": bool(saved.get("names", d["names"])),
         "ranking": bool(saved.get("ranking", d["ranking"])),
         "mention": str(saved.get("mention") or "")[:CERTIFICATE_MENTION_MAX],
+        "max_qso": _clamp_int(saved.get("max_qso"), 1, 14, d["max_qso"]),
+        "annexe": bool(saved.get("annexe", d["annexe"])),
     }
 
 
@@ -2284,6 +2288,8 @@ def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
         "names": bool(form.get("names")),
         "ranking": bool(form.get("ranking")),
         "mention": str(form.get("mention") or "").strip()[:CERTIFICATE_MENTION_MAX],
+        "max_qso": _clamp_int(form.get("max_qso"), 1, 14, DEFAULT_CERTIFICATE["max_qso"]),
+        "annexe": bool(form.get("annexe")),
     }
     _save_settings(data)
     return get_certificate_options()

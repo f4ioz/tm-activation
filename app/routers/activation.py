@@ -586,13 +586,15 @@ async def change_report_options(
 @router.post("/settings/certificate")
 async def change_certificate_options(
     request: Request, enabled: str = Form(""), names: str = Form(""),
-    ranking: str = Form(""), mention: str = Form(""),
+    ranking: str = Form(""), mention: str = Form(""), max_qso: str = Form(""),
+    annexe: str = Form(""),
 ) -> Response:
     """Certificats des chasseurs : ouverture au public et contenu."""
     if (g := _require_admin(request)) is not None:
         return g
     activation.set_certificate_options({"enabled": enabled, "names": names,
-                                        "ranking": ranking, "mention": mention})
+                                        "ranking": ranking, "mention": mention,
+                                        "max_qso": max_qso, "annexe": annexe})
     return RedirectResponse("/activation/settings?ce=ok#certificats", status_code=303)
 
 

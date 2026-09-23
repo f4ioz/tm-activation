@@ -88,6 +88,36 @@ def yagi(c, x, y, s=1):
         c.line(ex, -el / 2, ex, el / 2)
     c.restoreState()
 
+def poste(c, x, y, s=1):
+    """Poste de radio : boîtier, écran, S-mètre, VFO et haut-parleur."""
+    c.saveState(); c.translate(x, y); c.scale(s, s)
+    c.setFillColor(A(HexColor("#000000"), 0.18)); c.roundRect(-86, -50, 180, 92, 9, stroke=0, fill=1)
+    c.setFillColor(HexColor("#161C27")); c.roundRect(-90, -46, 180, 92, 9, stroke=0, fill=1)
+    c.setFillColor(NAVY3); c.roundRect(-82, -38, 164, 76, 6, stroke=0, fill=1)
+    # écran : fréquence et S-mètre
+    c.setFillColor(GOLDL); c.roundRect(-72, -6, 96, 36, 4, stroke=0, fill=1)
+    c.setFillColor(NAVY2); c.setFont("PopBold", 13); c.drawString(-66, 12, "14.190")
+    c.setStrokeColor(NAVY3); c.setLineWidth(1.4); c.line(-66, 4, 16, 4)
+    c.setStrokeColor(RED); c.setLineWidth(1.6)
+    for k in range(6):
+        c.line(-64 + k * 8, 0, -64 + k * 8, 3 + k)
+    # gros bouton d'accord (VFO) et deux petits
+    c.setFillColor(GOLD); c.circle(56, 6, 21, stroke=0, fill=1)
+    c.setFillColor(NAVY2); c.circle(56, 6, 15, stroke=0, fill=1)
+    c.setFillColor(GOLD2); c.roundRect(53, 12, 6, 12, 3, stroke=0, fill=1)
+    for dx in (-60, -42):
+        c.setFillColor(GOLD2); c.circle(dx, -22, 7, stroke=0, fill=1)
+        c.setFillColor(NAVY2); c.circle(dx, -22, 3, stroke=0, fill=1)
+    # haut-parleur
+    c.setStrokeColor(A(GOLD2, 0.85)); c.setLineWidth(1.6)
+    for k in range(5):
+        c.line(-24, -30 + k * 4, 24, -30 + k * 4)
+    # poignée
+    c.setStrokeColor(GOLD); c.setLineWidth(3.2)
+    c.line(-70, 46, -70, 56); c.line(-70, 56, 70, 56); c.line(70, 56, 70, 46)
+    c.restoreState()
+
+
 def etoile(c, x, y, r, col):
     p = c.beginPath()
     for i in range(10):
@@ -155,6 +185,7 @@ def decor(c, logo_path=None):
     ondes(c, 110, H - 70)
     manipulateur(c, 80, 55, 0.95)
     yagi(c, 150, 165, 0.6)
+    poste(c, 745, 300, 0.78)
     logo(c, 100, 318, 172, logo_path)
     for (x, y, r) in [(150, H - 40, 7), (175, 110, 9), (30, 205, 5), (205, 28, 6)]:
         etoile(c, x, y, r, GOLD2)

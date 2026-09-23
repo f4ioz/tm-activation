@@ -8,7 +8,17 @@ from reportlab.pdfbase import pdfmetrics
 from .decor import (register_fonts, decor, medaille, W, H, A,
                     NAVY, NAVY2, NAVY3, GOLD, RED, RED2, GRIS)
 
-MAX_LIGNES_P1 = 7          # lignes QSO visibles en page 1
+MAX_LIGNES_P1 = 10         # lignes QSO visibles en page 1 (défaut ; voir options)
+
+
+def options(d):
+    """Options de mise en page : ``max_qso`` (lignes en page 1) et ``annexe``."""
+    o = d.get("options") or {}
+    try:
+        maxi = int(o.get("max_qso", MAX_LIGNES_P1))
+    except (TypeError, ValueError):
+        maxi = MAX_LIGNES_P1
+    return {"max_qso": max(1, min(maxi, 14)), "annexe": bool(o.get("annexe", True))}
 LIGNES_ANNEXE = 28         # lignes QSO par page d'annexe
 X0, BW = 228, 420          # colonne de contenu
 MODE_COL = {"SSB": "#C9982E", "CW": "#B0202B", "FT8": "#2C6E9C", "FT4": "#2C6E9C",
@@ -94,16 +104,18 @@ def ligne_qso(c, x0, y, tw, q, i, rh=13.5):
 
 def tableau_p1(c, d, ytop):
     qso = d["qso"]; rh, hh = 13.5, 16
-    deborde = len(qso) > MAX_LIGNES_P1
-    visibles = qso[:MAX_LIGNES_P1 - 1] if deborde else qso
+    opt = options(d); maxi = opt["max_qso"]
+    deborde = len(qso) > maxi
+    visibles = qso[:maxi - 1] if deborde else qso
     y = ytop - hh; entete_tableau(c, X0, y, BW, hh)
     for i, q in enumerate(visibles):
         y -= rh; ligne_qso(c, X0, y, BW, q, i, rh)
     if deborde:
         y -= rh
+        reste = len(qso) - len(visibles)
+        suite = " — journal complet en annexe" if opt["annexe"] else ""
         c.setFillColor(NAVY3); c.setFont("PopMedium", 7.5)
-        c.drawCentredString(X0 + BW / 2, y + 4,
-                            f"… et {len(qso) - len(visibles)} autres QSO — journal complet en annexe")
+        c.drawCentredString(X0 + BW / 2, y + 4, f"… et {reste} autres QSO{suite}")
     c.setStrokeColor(GOLD); c.setLineWidth(1.2); c.line(X0, y, X0 + BW, y)
     s = d["stats"]
     parts = [("QSO ", str(s["nb"])), ("   BANDES ", str(s["bandes"])),
@@ -117,6 +129,40 @@ def tableau_p1(c, d, ytop):
     return deborde
 
 
+MORSE = {
+    "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".", "F": "..-.", "G": "--.",
+    "H": "....", "I": "..", "J": ".---", "K": "-.-", "L": ".-..", "M": "--", "N": "-.",
+    "O": "---", "P": ".--.", "Q": "--.-", "R": ".-.", "S": "...", "T": "-", "U": "..-",
+    "V": "...-", "W": ".--", "X": "-..-", "Y": "-.--", "Z": "--..", "0": "-----",
+    "1": ".----", "2": "..---", "3": "...--", "4": "....-", "5": ".....", "6": "-....",
+    "7": "--...", "8": "---..", "9": "----.", "/": "-..-.",
+}
+
+
+def morse_rule(c, x, y, texte, largeur, epaisseur=3.2, col=GOLD):
+    """Souligne un texte par sa traduction en morse (points et traits).
+
+    L'unité est calculée pour que la ligne fasse exactement la largeur donnée :
+    le souligné suit le titre, quel que soit l'indicatif."""
+    lettres = [MORSE.get(ch.upper(), "") for ch in (texte or "") if ch.strip()]
+    lettres = [m for m in lettres if m]
+    if not lettres:
+        return
+    # Largeur en unités : point 1, trait 3, séparation 1, espace entre lettres 3.
+    unites = sum(sum(3 if s == "-" else 1 for s in m) + (len(m) - 1) for m in lettres)
+    unites += 3 * (len(lettres) - 1)
+    u = largeur / max(unites, 1)
+    c.setFillColor(col)
+    cx = x
+    for i, m in enumerate(lettres):
+        for j, signe in enumerate(m):
+            w = 3 * u if signe == "-" else u
+            c.roundRect(cx, y, w, epaisseur, epaisseur / 2, stroke=0, fill=1)
+            cx += w + (u if j < len(m) - 1 else 0)
+        if i < len(lettres) - 1:
+            cx += 3 * u
+
+
 # ------------------------------------------------------------------ pages
 def page_principale(c, d):
     act, dest = d["activation"], d["destinataire"]
@@ -124,9 +170,14 @@ def page_principale(c, d):
     decor(c, d.get("logo_path"))
     medaille(c, cls.get("position"), cls.get("total"), W - 115, H - 110)
 
+    titre = act.get("titre") or "CERTIFICAT"
     c.setFillColor(NAVY); c.setFont("PopExtraBold", 60)
-    c.drawString(X0, H - 150, act.get("titre", "CERTIFICAT"))
+    c.drawString(X0, H - 150, titre)
+    # Sous le titre, son écriture en morse : clin d'œil, et repère visuel.
+    morse_rule(c, X0, H - 160, act.get("morse") or titre,
+               pdfmetrics.stringWidth(titre, "PopExtraBold", 60))
     st = act.get("sous_titre") or f"ACTIVATION SPÉCIALE · {act['evenement'].upper()}"
+    c.setFillColor(NAVY)          # morse_rule a laissé l'or dans le pinceau
     c.setFont("PopSemiBold", fit(st, "PopSemiBold", 20, 400, 12)); c.drawString(X0 + 2, H - 180, st)
 
     c.setFillColor(NAVY); c.rect(X0, H - 222, BW, 24, stroke=0, fill=1)
@@ -199,7 +250,7 @@ def render(data: dict) -> bytes:
     c = canvas.Canvas(buf, pagesize=(W, H))
     c.setTitle(f"Certificat {d['activation']['indicatif']} — {d['destinataire']['indicatif']}")
     c.setAuthor(d["certificat"].get("gestionnaire", d["activation"]["indicatif"]))
-    if page_principale(c, d):
+    if page_principale(c, d) and options(d)["annexe"]:
         pages_annexe(c, d)
     c.save()
     return buf.getvalue()

@@ -24,8 +24,10 @@ from a phone or a PC, while hunters follow the activation live on a public page.
 - **A certificate for hunters**: whoever finds their QSOs on the public page
   leaves with a **PDF certificate** in A4 landscape — their contacts, their
   points, their place in the ranking, the club logo and the name of the
-  activation. Opened to the public (or not) with one click in Settings; the
-  hunter's name only appears if the administrator asks for it.
+  activation, with the special callsign in pride of place, underlined by its own
+  Morse. Opened to the public (or not) with one click in Settings; the hunter's
+  name only appears if the administrator asks for it, and both the number of
+  contacts listed and the appendix are adjustable.
 - **A PDF report** for the administrator: counters, pace day by day, bands,
   modes, **DXCC entities with their flags** and a hunter ranking. Each section
   QSOs made through **satellites** get their own section, broken down per
@@ -73,15 +75,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.34.1.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.34.1.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.35.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.35.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.34.1.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.35.0.tar.gz
 ```
 
 ## Features
@@ -217,6 +219,7 @@ is forced on you.
 | QRZ photo and compass on the log | 96 and 120 px | adjustable size, 0 to hide |
 | Best moments in the PDF | 3 | pile-up periods listed, 0 to drop |
 | Hunter certificates | off | PDF downloadable from the public page |
+| Contacts on the certificate | 10 | plus the full log as an appendix (can be dropped) |
 | Refuse logging on a booked band and mode | on | avoids two stations at once |
 | Show the contact list | your choice | "Latest contacts" on the public page |
 | Show map, DXCC and ranking | your choice | the "hunters" part of the public page |
@@ -272,22 +275,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.34.1.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.35.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.34.1.tar.gz
-   cd tm-activation-1.34.1
+   tar xzf tm-activation-1.35.0.tar.gz
+   cd tm-activation-1.35.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.34.1.zip
-   cd tm-activation-1.34.1
+   unzip tm-activation-1.35.0.zip
+   cd tm-activation-1.35.0
    sudo bash install.sh --lan
    ```
 
@@ -370,8 +373,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.34.1.tar.gz
-cd tm-activation-1.34.1
+tar xzf tm-activation-1.35.0.tar.gz
+cd tm-activation-1.35.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
