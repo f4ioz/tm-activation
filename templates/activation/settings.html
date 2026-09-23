@@ -273,6 +273,24 @@
       <p class="act-muted act-map-note">{{ _("Règle actuelle : {rule}.", rule=scoring_summary) }} {{ _("Points d'un QSO = contact + mode + distance (critères cochés) ; score d'un chasseur = somme de ses QSO. Distance entre centres de locators (locator inconnu : 0 point de distance).") }}</p>
     </div>
 
+    <div class="act-card" id="certificats">
+      <h2>{{ _("Certificats des chasseurs") }}</h2>
+      {% if ce_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Certificats enregistrés.") }}</p>{% endif %}
+      {% if not certificate_engine %}
+        <p class="act-alert act-alert-err">{{ _("Moteur de certificats absent : installez reportlab (pip install reportlab), puis redémarrez.") }}</p>
+      {% endif %}
+      <p class="act-muted">{{ _("Un chasseur qui retrouve ses QSO sur la page publique peut repartir avec son certificat en PDF : ses contacts, ses points, sa place au classement et le logo du club.") }}</p>
+      <form method="post" action="/activation/settings/certificate" class="act-form">
+        <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if certificate_options.enabled %} checked{% endif %}> {{ _("Proposer le certificat sur la page publique") }}</label>
+        <label class="act-check"><input type="checkbox" name="ranking" value="1"{% if certificate_options.ranking %} checked{% endif %}> {{ _("Médaille avec la place au classement") }}</label>
+        <label class="act-check"><input type="checkbox" name="names" value="1"{% if certificate_options.names %} checked{% endif %}> {{ _("Inscrire le nom du chasseur (fiche QRZ) en plus de son indicatif") }}</label>
+        <label>{{ _("Mention en bas de page") }} <input type="text" name="mention" maxlength="160" value="{{ certificate_options.mention }}" placeholder="{{ _("ex. Radio-club de Villeneuve — F6ABC") }}"></label>
+        <button type="submit">{{ _("Enregistrer") }}</button>
+      </form>
+      <p class="act-muted act-map-note">{{ _("Le gestionnaire affiché est le nom du club (config.yml), le numéro reprend l'indicatif spécial et celui du chasseur. Un administrateur peut toujours produire un certificat, même sans l'ouvrir au public :") }}
+        <a href="/{{ station.slug }}/certificat?call={{ current_op or 'F4XYZ' }}">{{ _("essayer") }}</a>.</p>
+    </div>
+
     <div class="act-card" id="log">
       <h2>{{ _("Page de log") }}</h2>
       {% if lv_flash == 'ok' %}<p class="act-alert act-alert-ok">{{ _("Affichage du log enregistré.") }}</p>{% endif %}

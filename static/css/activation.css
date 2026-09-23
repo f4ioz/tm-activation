@@ -534,6 +534,15 @@ a.act-station-card:hover { border-color: var(--accent); }
 .flatpickr-time input:hover, .flatpickr-time input:focus { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .flatpickr-innerContainer, .flatpickr-time { border-color: var(--border); }
 
+/* Certificat du chasseur, sous ses QSO sur la page publique. */
+.act-cert-line { margin: 0.7rem 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.act-cert-btn {
+  display: inline-block; text-decoration: none; font-family: var(--font-mono, monospace);
+  font-size: 0.85rem; padding: 0.45rem 0.9rem; border-radius: 3px;
+  color: var(--bg); background: var(--accent); font-weight: 600;
+}
+.act-cert-btn:hover { background: var(--accent-hover, var(--accent)); }
+
 /* Fiche du correspondant pendant la saisie : photo QRZ, boussole, distance.
    Les tailles viennent des Réglages (attributs data-photo / data-compass). */
 .act-dir {

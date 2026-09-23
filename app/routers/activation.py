@@ -9,6 +9,7 @@ au micro est mémorisé dans un cookie ``tm_op``.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from datetime import datetime
 
@@ -27,7 +28,7 @@ from urllib.parse import quote, unquote
 
 from starlette.convertors import Convertor, register_url_convertor
 
-from app import activation, dx_spots, i18n, report, security, visits
+from app import activation, certificate, dx_spots, i18n, report, security, visits
 from app.auth import is_private
 from app.config import club_config
 from app.i18n import _
@@ -404,6 +405,9 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             logo=activation.logo_info(),
             logo_on_pages=activation.logo_on_pages(),
             log_view=activation.get_log_view(),
+            certificate_options=activation.get_certificate_options(),
+            certificate_engine=certificate.engine_ready(),
+            ce_flash=request.query_params.get("ce"),
             log_view_max=activation.LOG_VIEW_MAX,
             lv_flash=request.query_params.get("lv"),
             public_slots_max=activation.public_slots_max(),
@@ -575,6 +579,19 @@ async def change_report_options(
     activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters,
                                    "sats": sats, "one_page": one_page, "runs": runs})
     return RedirectResponse("/activation/settings?rp=ok#rapport", status_code=303)
+
+
+@router.post("/settings/certificate")
+async def change_certificate_options(
+    request: Request, enabled: str = Form(""), names: str = Form(""),
+    ranking: str = Form(""), mention: str = Form(""),
+) -> Response:
+    """Certificats des chasseurs : ouverture au public et contenu."""
+    if (g := _require_admin(request)) is not None:
+        return g
+    activation.set_certificate_options({"enabled": enabled, "names": names,
+                                        "ranking": ranking, "mention": mention})
+    return RedirectResponse("/activation/settings?ce=ok#certificats", status_code=303)
 
 
 @router.post("/settings/log-view")
@@ -1389,6 +1406,36 @@ class _CallSlugConvertor(Convertor):
 register_url_convertor("callslug", _CallSlugConvertor())
 
 
+@public_router.get("/{slug:callslug}/certificat")
+async def hunter_certificate(request: Request, slug: str, call: str = "") -> Response:
+    """Certificat PDF d'un chasseur (page publique de l'indicatif).
+
+    Ouvert aux chasseurs quand l'admin a activé les certificats ; un
+    administrateur peut toujours le produire, ne serait-ce que pour le relire
+    avant de l'ouvrir au public.
+    """
+    st = activation.station_by_slug(slug)
+    if st is None:
+        return Response(status_code=404)
+    admin = is_private(request)
+    if not admin and (not st["public"] or not activation.certificates_on()):
+        return Response(status_code=404)
+    cs = (call or "").strip().upper()
+    try:
+        data = await run_in_threadpool(certificate.build_certificate, cs, st["callsign"])
+    except certificate.CertificateUnavailable as exc:
+        logging.getLogger(__name__).warning("certificat indisponible : %s", exc)
+        return RedirectResponse(f"/{slug}?call={quote(cs)}&cert=moteur", status_code=303)
+    if data is None:
+        return RedirectResponse(f"/{slug}?call={quote(cs)}&cert=absent", status_code=303)
+    name = f"certificat-{activation.slugify_call(st['callsign'])}-{activation.slugify_call(cs)}.pdf"
+    return Response(
+        content=data, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}"',
+                 "Cache-Control": "no-store"},
+    )
+
+
 @public_router.get("/{slug:callslug}", response_class=HTMLResponse)
 async def public_board(request: Request, slug: str, call: str = "") -> Response:
     """Page publique d'un indicatif spécial : /tm25test, /tm61xyz…
@@ -1426,6 +1473,8 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
             "search": search,
             "search_call": call.strip().upper(),
             "show_contacts": activation.show_contacts(),
+            "certificates": activation.certificates_on(),
+            "cert_flash": request.query_params.get("cert"),
             **_public_stats(cs, call.strip().upper()),
             "tz_mode": mode,
             "tz_utc": mode == "utc",

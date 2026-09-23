@@ -6,3 +6,4 @@ Jinja2==3.1.6
 python-multipart==0.0.27
 httpx==0.28.1
 PyYAML==6.0.3
+reportlab==4.4.4          # certificats PDF (embarque ses polices)

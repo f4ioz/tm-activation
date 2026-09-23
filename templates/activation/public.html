@@ -20,6 +20,11 @@
 <p class="act-card act-archive-note act-muted">{{ _("Activation à venir : planning et log s'ouvriront à son lancement.") }} <a href="/activations">{{ _("Tous les indicatifs spéciaux du club →") }}</a></p>
 {% endif %}
 
+{% if cert_flash == 'absent' %}
+<p class="act-alert act-alert-dupe act-results-top">{{ _("Pas de certificat : cet indicatif n'a pas de QSO avec {call}.", call=callsign) }}</p>
+{% elif cert_flash == 'moteur' %}
+<p class="act-alert act-alert-err act-results-top">{{ _("Certificat indisponible pour l'instant.") }}</p>
+{% endif %}
 {% if search and search.found %}
 <div class="act-card act-results-top">
   <h2>{{ _("📋 Vos QSO avec {call}", call=callsign) }} — <span class="act-call">{{ search_call }}</span></h2>
@@ -48,6 +53,12 @@
       {% endfor %}
     </tbody>
   </table>
+  {% if certificates or site_admin %}
+  <p class="act-cert-line">
+    <a class="act-cert-btn" href="/{{ slug }}/certificat?call={{ search_call }}">{{ _("🏅 Télécharger mon certificat (PDF)") }}</a>
+    {% if not certificates %}<span class="act-muted">{{ _("(visible seulement par l'administrateur tant que les certificats ne sont pas ouverts au public)") }}</span>{% endif %}
+  </p>
+  {% endif %}
 </div>
 {% elif search %}
 <p class="act-alert act-alert-dupe act-results-top">{{ _("Aucun QSO trouvé pour {call}.", call=search_call) }} {{ _("Peut-être pas encore loggé — retentez plus tard, ou venez nous contacter !") }}</p>

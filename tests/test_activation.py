@@ -1964,6 +1964,62 @@ def test_run_periods_spot_the_pile_up() -> None:
     assert activation.run_periods(top=0)["periods"] == []
 
 
+def test_hunter_certificate(monkeypatch, tmp_path) -> None:
+    """Certificat d'un chasseur : réservé à l'admin tant qu'il n'est pas ouvert,
+    public ensuite, et refusé pour un indicatif absent du log."""
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    _public("JN18FS")
+    for band, mode, time_on in (("20M", "SSB", "1000"), ("40M", "CW", "1130")):
+        activation.add_contact(call="ON4ZZ", band=band, mode=mode, operator_call="F4IOZ",
+                               qso_date="20260910", time_on=time_on, gridsquare="JO20")
+    public = TestClient(app, follow_redirects=False)
+    admin = _private_client()
+
+    assert activation.get_certificate_options()["enabled"] is False
+    assert public.get("/tm25test/certificat?call=ON4ZZ").status_code == 404   # pas encore ouvert
+    data = certificate.hunter_data("ON4ZZ", "TM25TEST")
+    assert data["destinataire"] == {"indicatif": "ON4ZZ", "nom": "", "locator": "JO20"}
+    assert [q["bande"] for q in data["qso"]] == ["20 m", "40 m"]   # présentation du kit
+    assert data["certificat"]["numero"] == "TM25TEST-ON4ZZ"
+    assert certificate.hunter_data("XX9ZZZ", "TM25TEST") is None
+
+    # L'admin peut produire le certificat avant de l'ouvrir au public.
+    r = admin.get("/tm25test/certificat?call=ON4ZZ")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert r.content.startswith(b"%PDF-") and r.content.rstrip().endswith(b"%%EOF")
+    assert "certificat-tm25test-on4zz.pdf" in r.headers["content-disposition"]
+    assert b"ON4ZZ" in r.content or len(r.content) > 20_000      # texte comprimé par reportlab
+
+    # Ouvert au public : bouton sur la page et téléchargement libre.
+    assert admin.post("/activation/settings/certificate",
+                      data={"enabled": "1", "ranking": "1"}).status_code == 303
+    assert activation.certificates_on() is True
+    assert public.get("/tm25test/certificat?call=ON4ZZ").status_code == 200
+    page = TestClient(app).get("/tm25test?call=ON4ZZ").text
+    assert "/tm25test/certificat?call=ON4ZZ" in page
+    # Indicatif sans QSO : retour à la page avec un message, pas d'erreur.
+    r = public.get("/tm25test/certificat?call=XX9ZZZ")
+    assert r.status_code == 303 and "cert=absent" in r.headers["location"]
+    assert "Pas de certificat" in TestClient(app).get("/tm25test?call=XX9ZZZ&cert=absent").text
+
+
+def test_certificate_name_is_opt_in(monkeypatch, tmp_path) -> None:
+    """Le nom du chasseur n'apparaît que si l'admin l'a demandé (vie privée)."""
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    activation.qrz_lookup("DL1ABC", _FakeQrz({"DL1ABC": _rec("DL1ABC")}))
+    activation.set_certificate_options({"enabled": "1", "ranking": "1"})
+    assert certificate.hunter_data("DL1ABC")["destinataire"]["nom"] == ""
+    activation.set_certificate_options({"enabled": "1", "names": "1"})
+    assert certificate.hunter_data("DL1ABC")["destinataire"]["nom"] == "Hans MUSTER"
+
+
 def test_report_best_moments_section(monkeypatch, tmp_path) -> None:
     """Section « Meilleurs moments » du PDF : réglable, retirée à 0."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")

@@ -2252,6 +2252,47 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
     return {"entities": entities, "count": len(entities), "unidentified": unidentified}
 
 
+# ── Certificats des chasseurs (réglable) ──────────────────────────────────
+# Un chasseur qui retrouve ses QSO sur la page publique peut repartir avec son
+# certificat en PDF. Désactivé tant que l'admin ne l'a pas voulu : le dessin
+# porte le nom du club, autant qu'il le relise avant.
+
+DEFAULT_CERTIFICATE: dict[str, Any] = {
+    "enabled": False,    # bouton « Certificat » sur la page publique
+    "names": False,      # inscrire le nom du chasseur (sinon : son seul indicatif)
+    "ranking": True,     # médaille avec la place au classement
+    "mention": "",       # petite ligne libre en bas de page
+}
+CERTIFICATE_MENTION_MAX = 160
+
+
+def get_certificate_options() -> dict[str, Any]:
+    saved = load_settings().get("certificate") or {}
+    d = DEFAULT_CERTIFICATE
+    return {
+        "enabled": bool(saved.get("enabled", d["enabled"])),
+        "names": bool(saved.get("names", d["names"])),
+        "ranking": bool(saved.get("ranking", d["ranking"])),
+        "mention": str(saved.get("mention") or "")[:CERTIFICATE_MENTION_MAX],
+    }
+
+
+def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
+    data = load_settings()
+    data["certificate"] = {
+        "enabled": bool(form.get("enabled")),
+        "names": bool(form.get("names")),
+        "ranking": bool(form.get("ranking")),
+        "mention": str(form.get("mention") or "").strip()[:CERTIFICATE_MENTION_MAX],
+    }
+    _save_settings(data)
+    return get_certificate_options()
+
+
+def certificates_on() -> bool:
+    return get_certificate_options()["enabled"]
+
+
 # ── Fiche du correspondant sur la page de log (réglable) ──────────────────
 # Pendant la saisie : la photo de la fiche QRZ et une boussole qui montre où
 # tourner l'antenne. Chacune se règle en pixels, 0 = on ne l'affiche pas.
