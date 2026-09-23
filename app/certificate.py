@@ -127,10 +127,10 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
             "evenement": st.get("label") or target,
             "periode": _period(st),
             # L'indicatif spécial prend la place du gros titre, souligné de son
-            # propre morse ; le mot « certificat » passe en sous-titre.
+            # propre morse. Pas de sous-titre : le nom de l'activation est déjà
+            # dans la phrase d'attribution, juste en dessous.
             "titre": target,
-            "sous_titre": _("CERTIFICAT · {event}",
-                            event=(st.get("label") or target).upper()),
+            "sous_titre": "",
             "morse": target,
         },
         "options": {"max_qso": options["max_qso"], "annexe": options["annexe"]},
@@ -150,7 +150,30 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
     logo = _certificate_logo()
     if logo:
         data["logo_path"] = str(logo)
+    flag = _flag_path(options["flag"], target)
+    if flag:
+        data["drapeau"] = str(flag)
+    if options["border"]:
+        data["liseret"] = options["border_colors"]
     return data
+
+
+FLAGS_DIR = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flags"
+
+
+def _flag_path(choice: str, station: str) -> Path | None:
+    """Vignette du drapeau choisi (« auto » = d'après l'indicatif spécial)."""
+    from app import dxcc_flags
+
+    code = (choice or "").strip()
+    if not code:
+        return None
+    if code.lower() == "auto":
+        code = dxcc_flags.entity_for_call(station)[0]
+    if not code:
+        return None
+    path = FLAGS_DIR / f"{dxcc_flags.flag_file(code)}.png"
+    return path if path.is_file() else None
 
 
 def _apply_best_per_pair(qso: list[dict[str, Any]], rule: dict[str, Any]) -> None:

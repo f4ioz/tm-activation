@@ -178,6 +178,41 @@ def logo(c, cx, cy, diam, path=None):
     c.saveState(); pth = c.beginPath(); pth.circle(cx, cy, diam / 2 + 2); c.clipPath(pth, stroke=0, fill=0)
     c.drawImage(img, cx - w / 2, cy - h / 2, w, h); c.restoreState()
 
+def liseret(c, couleurs=None, marge=7, epaisseur=1.3):
+    """Fin liseré autour de la page : trois filets concentriques.
+
+    Par défaut bleu-blanc-rouge ; l'appelant choisit ses couleurs (drapeau du
+    club, du pays, ou rien du tout)."""
+    couleurs = couleurs or ("#0055A4", "#FFFFFF", "#EF3340")
+    for i, col in enumerate(couleurs):
+        d = marge + i * (epaisseur + 0.6)
+        c.setStrokeColor(HexColor(col)); c.setLineWidth(epaisseur)
+        c.rect(d, d, W - 2 * d, H - 2 * d, stroke=1, fill=0)
+
+
+def drapeau(c, chemin, x, y, hauteur=30):
+    """Vignette de drapeau (PNG), calée à gauche sur x, centrée sur y.
+
+    Les vignettes de drapeaux sont des PNG à palette : passées telles quelles,
+    elles ressortent délavées. On les convertit en RVB avant de les poser."""
+    from PIL import Image
+
+    with Image.open(chemin) as src:
+        img = ImageReader(src.convert("RGB"))
+    iw, ih = img.getSize()
+    w = hauteur * iw / ih
+    # L'ombre portée est posée dans un état isolé : sinon son alpha reste dans
+    # le pinceau et le drapeau ressort délavé.
+    c.saveState()
+    c.setFillColor(A(HexColor("#000000"), 0.18))
+    c.rect(x + 1.5, y - hauteur / 2 - 1.5, w, hauteur, stroke=0, fill=1)
+    c.restoreState()
+    c.drawImage(img, x, y - hauteur / 2, w, hauteur, mask="auto")
+    c.setStrokeColor(NAVY3); c.setLineWidth(0.7)
+    c.rect(x, y - hauteur / 2, w, hauteur, stroke=1, fill=0)
+    return w
+
+
 def decor(c, logo_path=None):
     """Dessine toute la couche statique (hors médaille)."""
     fond(c)

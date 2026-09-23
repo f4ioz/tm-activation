@@ -410,6 +410,7 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             ce_flash=request.query_params.get("ce"),
             cert_call=(request.query_params.get("cert_call") or "").strip().upper()[:12],
             cert_sample=next((h["call"] for h in activation.hunters_ranking(1)), ""),
+            certificate_flags=activation.certificate_flags(),
             log_view_max=activation.LOG_VIEW_MAX,
             lv_flash=request.query_params.get("lv"),
             public_slots_max=activation.public_slots_max(),
@@ -587,14 +588,18 @@ async def change_report_options(
 async def change_certificate_options(
     request: Request, enabled: str = Form(""), names: str = Form(""),
     ranking: str = Form(""), mention: str = Form(""), max_qso: str = Form(""),
-    annexe: str = Form(""),
+    annexe: str = Form(""), flag: str = Form(""), border: str = Form(""),
+    border1: str = Form(""), border2: str = Form(""), border3: str = Form(""),
 ) -> Response:
     """Certificats des chasseurs : ouverture au public et contenu."""
     if (g := _require_admin(request)) is not None:
         return g
     activation.set_certificate_options({"enabled": enabled, "names": names,
                                         "ranking": ranking, "mention": mention,
-                                        "max_qso": max_qso, "annexe": annexe})
+                                        "max_qso": max_qso, "annexe": annexe,
+                                        "flag": flag, "border": border,
+                                        "border1": border1, "border2": border2,
+                                        "border3": border3})
     return RedirectResponse("/activation/settings?ce=ok#certificats", status_code=303)
 
 

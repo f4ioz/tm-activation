@@ -2007,6 +2007,37 @@ def test_hunter_certificate(monkeypatch, tmp_path) -> None:
     assert "Pas de certificat" in TestClient(app).get("/tm25test?call=XX9ZZZ&cert=absent").text
 
 
+def test_certificate_flag_and_border(monkeypatch, tmp_path) -> None:
+    """Drapeau du pays (auto ou choisi) et liseré : deux options, bornées."""
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.add_contact(call="ON4ZZ", band="20M", mode="SSB", operator_call="F4IOZ")
+    admin = _private_client()
+    admin.post("/activation/settings/certificate",
+               data={"enabled": "1", "flag": "auto", "border": "1",
+                     "border1": "#0055A4", "border2": "#FFFFFF", "border3": "#EF3340"})
+    data = certificate.hunter_data("ON4ZZ")
+    assert data["drapeau"].endswith("/fr.png")          # TM25TEST → France
+    assert data["liseret"] == ["#0055A4", "#FFFFFF", "#EF3340"]
+    assert data["activation"]["sous_titre"] == ""       # plus de répétition sous le titre
+
+    admin.post("/activation/settings/certificate", data={"enabled": "1", "flag": "BE"})
+    assert certificate.hunter_data("ON4ZZ")["drapeau"].endswith("/be.png")
+    assert "liseret" not in certificate.hunter_data("ON4ZZ")   # case décochée
+    # Entité inconnue ou couleur bricolée : on retombe sur des valeurs saines.
+    admin.post("/activation/settings/certificate",
+               data={"enabled": "1", "flag": "ZZ9", "border": "1", "border1": "bleu"})
+    options = activation.get_certificate_options()
+    assert options["flag"] == "" and options["border_colors"][0] == "#0055A4"
+    assert "drapeau" not in certificate.hunter_data("ON4ZZ")
+    # Le PDF sort avec tout ça.
+    admin.post("/activation/settings/certificate",
+               data={"enabled": "1", "flag": "auto", "border": "1"})
+    assert certificate.build_certificate("ON4ZZ").startswith(b"%PDF-")
+
+
 def test_certificate_points_match_the_ranking(monkeypatch, tmp_path) -> None:
     """Les points du certificat sont CEUX de l'application : même règle, mêmes
     doublons à zéro, même total que le classement public."""
@@ -2067,7 +2098,8 @@ def test_certificate_page_options(monkeypatch, tmp_path) -> None:
                data={"enabled": "1", "max_qso": "14"})                # annexe décochée
     assert activation.get_certificate_options() == {
         "enabled": True, "names": False, "ranking": False, "mention": "",
-        "max_qso": 14, "annexe": False}
+        "max_qso": 14, "annexe": False, "flag": "", "border": False,
+        "border_colors": activation.DEFAULT_CERTIFICATE["border_colors"]}
     assert pages(certificate.build_certificate("ON4ZZ")) == 1         # tout tient, pas d'annexe
     # Valeur absurde : bornée.
     admin.post("/activation/settings/certificate", data={"enabled": "1", "max_qso": "99"})

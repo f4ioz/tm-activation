@@ -289,6 +289,22 @@
         <label class="act-check"><input type="checkbox" name="annexe" value="1"{% if certificate_options.annexe %} checked{% endif %}> {{ _("Joindre le journal complet en annexe quand il y a plus de contacts") }}</label>
         <label>{{ _("Contacts listés sur la page principale") }}
           <input type="number" name="max_qso" min="1" max="14" value="{{ certificate_options.max_qso }}"></label>
+        <label>{{ _("Drapeau du pays de l'activation") }}
+          <select name="flag">
+            <option value=""{% if not certificate_options.flag %} selected{% endif %}>{{ _("Aucun") }}</option>
+            <option value="auto"{% if certificate_options.flag == 'auto' %} selected{% endif %}>{{ _("D'après l'indicatif spécial") }}</option>
+            {% for code, name in certificate_flags %}<option value="{{ code }}"{% if certificate_options.flag == code %} selected{% endif %}>{{ name }}</option>{% endfor %}
+          </select>
+        </label>
+        <fieldset class="act-fieldset">
+          <legend><label class="act-check"><input type="checkbox" name="border" value="1"{% if certificate_options.border %} checked{% endif %}> {{ _("Liseré autour de la page") }}</label></legend>
+          <div class="act-style-grid">
+            {% for i in (0, 1, 2) %}
+              <label class="act-style-cell">{{ _("Filet {n}", n=i + 1) }}
+                <input type="color" name="border{{ i + 1 }}" value="{{ certificate_options.border_colors[i] }}"></label>
+            {% endfor %}
+          </div>
+        </fieldset>
         <label>{{ _("Mention en bas de page") }} <input type="text" name="mention" maxlength="160" value="{{ certificate_options.mention }}" placeholder="{{ _("ex. Radio-club de Villeneuve — F6ABC") }}"></label>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>

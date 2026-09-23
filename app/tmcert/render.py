@@ -5,7 +5,7 @@ from datetime import date, datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor, white
 from reportlab.pdfbase import pdfmetrics
-from .decor import (register_fonts, decor, medaille, W, H, A,
+from .decor import (register_fonts, decor, medaille, liseret, drapeau, W, H, A,
                     NAVY, NAVY2, NAVY3, GOLD, RED, RED2, GRIS)
 
 MAX_LIGNES_P1 = 10         # lignes QSO visibles en page 1 (défaut ; voir options)
@@ -170,6 +170,8 @@ def page_principale(c, d):
     act, dest = d["activation"], d["destinataire"]
     cls, cert = d.get("classement") or {}, d["certificat"]
     decor(c, d.get("logo_path"))
+    if d.get("liseret"):
+        liseret(c, d["liseret"])
     medaille(c, cls.get("position"), cls.get("total"), W - 115, H - 110)
 
     titre = act.get("titre") or "CERTIFICAT"
@@ -178,9 +180,19 @@ def page_principale(c, d):
     # Sous le titre, son écriture en morse : clin d'œil, et repère visuel.
     morse_rule(c, X0, H - 160, act.get("morse") or titre,
                pdfmetrics.stringWidth(titre, "PopExtraBold", 60))
-    st = act.get("sous_titre") or f"ACTIVATION SPÉCIALE · {act['evenement'].upper()}"
-    c.setFillColor(NAVY)          # morse_rule a laissé l'or dans le pinceau
-    c.setFont("PopSemiBold", fit(st, "PopSemiBold", 20, 400, 12)); c.drawString(X0 + 2, H - 180, st)
+    # Sous-titre : celui fourni ; une chaîne vide le supprime franchement.
+    st = act["sous_titre"] if "sous_titre" in act \
+        else f"ACTIVATION SPÉCIALE · {act['evenement'].upper()}"
+    if st:
+        c.setFillColor(NAVY)      # morse_rule a laissé l'or dans le pinceau
+        c.setFont("PopSemiBold", fit(st, "PopSemiBold", 20, 400, 12))
+        c.drawString(X0 + 2, H - 180, st)
+    if d.get("drapeau"):
+        # Drapeau du pays de l'activation, au bout de la ligne de titre.
+        try:
+            drapeau(c, d["drapeau"], X0 + BW - 52, H - 148, 32)
+        except OSError:
+            pass
 
     c.setFillColor(NAVY); c.rect(X0, H - 222, BW, 24, stroke=0, fill=1)
     c.setFillColor(white); c.setFont("PopSemiBold", 10)
@@ -188,8 +200,10 @@ def page_principale(c, d):
 
     nom = (dest.get("nom") or "").strip()
     if nom:
-        c.setFillColor(NAVY2); c.setFont("Script", fit(nom, "Script", 44, BW - 20, 26))
-        c.drawCentredString(X0 + BW / 2, H - 276, nom)
+        # Le nom se LIT : capitales étrangères, accents, indicatifs collés au
+        # nom… une anglaise faisait joli mais se déchiffrait mal.
+        c.setFillColor(NAVY2); c.setFont("PopSemiBold", fit(nom, "PopSemiBold", 30, BW - 20, 17))
+        c.drawCentredString(X0 + BW / 2, H - 274, nom)
         ind, li = dest["indicatif"] + "   ", dest.get("locator", "")
     else:   # pas de nom : l'indicatif prend la place du nom
         c.setFillColor(NAVY2); c.setFont("PopExtraBold", 40)

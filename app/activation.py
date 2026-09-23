@@ -2264,7 +2264,11 @@ DEFAULT_CERTIFICATE: dict[str, Any] = {
     "mention": "",       # petite ligne libre en bas de page
     "max_qso": 10,       # contacts listés sur la page principale
     "annexe": True,      # page(s) annexe avec le journal complet
+    "flag": "auto",      # drapeau du pays : "" (aucun), "auto" (d'après l'indicatif) ou un code
+    "border": False,     # fin liseré autour de la page
+    "border_colors": ["#0055A4", "#FFFFFF", "#EF3340"],
 }
+_RE_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 CERTIFICATE_MENTION_MAX = 160
 
 
@@ -2278,7 +2282,25 @@ def get_certificate_options() -> dict[str, Any]:
         "mention": str(saved.get("mention") or "")[:CERTIFICATE_MENTION_MAX],
         "max_qso": _clamp_int(saved.get("max_qso"), 1, 14, d["max_qso"]),
         "annexe": bool(saved.get("annexe", d["annexe"])),
+        "flag": _clean_flag(saved.get("flag", d["flag"])),
+        "border": bool(saved.get("border", d["border"])),
+        "border_colors": _clean_colors(saved.get("border_colors"), d["border_colors"]),
     }
+
+
+def _clean_flag(value: Any) -> str:
+    """« auto », un code d'entité connu, ou rien."""
+    code = str(value or "").strip().upper()
+    if code in ("", "AUTO"):
+        return code.lower()
+    return code if any(code == c for c, _n in dxcc_flags.PREFIXES.values()) else ""
+
+
+def _clean_colors(value: Any, default: list[str]) -> list[str]:
+    """Trois couleurs #rrggbb ; toute valeur douteuse retombe sur le défaut."""
+    given = list(value or [])
+    return [given[i] if i < len(given) and _RE_HEX.match(str(given[i] or "")) else default[i]
+            for i in range(3)]
 
 
 def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
@@ -2290,9 +2312,20 @@ def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
         "mention": str(form.get("mention") or "").strip()[:CERTIFICATE_MENTION_MAX],
         "max_qso": _clamp_int(form.get("max_qso"), 1, 14, DEFAULT_CERTIFICATE["max_qso"]),
         "annexe": bool(form.get("annexe")),
+        "flag": _clean_flag(form.get("flag")),
+        "border": bool(form.get("border")),
+        "border_colors": _clean_colors(
+            [form.get("border1"), form.get("border2"), form.get("border3")],
+            DEFAULT_CERTIFICATE["border_colors"]),
     }
     _save_settings(data)
     return get_certificate_options()
+
+
+def certificate_flags() -> list[tuple[str, str]]:
+    """Entités disponibles pour le drapeau du certificat : (code, nom), triées."""
+    seen = {code: name for code, name in dxcc_flags.PREFIXES.values()}
+    return sorted(seen.items(), key=lambda item: item[1])
 
 
 def certificates_on() -> bool:
