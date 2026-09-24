@@ -77,15 +77,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -98,19 +98,20 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38
     caractères spéciaux ; 8/1/1/1 par défaut, 0 = pas d'exigence) et la règle en
     vigueur est rappelée sur la page de connexion. Une **question anti-robot** (calcul simple, sans service
     extérieur) protège la création de comptes. La validation des nouveaux comptes
-    par un administrateur est facultative, et plusieurs opérateurs peuvent être
-    **administrateurs**. Réglages → Comptes opérateurs.
-  - **Chacun sur son indicatif** : un opérateur qui n'est pas coché
-    « administrateur » logue, réserve ses créneaux, importe et exporte sous le
+    par un administrateur est facultative. Deux rôles se donnent à plusieurs
+    opérateurs : **admin** (log sous n'importe quel indicatif, rapport PDF) et
+    **superadmin** (en plus : accès aux Réglages). Réglages → Comptes opérateurs.
+  - **Chacun sur son indicatif** : un opérateur qui n'est ni admin ni
+    superadmin logue, réserve ses créneaux, importe et exporte sous le
     seul indicatif donné à la connexion, et ne peut ni modifier ni supprimer les
     QSO et les créneaux des autres — avec un mot de passe par opérateur comme
     avec le mot de passe commun. Il voit le log complet de la station — utile
     pour repérer les doublons — mais ses exports ne contiennent que ses propres
     QSO. Avec le mot de passe commun, c'est un garde-fou contre les erreurs de
     saisie, pas une barrière : qui connaît le mot de passe peut se reconnecter
-    sous un autre indicatif. Les administrateurs, eux, gardent la main sur tout,
-    et les Réglages exigent toujours un mot de passe personnel (ou celui du
-    site).
+    sous un autre indicatif. Les admins, eux, gardent la main sur tous les QSO
+    et créneaux ; les Réglages sont réservés aux superadmins et exigent
+    toujours un mot de passe personnel (ou celui du site).
   - **Planning** des créneaux (qui, quand, bande, mode), avec alerte si deux
     créneaux se chevauchent sur la même bande, comptes à rebours et **nombre de
     QSO loggés** dans chaque créneau (même opérateur, même bande, même mode) ;
@@ -207,7 +208,7 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38
 
 ### Options (Réglages)
 
-Tout est activable ou désactivable depuis **Réglages** (administrateur) : rien
+Tout est activable ou désactivable depuis **Réglages** (superadmin) : rien
 n'est imposé.
 
 | Option | Par défaut | Effet |
@@ -288,22 +289,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.38.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.39.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.38.0.tar.gz
-   cd tm-activation-1.38.0
+   tar xzf tm-activation-1.39.0.tar.gz
+   cd tm-activation-1.39.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.38.0.zip
-   cd tm-activation-1.38.0
+   unzip tm-activation-1.39.0.zip
+   cd tm-activation-1.39.0
    sudo bash install.sh --lan
    ```
 
@@ -390,8 +391,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.38.0.tar.gz
-cd tm-activation-1.38.0
+tar xzf tm-activation-1.39.0.tar.gz
+cd tm-activation-1.39.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -476,7 +477,10 @@ le certificat HTTPS, nginx et l'horloge, sans rien modifier.
    êtes prêts.
 4. Donner aux opérateurs l'adresse `/activation/login` et le mot de passe
    commun. Chacun se connecte avec **son** indicatif et rejoint
-   automatiquement la liste des opérateurs.
+   automatiquement la liste des opérateurs. Pour déléguer, **Comptes
+   opérateurs** : rendre un opérateur **admin** (log sous tout indicatif,
+   rapport PDF) ou **superadmin** (accès aux Réglages en plus) — il faut pour
+   cela les comptes individuels (un mot de passe par opérateur).
 5. La page publique est `/tm50abc` (indicatif en minuscules). La racine du
    site redirige vers elle.
 
@@ -531,6 +535,20 @@ dépendances sont remplacés et le service redémarre. `config.yml`, le dossier
 `var/` (base, mots de passe, sauvegardes) et la configuration nginx ne sont
 **jamais** touchés. Par précaution, la base est d'abord copiée dans
 `var/backups/preupgrade-*.sqlite`.
+
+### Passage à la 1.39 : rôle superadmin
+
+L'accès aux **Réglages** passe à un nouveau rôle, **superadmin**. Les
+opérateurs déjà cochés « administrateur » restent **admin** : ils loguent
+toujours sous n'importe quel indicatif et téléchargent le rapport PDF, mais
+**n'ouvrent plus les Réglages**. Après la mise à jour :
+
+1. se connecter en administrateur sur `/login` (mot de passe de `config.yml`,
+   qui garde un accès complet) ;
+2. **Réglages → Comptes opérateurs** : cliquer **Rendre superadmin** pour
+   chaque opérateur qui doit garder la main sur les Réglages.
+
+Rien d'autre ne change : comptes, mots de passe et log sont conservés.
 
 ## Sauvegardes et restauration
 

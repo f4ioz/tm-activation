@@ -617,12 +617,31 @@ def approve_operator(call: str) -> None:
 
 
 def set_operator_admin(call: str, is_admin: bool) -> None:
-    """Droits d'administration (Réglages) d'un opérateur."""
+    """Droits d'administration d'un opérateur (log sous tout indicatif, rapport).
+
+    Retirer l'admin retire aussi le superadmin : un superadmin est un admin."""
     cs = (call or "").strip().upper()
     if get_operator(cs) is None:
         raise ValueError(_("indicatif inconnu"))
     with conn() as c:
-        c.execute("UPDATE operators SET is_admin=? WHERE callsign=?", (1 if is_admin else 0, cs))
+        if is_admin:
+            c.execute("UPDATE operators SET is_admin=1 WHERE callsign=?", (cs,))
+        else:
+            c.execute("UPDATE operators SET is_admin=0, is_superadmin=0 WHERE callsign=?", (cs,))
+    maybe_backup()
+
+
+def set_operator_superadmin(call: str, is_superadmin: bool) -> None:
+    """Accès aux Réglages. Donner le superadmin donne l'admin ; le retirer
+    laisse l'opérateur admin."""
+    cs = (call or "").strip().upper()
+    if get_operator(cs) is None:
+        raise ValueError(_("indicatif inconnu"))
+    with conn() as c:
+        if is_superadmin:
+            c.execute("UPDATE operators SET is_admin=1, is_superadmin=1 WHERE callsign=?", (cs,))
+        else:
+            c.execute("UPDATE operators SET is_superadmin=0 WHERE callsign=?", (cs,))
     maybe_backup()
 
 
@@ -633,9 +652,19 @@ def set_operator_active(call: str, active: bool) -> None:
     maybe_backup()
 
 
+def _operator_usable(row: dict[str, Any] | None) -> bool:
+    return bool(row and row.get("active") and row.get("status", "active") == "active")
+
+
 def operator_is_admin(call: str) -> bool:
+    """Admin ou superadmin (le second englobe le premier)."""
     row = get_operator(call)
-    return bool(row and row.get("is_admin") and row.get("active") and row.get("status", "active") == "active")
+    return _operator_usable(row) and bool(row.get("is_admin") or row.get("is_superadmin"))
+
+
+def operator_is_superadmin(call: str) -> bool:
+    row = get_operator(call)
+    return _operator_usable(row) and bool(row.get("is_superadmin"))
 
 
 def _seed_operators() -> list[str]:
@@ -719,7 +748,8 @@ def init_db() -> None:
                 name TEXT DEFAULT '',
                 active INTEGER DEFAULT 1,
                 password_hash TEXT DEFAULT '',  -- option « un mot de passe par opérateur »
-                is_admin INTEGER DEFAULT 0,     -- accès aux Réglages avec son propre mot de passe
+                is_admin INTEGER DEFAULT 0,     -- log sous tout indicatif, rapport PDF
+                is_superadmin INTEGER DEFAULT 0, -- en plus : accès aux Réglages
                 status TEXT DEFAULT 'active',   -- active / pending (validation par un admin)
                 created_at INTEGER
             );
@@ -787,7 +817,8 @@ def init_db() -> None:
         # Comptes opérateurs (mot de passe individuel, admin, validation).
         ops_cols = {row[1] for row in c.execute("PRAGMA table_info(operators)").fetchall()}
         for col, decl in (("password_hash", "TEXT DEFAULT ''"), ("is_admin", "INTEGER DEFAULT 0"),
-                          ("status", "TEXT DEFAULT 'active'")):
+                          ("status", "TEXT DEFAULT 'active'"),
+                          ("is_superadmin", "INTEGER DEFAULT 0")):
             if col not in ops_cols:
                 c.execute(f"ALTER TABLE operators ADD COLUMN {col} {decl}")
         # Passage au multi-indicatif : copie intacte de la base AVANT de toucher

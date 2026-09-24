@@ -105,9 +105,10 @@
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
       <p class="act-muted act-map-note">{{ _("Avec les comptes individuels, chaque opérateur crée son mot de passe à sa première connexion (son indicatif suffit). Un opérateur déjà inscrit dans la liste des opérateurs n'a pas besoin d'être validé : il a été ajouté par un administrateur.") }}</p>
+      <p class="act-muted act-map-note">{{ _("Rôles : un admin logue sous n'importe quel indicatif et télécharge le rapport PDF ; un superadmin a en plus accès aux Réglages. Les deux demandent les comptes individuels.") }}</p>
       <div class="act-scroll">
         <table class="act-table">
-          <thead><tr><th>{{ _("Indicatif") }}</th><th>{{ _("Nom") }}</th><th>{{ _("État") }}</th><th>{{ _("Mot de passe") }}</th><th>{{ _("Administrateur") }}</th><th></th></tr></thead>
+          <thead><tr><th>{{ _("Indicatif") }}</th><th>{{ _("Nom") }}</th><th>{{ _("État") }}</th><th>{{ _("Mot de passe") }}</th><th>{{ _("Rôle") }}</th><th></th></tr></thead>
           <tbody>
             {% for o in accounts %}
               <tr{% if o.status == 'pending' %} class="act-row-conflict"{% endif %}>
@@ -115,10 +116,12 @@
                 <td>{{ o.name }}</td>
                 <td>{% if o.status == 'pending' %}<span class="act-warn">{{ _("à valider") }}</span>{% elif not o.active %}<span class="act-muted">{{ _("désactivé") }}</span>{% else %}{{ _("actif") }}{% endif %}</td>
                 <td>{% if o.password_hash %}{{ _("défini") }}{% else %}<span class="act-muted">{{ _("à créer") }}</span>{% endif %}</td>
-                <td>{% if o.is_admin %}✓{% endif %}</td>
+                <td>{% if o.is_superadmin %}<strong>{{ _("superadmin") }}</strong>{% elif o.is_admin %}{{ _("admin") }}{% endif %}</td>
                 <td class="act-actions act-acct-actions">
                   {% if o.status == 'pending' %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="approve" class="act-cancel-btn">{{ _("Valider") }}</button></form>{% endif %}
-                  {% if o.is_admin %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="unadmin" class="act-cancel-btn">{{ _("Retirer admin") }}</button></form>
+                  {% if o.is_superadmin %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="unsuperadmin" class="act-cancel-btn">{{ _("Retirer superadmin") }}</button></form>
+                  {% elif o.is_admin %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="superadmin" class="act-cancel-btn">{{ _("Rendre superadmin") }}</button></form>
+                  <form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="unadmin" class="act-cancel-btn">{{ _("Retirer admin") }}</button></form>
                   {% else %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="admin" class="act-cancel-btn">{{ _("Rendre admin") }}</button></form>{% endif %}
                   {% if o.password_hash %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}" onsubmit="return confirm({{ _("Effacer le mot de passe de {call} ? Il en choisira un nouveau à sa prochaine connexion.", call=o.callsign)|tojson|forceescape }})"><button type="submit" name="action" value="forget" class="act-cancel-btn">{{ _("Oubli de mot de passe") }}</button></form>{% endif %}
                   {% if o.active %}<form method="post" action="/activation/settings/operators/{{ o.callsign }}"><button type="submit" name="action" value="disable" class="act-del" title="{{ _("Désactiver le compte") }}">✕</button></form>
@@ -186,7 +189,7 @@
         {% endif %}
       </p>
       <p class="act-muted">{{ _("Toutes les activations publiées :") }} <a href="/activations">/activations</a>.</p>
-      {% if is_admin %}<p class="act-muted">{{ _("Tu es connecté en admin site (accès garanti même sans mot de passe opérateur).") }}</p>{% endif %}
+      {% if site_admin %}<p class="act-muted">{{ _("Tu es connecté en admin site (accès garanti même sans mot de passe opérateur).") }}</p>{% endif %}
     </div>
 
     {% if site_admin %}<div class="act-card">

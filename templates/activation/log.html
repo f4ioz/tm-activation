@@ -17,7 +17,7 @@
     <a href="/activation/planning">{{ _("Planning") }}</a>
     <a href="/activation/log" class="active">{{ _("Log QSO") }}</a>
     <a href="/activation/adif">ADIF</a>
-    {% if is_admin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
+    {% if is_superadmin %}<a href="/activation/settings">{{ _("Réglages") }}</a>{% endif %}
   </nav>
 </header>
 

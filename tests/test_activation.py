@@ -1557,28 +1557,79 @@ def test_roster_operator_sets_password_without_approval() -> None:
     assert acc["status"] == "active" and acc["name"] == "Jean"
 
 
-def test_operator_admin_reaches_settings_but_not_site_stats(monkeypatch) -> None:
+def test_operator_superadmin_reaches_settings_but_not_site_stats(monkeypatch) -> None:
+    """Admin : tout sauf les Réglages. Superadmin : les Réglages en plus, sans
+    l'encart réservé à l'admin du site."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("per_operator_auth", True)
     op = _op_client()
     _login(op, "F5OP", PW)
+    activation.add_operator("F5ABC")
     assert op.get("/activation/settings").status_code == 303     # simple opérateur
+    # Admin : rapport PDF oui, Réglages non (ni la page, ni le lien, ni les actions).
     activation.set_operator_admin("F5OP", True)
+    assert activation.operator_is_admin("F5OP") and not activation.operator_is_superadmin("F5OP")
+    assert op.get("/activation/settings").status_code == 303
+    assert op.post("/activation/settings/operators/F5ABC", data={"action": "admin"}).status_code == 303
+    assert not activation.operator_is_admin("F5ABC")              # refusé, rien n'a bougé
+    assert op.post("/activation/stations", data={"callsign": "TM1X"}).status_code == 303
+    assert activation.get_station("TM1X") is None
+    assert 'href="/activation/settings"' not in op.get("/activation").text
+    assert op.get("/activation/report.pdf").status_code == 200
+    # Superadmin : les Réglages s'ouvrent.
+    activation.set_operator_superadmin("F5OP", True)
     page = op.get("/activation/settings")
     assert page.status_code == 200 and "Comptes opérateurs" in page.text
+    assert 'href="/activation/settings"' in op.get("/activation").text
     # Encart réservé à l'admin principal (journal des visites du site, ou des
-    # connexions dans l'application autonome) : invisible pour un admin du club.
+    # connexions dans l'application autonome) : invisible pour un superadmin du club.
     site_page = _private_client().get("/activation/settings").text
     reserved = [t for t in ("Fréquentation du site", "Connexions") if t in site_page]
     assert reserved, "encart réservé à l'admin introuvable"
     for title in reserved:
         assert title not in page.text
-    # Il peut gérer les comptes…
+    # Il peut gérer les comptes et les rôles…
     assert op.post("/activation/settings/operators/F5ABC", data={"action": "admin"}).status_code == 303
+    assert activation.operator_is_admin("F5ABC")
+    op.post("/activation/settings/operators/F5ABC", data={"action": "superadmin"})
+    assert activation.operator_is_superadmin("F5ABC")
+    op.post("/activation/settings/operators/F5ABC", data={"action": "unsuperadmin"})
+    assert activation.operator_is_admin("F5ABC") and not activation.operator_is_superadmin("F5ABC")
+    op.post("/activation/settings/operators/F5ABC", data={"action": "superadmin"})
+    op.post("/activation/settings/operators/F5ABC", data={"action": "unadmin"})   # retire les deux
+    assert not activation.operator_is_admin("F5ABC") and not activation.operator_is_superadmin("F5ABC")
     # …mais pas se retirer ses propres droits.
-    r = op.post("/activation/settings/operators/F5OP", data={"action": "unadmin"})
-    assert r.headers["location"].endswith("ac=self#comptes")
-    assert activation.operator_is_admin("F5OP")
+    for action in ("unsuperadmin", "unadmin"):
+        r = op.post("/activation/settings/operators/F5OP", data={"action": action})
+        assert r.headers["location"].endswith("ac=self#comptes")
+    assert activation.operator_is_superadmin("F5OP")
+
+
+def test_superadmin_needs_individual_password() -> None:
+    """Avec le mot de passe commun, se déclarer superadmin n'ouvre rien."""
+    activation.set_operator_password("commun")
+    op = _op_client()
+    assert _login(op, "F5SUP", "commun").status_code == 303
+    activation.set_operator_superadmin("F5SUP", True)
+    assert op.get("/activation").status_code == 200
+    assert op.get("/activation/settings").status_code == 303
+
+
+def test_superadmin_column_added_to_old_database(tmp_path, monkeypatch) -> None:
+    """Base d'avant le superadmin : colonne ajoutée, les admins restent admins."""
+    import sqlite3
+
+    db = tmp_path / "old.sqlite"
+    with sqlite3.connect(db) as c:
+        c.execute("CREATE TABLE operators (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                  "callsign TEXT UNIQUE NOT NULL, name TEXT DEFAULT '', active INTEGER DEFAULT 1, "
+                  "password_hash TEXT DEFAULT '', is_admin INTEGER DEFAULT 0, "
+                  "status TEXT DEFAULT 'active', created_at INTEGER)")
+        c.execute("INSERT INTO operators(callsign, is_admin) VALUES ('F5OLD', 1)")
+    monkeypatch.setattr(activation, "DB_PATH", db)
+    activation.init_db()
+    assert activation.operator_is_admin("F5OLD")
+    assert not activation.operator_is_superadmin("F5OLD")
 
 
 def test_disabled_account_loses_its_session() -> None:

@@ -75,15 +75,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39.0.tar.gz
 ```
 
 ## Features
@@ -96,17 +96,19 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38
     special characters; 8/1/1/1 by default, 0 = not required) and the rule in
     force is shown on the login page. An **anti-robot question** (simple sum, no
     outside service) protects account creation. Approval of new accounts by an
-    administrator is optional, and several operators can be **administrators**.
-    Settings → Operator accounts.
-  - **Everyone on their own callsign**: an operator who is not ticked
-    "administrator" logs, books slots, imports and exports under the callsign
+    administrator is optional. Two roles can be given to several operators:
+    **admin** (logs under any callsign, PDF report) and **superadmin** (also
+    opens the Settings). Settings → Operator accounts.
+  - **Everyone on their own callsign**: an operator who is neither admin
+    nor superadmin logs, books slots, imports and exports under the callsign
     given at login only, and cannot edit or delete other operators' QSOs and
     slots — with a password per operator as well as with the shared password.
     They still see the station's whole log — handy to spot duplicates — but
     their exports contain only their own QSOs. With the shared password this is
     a guard against mistakes, not a barrier: whoever knows the password can log
-    back in under another callsign. Administrators keep full control, and the
-    Settings still require a personal password (or the site one).
+    back in under another callsign. Admins keep control over all QSOs and
+    slots; the Settings are for superadmins only and always require a personal
+    password (or the site one).
   - **Schedule** of slots (who, when, band, mode), with a warning if two slots
     overlap on the same band, countdowns and the **number of QSOs logged** in
     each slot (same operator, same band, same mode); nothing is shown until a
@@ -198,7 +200,7 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.38
 
 ### Options (Settings)
 
-Everything can be switched on or off from **Settings** (administrator): nothing
+Everything can be switched on or off from **Settings** (superadmin): nothing
 is forced on you.
 
 | Option | Default | Effect |
@@ -278,22 +280,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.38.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.39.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.38.0.tar.gz
-   cd tm-activation-1.38.0
+   tar xzf tm-activation-1.39.0.tar.gz
+   cd tm-activation-1.39.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.38.0.zip
-   cd tm-activation-1.38.0
+   unzip tm-activation-1.39.0.zip
+   cd tm-activation-1.39.0
    sudo bash install.sh --lan
    ```
 
@@ -376,8 +378,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.38.0.tar.gz
-cd tm-activation-1.38.0
+tar xzf tm-activation-1.39.0.tar.gz
+cd tm-activation-1.39.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -461,7 +463,10 @@ HTTPS certificate, nginx and the clock, without changing anything.
    subtitle, flags) and tick **Public page online** when you are ready.
 4. Give the operators the address `/activation/login` and the shared password.
    Each of them logs in with **their** callsign and automatically joins the
-   list of operators.
+   list of operators. To delegate, **Operator accounts**: make an operator
+   **admin** (logs under any callsign, PDF report) or **superadmin** (also
+   opens the Settings) — this requires individual accounts (one password per
+   operator).
 5. The public page is `/tm50abc` (callsign in lower case). The root of the site
    redirects to it.
 
@@ -516,6 +521,20 @@ are replaced and the service restarts. `config.yml`, the `var/` folder
 (database, passwords, backups) and the nginx configuration are **never**
 touched. As a precaution, the database is first copied to
 `var/backups/preupgrade-*.sqlite`.
+
+### Upgrading to 1.39: superadmin role
+
+Access to the **Settings** now belongs to a new role, **superadmin**.
+Operators already ticked "administrator" stay **admin**: they still log under
+any callsign and download the PDF report, but **no longer open the Settings**.
+After the update:
+
+1. log in as administrator on `/login` (password from `config.yml`, which
+   keeps full access);
+2. **Settings → Operator accounts**: click **Make superadmin** for each
+   operator who should keep control over the Settings.
+
+Nothing else changes: accounts, passwords and the log are kept.
 
 ## Backups and restoring
 

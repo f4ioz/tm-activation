@@ -85,7 +85,7 @@ def _session_op(request: Request) -> str:
 
 
 def _is_admin(request: Request) -> bool:
-    """Admin site (mot de passe de config.yml) OU opérateur marqué administrateur.
+    """Admin site (mot de passe de config.yml) OU opérateur admin ou superadmin.
 
     L'indicatif ne suffit pas : il faut un mot de passe personnel. Avec le mot
     de passe commun, tout le monde le connaît — se dire administrateur en tapant
@@ -95,6 +95,16 @@ def _is_admin(request: Request) -> bool:
         return True
     op = _session_op(request)
     return bool(op) and activation.per_operator_auth() and activation.operator_is_admin(op)
+
+
+def _is_superadmin(request: Request) -> bool:
+    """Admin site OU opérateur superadmin : les seuls à ouvrir les Réglages.
+
+    Même exigence que pour l'admin : un mot de passe personnel."""
+    if is_private(request):
+        return True
+    op = _session_op(request)
+    return bool(op) and activation.per_operator_auth() and activation.operator_is_superadmin(op)
 
 
 def _guard(request: Request) -> Response | None:
@@ -110,11 +120,19 @@ def _guard(request: Request) -> Response | None:
 
 
 def _require_admin(request: Request) -> Response | None:
-    """None si l'admin site est connecté (mode privé) ; sinon redirige vers /login.
-
-    Les Réglages sont réservés à l'administrateur, pas aux opérateurs.
-    """
+    """None pour un admin (site, opérateur admin ou superadmin) ; sinon /login."""
     if _is_admin(request):
+        return None
+    return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+
+
+def _require_superadmin(request: Request) -> Response | None:
+    """None pour un superadmin ; sinon redirige vers /login.
+
+    Les Réglages sont réservés à l'administrateur et aux opérateurs
+    superadmin — pas aux simples admins ni aux opérateurs.
+    """
+    if _is_superadmin(request):
         return None
     return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
 
@@ -154,6 +172,7 @@ def _ctx(request: Request, **extra: object) -> dict:
         "log_view": activation.get_log_view(),
         "my_grid": activation.my_gridsquare(),
         "is_admin": _is_admin(request),
+        "is_superadmin": _is_superadmin(request),
         "site_admin": is_private(request),     # journal des visites : admin du site seul
         "session_op": _session_op(request),
         "locked_op": _locked_op(request),
@@ -373,7 +392,7 @@ async def add_operator(request: Request, callsign: str = Form(""), name: str = F
 
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     return _settings_page(request)
 
@@ -452,7 +471,7 @@ async def change_operator_password(
     new_password: str = Form(""),
     confirm: str = Form(""),
 ) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     if not new_password.strip() or new_password != confirm:
         return RedirectResponse("/activation/settings?pw=mismatch", status_code=303)
@@ -468,7 +487,7 @@ async def change_flags(
     request: Request, show_contacts: str = Form(""), show_map_stats: str = Form(""),
     auto_slots: str = Form(""), slot_lock: str = Form(""), public_slots_max: str = Form("0"),
 ) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_flag("show_contacts", bool(show_contacts))
     activation.set_flag("show_map_stats", bool(show_map_stats))
@@ -486,7 +505,7 @@ async def change_auth_mode(
 ) -> Response:
     """Mot de passe commun ou un mot de passe par opérateur (+ validation), et
     exigences des mots de passe individuels."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_flag("per_operator_auth", bool(per_operator))
     activation.set_flag("operator_approval", bool(approval))
@@ -500,7 +519,7 @@ async def manage_operator(
     request: Request, call: str, action: str = Form(""), password: str = Form(""),
 ) -> Response:
     """Gestion d'un compte opérateur (admin) : validation, droits, mot de passe."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     cs = (call or "").strip().upper()
     me = _session_op(request)
@@ -514,6 +533,11 @@ async def manage_operator(
                 flash = "self"
             else:
                 activation.set_operator_admin(cs, action == "admin")
+        elif action in ("superadmin", "unsuperadmin"):
+            if action == "unsuperadmin" and cs == me:
+                flash = "self"
+            else:
+                activation.set_operator_superadmin(cs, action == "superadmin")
         elif action in ("enable", "disable"):
             if action == "disable" and cs == me:
                 flash = "self"
@@ -538,7 +562,7 @@ async def change_qrz_account(
     action: str = Form("save"),
 ) -> Response:
     """Compte QRZ.com du callbook (admin) : testé auprès de QRZ avant d'être gardé."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     if action == "clear":
         activation.clear_qrz_account()
@@ -563,7 +587,7 @@ async def change_qrz_account(
 @router.post("/settings/scoring")
 async def change_scoring(request: Request) -> Response:
     """Règle de points du classement (admin) : champs dynamiques par mode."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     form = await request.form()
     activation.set_scoring(dict(form))
@@ -577,7 +601,7 @@ async def change_report_options(
     runs: str = Form(""),
 ) -> Response:
     """Contenu du rapport PDF (sections facultatives)."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters,
                                    "sats": sats, "one_page": one_page, "runs": runs})
@@ -594,7 +618,7 @@ async def change_certificate_options(
     qr_url: str = Form(""),
 ) -> Response:
     """Certificats des chasseurs : ouverture au public et contenu."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_certificate_options({"enabled": enabled, "names": names,
                                         "ranking": ranking, "mention": mention,
@@ -612,7 +636,7 @@ async def change_certificate_options(
 async def change_log_view(request: Request, photo: str = Form(""),
                           compass: str = Form("")) -> Response:
     """Tailles de la photo QRZ et de la boussole sur la page de log."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_log_view({"photo": photo, "compass": compass})
     return RedirectResponse("/activation/settings?lv=ok#log", status_code=303)
@@ -621,7 +645,7 @@ async def change_log_view(request: Request, photo: str = Form(""),
 @router.post("/settings/logo")
 async def upload_logo(request: Request, logo: UploadFile | None = File(None)) -> Response:
     """Logo du club : bandeau du site, en-tête des pages et rapport PDF."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     data = await logo.read() if logo is not None else b""
     try:
@@ -635,7 +659,7 @@ async def upload_logo(request: Request, logo: UploadFile | None = File(None)) ->
 @router.post("/settings/logo/show")
 async def toggle_logo_on_pages(request: Request, show: str = Form("")) -> Response:
     """Afficher ou non le logo dans le bandeau des pages (le PDF le garde)."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_flag("logo_on_pages", bool(show))
     return RedirectResponse("/activation/settings?lg=ok#rapport", status_code=303)
@@ -643,7 +667,7 @@ async def toggle_logo_on_pages(request: Request, show: str = Form("")) -> Respon
 
 @router.post("/settings/logo/delete")
 async def delete_logo(request: Request) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.clear_logo()
     return RedirectResponse("/activation/settings?lg=gone#rapport", status_code=303)
@@ -670,7 +694,7 @@ async def activity_report(request: Request, station: str = "") -> Response:
 @router.post("/settings/slots-from-log")
 async def rebuild_slots_from_log(request: Request) -> Response:
     """Recale tout de suite les créneaux sur le log (admin), sans attendre un QSO."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     done = activation.reconcile_slots_from_log(force=True)
     return RedirectResponse(
@@ -681,7 +705,7 @@ async def rebuild_slots_from_log(request: Request) -> Response:
 @router.post("/settings/map")
 async def change_map_style(request: Request) -> Response:
     """Couleurs (modes) et formes (bandes) de la carte publique (admin)."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     form = await request.form()
     activation.set_map_style(dict(form))
@@ -707,7 +731,7 @@ def _station_or_404(slug: str) -> dict:
 
 @router.post("/stations")
 async def station_create(request: Request) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     form = await request.form()
     fields = _station_fields(form)
@@ -721,7 +745,7 @@ async def station_create(request: Request) -> Response:
 
 @router.get("/stations/{slug}/edit", response_class=HTMLResponse)
 async def station_edit_form(request: Request, slug: str) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     st = _station_or_404(slug)
     return templates.TemplateResponse(
@@ -731,7 +755,7 @@ async def station_edit_form(request: Request, slug: str) -> Response:
 
 @router.post("/stations/{slug}")
 async def station_edit_submit(request: Request, slug: str) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     st = _station_or_404(slug)
     fields = _station_fields(await request.form())
@@ -748,7 +772,7 @@ async def station_edit_submit(request: Request, slug: str) -> Response:
 @router.post("/stations/{slug}/current")
 async def station_set_current(request: Request, slug: str) -> Response:
     """Un seul indicatif en cours : l'espace opérateurs bascule sur celui-ci."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_current_station(_station_or_404(slug)["callsign"])
     return RedirectResponse("/activation/settings?st=current#stations", status_code=303)
@@ -757,7 +781,7 @@ async def station_set_current(request: Request, slug: str) -> Response:
 @router.post("/stations/{slug}/delete")
 async def station_delete(request: Request, slug: str) -> Response:
     """Suppression d'une fiche sans QSO (refus expliqué sinon)."""
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     try:
         activation.delete_station(_station_or_404(slug)["callsign"])
@@ -768,7 +792,7 @@ async def station_delete(request: Request, slug: str) -> Response:
 
 @router.post("/settings/backup")
 async def backup_now_route(request: Request) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     try:
         activation.backup_now()
@@ -780,7 +804,7 @@ async def backup_now_route(request: Request) -> Response:
 
 @router.get("/settings/backup.sqlite")
 async def download_backup(request: Request) -> Response:
-    if (g := _require_admin(request)) is not None:
+    if (g := _require_superadmin(request)) is not None:
         return g
     path = activation.backup_now()
     stamp = path.stem.replace("activation-", "")
