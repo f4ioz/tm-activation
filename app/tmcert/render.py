@@ -5,8 +5,8 @@ from datetime import date, datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor, white
 from reportlab.pdfbase import pdfmetrics
-from .decor import (register_fonts, decor, medaille, liseret, drapeau, W, H, A,
-                    NAVY, NAVY2, NAVY3, GOLD, RED, RED2, GRIS)
+from .decor import (register_fonts, decor, medaille, liseret, drapeau, emblem, symbole_ra, W, H, A,
+                    NAVY, NAVY2, NAVY3, GOLD, GOLDL, RED, RED2, GRIS)
 
 MAX_LIGNES_P1 = 10         # lignes QSO visibles en page 1 (défaut ; voir options)
 
@@ -21,6 +21,8 @@ def options(d):
     return {"max_qso": max(1, min(maxi, 14)), "annexe": bool(o.get("annexe", True))}
 LIGNES_ANNEXE = 28         # lignes QSO par page d'annexe
 X0, BW = 228, 420          # colonne de contenu
+CAP = 0.70                 # hauteur des capitales Poppins, en fraction du corps
+TITRE_MAXW = 655 - X0      # titre + drapeau s'arrêtent avant la médaille
 MODE_COL = {"SSB": "#C9982E", "CW": "#B0202B", "FT8": "#2C6E9C", "FT4": "#2C6E9C",
             "FM": "#3B7D4F", "RTTY": "#6A4C93", "DIGI": "#2C6E9C"}
 BANDES = [(1.8, 2.0, "160 m"), (3.5, 3.8, "80 m"), (5.3, 5.4, "60 m"), (7.0, 7.2, "40 m"),
@@ -166,6 +168,28 @@ def morse_rule(c, x, y, texte, largeur, epaisseur=3.2, col=GOLD):
 
 
 # ------------------------------------------------------------------ pages
+def qr_tuile(c, url, cx=65, cy=162, cote=66):
+    """QR code sur une tuile blanche, dans la colonne marine sous le logo ;
+    l'adresse (sans « https:// ») en petit, dessous, pour qui ne scanne pas."""
+    from reportlab.graphics import renderPDF
+    from reportlab.graphics.barcode import qr
+    from reportlab.graphics.shapes import Drawing
+
+    w = qr.QrCodeWidget(url, barLevel="M", barBorder=0)
+    x0, y0, x1, y1 = w.getBounds()
+    k = cote / max(x1 - x0, y1 - y0)
+    dr = Drawing(cote, cote, transform=[k, 0, 0, k, 0, 0]); dr.add(w)
+    pad = 5
+    c.setFillColor(A(HexColor("#000000"), 0.25))
+    c.roundRect(cx - cote / 2 - pad + 2, cy - cote / 2 - pad - 2, cote + 2 * pad, cote + 2 * pad, 5, stroke=0, fill=1)
+    c.setFillColor(white); c.setStrokeColor(GOLD); c.setLineWidth(1.2)
+    c.roundRect(cx - cote / 2 - pad, cy - cote / 2 - pad, cote + 2 * pad, cote + 2 * pad, 5, stroke=1, fill=1)
+    renderPDF.draw(dr, c, cx - cote / 2, cy - cote / 2)
+    court = url.split("://", 1)[-1].rstrip("/")
+    c.setFillColor(GOLDL); c.setFont("PopMedium", fit(court, "PopMedium", 6.5, cote + 30, 4.5))
+    c.drawCentredString(cx, cy - cote / 2 - pad - 9, court)
+
+
 def page_principale(c, d):
     act, dest = d["activation"], d["destinataire"]
     cls, cert = d.get("classement") or {}, d["certificat"]
@@ -173,26 +197,52 @@ def page_principale(c, d):
     if d.get("liseret"):
         liseret(c, d["liseret"])
     medaille(c, cls.get("position"), cls.get("total"), W - 115, H - 110)
+    # Sous le poste de radio : l'emblème (banderole au nom du club, sinon
+    # « HAM RADIO ») et/ou le symbole radioamateur, chacun en option.
+    emb, sym = d.get("embleme"), d.get("symbole_ra")
+    if emb is not None:
+        emblem(c, 733 if sym else 745, 176, emb.get("texte") or "HAM RADIO")
+    if sym:
+        symbole_ra(c, 808 if emb is not None else 745, 205 if emb is not None else 205,
+                   46 if emb is not None else 70)
 
     titre = act.get("titre") or "CERTIFICAT"
-    c.setFillColor(NAVY); c.setFont("PopExtraBold", 60)
-    c.drawString(X0, H - 150, titre)
+    # Drapeau du pays À DROITE du titre, sur sa ligne et à la hauteur de ses
+    # capitales ; le titre rétrécit si l'ensemble déborderait sur la médaille.
+    ratio = None
+    if d.get("drapeau"):
+        try:
+            from PIL import Image
+            with Image.open(d["drapeau"]) as im:
+                ratio = im.width / im.height
+        except OSError:
+            ratio = None
+    fs = 60.0
+    def largeur(f):
+        w = pdfmetrics.stringWidth(titre, "PopExtraBold", f)
+        return w + (14 + CAP * f * ratio if ratio else 0)
+    while fs > 36 and largeur(fs) > TITRE_MAXW:
+        fs -= 1
+    yt = H - 140
+    c.setFillColor(NAVY); c.setFont("PopExtraBold", fs)
+    c.drawString(X0, yt, titre)
+    wt = pdfmetrics.stringWidth(titre, "PopExtraBold", fs)
     # Sous le titre, son écriture en morse : clin d'œil, et repère visuel.
-    morse_rule(c, X0, H - 160, act.get("morse") or titre,
-               pdfmetrics.stringWidth(titre, "PopExtraBold", 60))
+    morse_rule(c, X0, yt - 10, act.get("morse") or titre, wt)
+    if ratio:
+        try:
+            drapeau(c, d["drapeau"], X0 + wt + 14, yt + CAP * fs / 2, CAP * fs)
+        except OSError:
+            pass
     # Sous-titre : celui fourni ; une chaîne vide le supprime franchement.
     st = act["sous_titre"] if "sous_titre" in act \
         else f"ACTIVATION SPÉCIALE · {act['evenement'].upper()}"
     if st:
         c.setFillColor(NAVY)      # morse_rule a laissé l'or dans le pinceau
         c.setFont("PopSemiBold", fit(st, "PopSemiBold", 20, 400, 12))
-        c.drawString(X0 + 2, H - 180, st)
-    if d.get("drapeau"):
-        # Drapeau du pays de l'activation, au bout de la ligne de titre.
-        try:
-            drapeau(c, d["drapeau"], X0 + BW - 52, H - 148, 32)
-        except OSError:
-            pass
+        c.drawString(X0 + 2, H - 176, st)
+    if d.get("qr_url"):
+        qr_tuile(c, d["qr_url"])
 
     c.setFillColor(NAVY); c.rect(X0, H - 222, BW, 24, stroke=0, fill=1)
     c.setFillColor(white); c.setFont("PopSemiBold", 10)

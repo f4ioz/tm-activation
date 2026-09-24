@@ -2100,7 +2100,8 @@ def test_certificate_page_options(monkeypatch, tmp_path) -> None:
     assert activation.get_certificate_options() == {
         "enabled": True, "names": False, "ranking": False, "mention": "",
         "max_qso": 14, "annexe": False, "flag": "", "border": False,
-        "border_colors": activation.DEFAULT_CERTIFICATE["border_colors"]}
+        "border_colors": activation.DEFAULT_CERTIFICATE["border_colors"],
+        "emblem": False, "emblem_text": "", "ham_symbol": False, "qr_url": ""}
     assert pages(certificate.build_certificate("ON4ZZ")) == 1         # tout tient, pas d'annexe
     # Valeur absurde : bornée.
     admin.post("/activation/settings/certificate", data={"enabled": "1", "max_qso": "99"})
@@ -2143,6 +2144,64 @@ def test_certificate_name_is_opt_in(monkeypatch, tmp_path) -> None:
     assert certificate.hunter_data("DL1ABC")["destinataire"]["nom"] == ""
     activation.set_certificate_options({"enabled": "1", "names": "1"})
     assert certificate.hunter_data("DL1ABC")["destinataire"]["nom"] == "Hans MUSTER"
+
+
+def test_certificate_emblem_and_ham_symbol(monkeypatch, tmp_path) -> None:
+    """Emblème sous le poste (banderole au nom du club, sinon « HAM RADIO »)
+    et symbole radioamateur : chacun en option dans les Réglages."""
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    data = certificate.hunter_data("DL1ABC")
+    assert data["embleme"] == {"texte": "HAM RADIO"}          # par défaut
+    assert "symbole_ra" not in data
+
+    admin = _private_client()
+    page = admin.get("/activation/settings").text
+    assert 'name="emblem"' in page and 'name="emblem_text"' in page and 'name="ham_symbol"' in page
+    admin.post("/activation/settings/certificate",
+               data={"enabled": "1", "emblem": "1", "ham_symbol": "1",
+                     "emblem_text": "  Radio-club   de Villeneuve " + "x" * 60})
+    opts = activation.get_certificate_options()
+    assert opts["emblem"] and opts["ham_symbol"]
+    assert opts["emblem_text"].startswith("Radio-club de Villeneuve")    # espaces resserrés
+    assert len(opts["emblem_text"]) == activation.CERTIFICATE_EMBLEM_MAX
+    data = certificate.hunter_data("DL1ABC")
+    assert data["embleme"]["texte"] == opts["emblem_text"] and data["symbole_ra"] is True
+    assert certificate.build_certificate("DL1ABC").startswith(b"%PDF-")
+
+    admin.post("/activation/settings/certificate", data={"enabled": "1"})   # tout décoché
+    data = certificate.hunter_data("DL1ABC")
+    assert "embleme" not in data and "symbole_ra" not in data
+    assert certificate.build_certificate("DL1ABC").startswith(b"%PDF-")
+
+
+def test_certificate_qr_code_address_from_settings(monkeypatch, tmp_path) -> None:
+    """Adresse du QR code réglée dans les Réglages : imprimée si valide, sinon rien."""
+    from app import certificate
+
+    monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
+    monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
+    activation.set_flag("auto_slots", False)
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
+    assert "qr_url" not in certificate.hunter_data("DL1ABC")          # par défaut : pas de QR
+
+    admin = _private_client()
+    assert 'name="qr_url"' in admin.get("/activation/settings").text
+    admin.post("/activation/settings/certificate",
+               data={"enabled": "1", "qr_url": "  mon-radioclub.fr/activation "})
+    assert activation.get_certificate_options()["qr_url"] == "https://mon-radioclub.fr/activation"
+    data = certificate.hunter_data("DL1ABC")
+    assert data["qr_url"] == "https://mon-radioclub.fr/activation"
+    pdf = certificate.build_certificate("DL1ABC")
+    assert pdf.startswith(b"%PDF-")
+
+    for bad in ("javascript:alert(1)", "https://" + "x" * 250 + ".fr", "pas une adresse"):
+        admin.post("/activation/settings/certificate", data={"enabled": "1", "qr_url": bad})
+        assert activation.get_certificate_options()["qr_url"] == "", bad
+    assert "qr_url" not in certificate.hunter_data("DL1ABC")
 
 
 def test_report_best_moments_section(monkeypatch, tmp_path) -> None:

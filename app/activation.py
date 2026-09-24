@@ -2267,9 +2267,16 @@ DEFAULT_CERTIFICATE: dict[str, Any] = {
     "flag": "auto",      # drapeau du pays : "" (aucun), "auto" (d'après l'indicatif) ou un code
     "border": False,     # fin liseré autour de la page
     "border_colors": ["#0055A4", "#FFFFFF", "#EF3340"],
+    "emblem": True,      # emblème pylône + banderole sous le poste de radio
+    "emblem_text": "",   # texte de la banderole (nom du club) ; vide → « HAM RADIO »
+    "ham_symbol": False, # symbole international du radioamateur (losange)
+    "qr_url": "",        # adresse du QR code (colonne de gauche) ; vide → pas de QR
 }
 _RE_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 CERTIFICATE_MENTION_MAX = 160
+CERTIFICATE_EMBLEM_MAX = 40     # au-delà, la banderole deviendrait illisible
+CERTIFICATE_QR_MAX = 200        # un QR plus dense ne se lirait plus à 2 cm
+_RE_QR_URL = re.compile(r"^https?://[^\s/]+\.[^\s]*$", re.IGNORECASE)
 
 
 def get_certificate_options() -> dict[str, Any]:
@@ -2285,7 +2292,19 @@ def get_certificate_options() -> dict[str, Any]:
         "flag": _clean_flag(saved.get("flag", d["flag"])),
         "border": bool(saved.get("border", d["border"])),
         "border_colors": _clean_colors(saved.get("border_colors"), d["border_colors"]),
+        "emblem": bool(saved.get("emblem", d["emblem"])),
+        "emblem_text": str(saved.get("emblem_text") or "")[:CERTIFICATE_EMBLEM_MAX],
+        "ham_symbol": bool(saved.get("ham_symbol", d["ham_symbol"])),
+        "qr_url": _clean_qr_url(saved.get("qr_url")),
     }
+
+
+def _clean_qr_url(value: Any) -> str:
+    """Adresse http(s) du QR code ; « https:// » ajouté s'il manque, sinon rien."""
+    url = "".join(str(value or "").split())
+    if url and "://" not in url:
+        url = "https://" + url
+    return url if len(url) <= CERTIFICATE_QR_MAX and _RE_QR_URL.match(url) else ""
 
 
 def _clean_flag(value: Any) -> str:
@@ -2317,6 +2336,10 @@ def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
         "border_colors": _clean_colors(
             [form.get("border1"), form.get("border2"), form.get("border3")],
             DEFAULT_CERTIFICATE["border_colors"]),
+        "emblem": bool(form.get("emblem")),
+        "emblem_text": " ".join(str(form.get("emblem_text") or "").split())[:CERTIFICATE_EMBLEM_MAX],
+        "ham_symbol": bool(form.get("ham_symbol")),
+        "qr_url": _clean_qr_url(form.get("qr_url")),
     }
     _save_settings(data)
     return get_certificate_options()

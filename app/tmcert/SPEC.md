@@ -44,6 +44,14 @@ Poppins (Regular, Medium, SemiBold, Bold, ExtraBold) ; Great Vibes pour le nom.
 | `max_qso` | 10 | contacts listés sur la page principale (1 à 14) |
 | `annexe` | vrai | produire le journal complet en annexe quand ça déborde |
 
+## Emblème et symbole (sous le poste de radio, optionnels)
+| Clé de données | Effet |
+|---|---|
+| `embleme: {texte}` | pylône à éclairs dans un arc or, banderole marine ailée portant `texte` en Poppins Bold blanc le long de la courbe (9 pt, réduit jusqu'à 4,5 pt) ; défaut « HAM RADIO ». Milieu de banderole en (745, 176), (733, 176) avec le symbole |
+| `symbole_ra: true` | symbole international du radioamateur (losange marine/or, antenne-bobine-masse) : 46 pt de haut en (808, 205) à côté de l'emblème, 70 pt en (745, 205) seul |
+
+Dessinés en vectoriel (`decor.emblem`, `decor.symbole_ra`), aucune image externe.
+
 ## Règles de données
 - QSO triés par date/heure UTC ; bande déduite de la fréquence si absente.
 - Fréquence affichée en MHz, 3 décimales, virgule décimale.

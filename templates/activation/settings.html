@@ -305,6 +305,16 @@
             {% endfor %}
           </div>
         </fieldset>
+        <fieldset class="act-fieldset">
+          <legend><label class="act-check"><input type="checkbox" name="emblem" value="1"{% if certificate_options.emblem %} checked{% endif %}> {{ _("Emblème sous le poste de radio (pylône et banderole)") }}</label></legend>
+          <label>{{ _("Texte de la banderole") }}
+            <input type="text" name="emblem_text" maxlength="40" value="{{ certificate_options.emblem_text }}" placeholder="HAM RADIO"></label>
+          <p class="act-muted act-map-note">{{ _("Le nom du club, par exemple. Laissé vide : « HAM RADIO ».") }}</p>
+        </fieldset>
+        <label class="act-check"><input type="checkbox" name="ham_symbol" value="1"{% if certificate_options.ham_symbol %} checked{% endif %}> {{ _("Symbole international du radioamateur (losange)") }}</label>
+        <label>{{ _("Adresse du QR code") }}
+          <input type="text" name="qr_url" maxlength="200" inputmode="url" value="{{ certificate_options.qr_url }}" placeholder="{{ _("ex. https://mon-radioclub.fr/activation") }}"></label>
+        <p class="act-muted act-map-note">{{ _("Imprimé dans la colonne de gauche, sous le logo, avec l'adresse en clair. Laissé vide : pas de QR code.") }}</p>
         <label>{{ _("Mention en bas de page") }} <input type="text" name="mention" maxlength="160" value="{{ certificate_options.mention }}" placeholder="{{ _("ex. Radio-club de Villeneuve — F6ABC") }}"></label>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>

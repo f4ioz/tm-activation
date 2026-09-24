@@ -213,6 +213,109 @@ def drapeau(c, chemin, x, y, hauteur=30):
     return w
 
 
+def _eclair(c, x, y, ang, long, col):
+    """Petit éclair en zigzag partant de (x, y), orienté selon ``ang`` (degrés)."""
+    c.saveState(); c.translate(x, y); c.rotate(ang)
+    p = c.beginPath()
+    for i, (px, py) in enumerate([(0, 1.2), (long * .55, 2.4), (long * .45, .2), (long, 1.4),
+                                  (long * .5, -1.4), (long * .6, .9), (0, -1.2)]):
+        (p.moveTo if i == 0 else p.lineTo)(px, py)
+    p.close(); c.setFillColor(col); c.drawPath(p, stroke=0, fill=1)
+    c.restoreState()
+
+
+def emblem(c, cx, cy, texte="HAM RADIO", s=1):
+    """Emblème radioamateur : pylône et ses éclairs dans un arc, sur une
+    banderole ailée qui porte ``texte`` (le nom du club, sinon « HAM RADIO »).
+    (cx, cy) = milieu de la banderole."""
+    c.saveState(); c.translate(cx, cy); c.scale(s, s)
+    # arc ouvert vers le bas, derrière le pylône
+    c.setStrokeColor(GOLD); c.setLineWidth(2.2)
+    c.arc(-40, -8, 40, 72, -22, 224)
+    # ailes : trois plumes de chaque côté, en éventail, derrière la banderole
+    for sx in (-1, 1):
+        for k in range(3):
+            c.saveState(); c.translate(sx * 33, 11); c.rotate(sx * (12 + k * 20))
+            c.setFillColor(GOLD if k % 2 == 0 else GOLD2)
+            lg = 28 - k * 4
+            p = c.beginPath(); p.moveTo(0, 2.8); p.lineTo(sx * (lg - 5), 3.4)
+            p.curveTo(sx * (lg + 1), 3.4, sx * (lg + 1), -3.4, sx * (lg - 5), -3.4)
+            p.lineTo(0, -2.8); p.close(); c.drawPath(p, stroke=0, fill=1)
+            c.restoreState()
+    # butte et pylône en treillis
+    c.setFillColor(NAVY2); p = c.beginPath(); p.moveTo(-24, 6)
+    p.curveTo(-16, 16, 16, 16, 24, 6); p.close(); c.drawPath(p, stroke=0, fill=1)
+    c.setStrokeColor(NAVY2); c.setLineWidth(1.6)
+    c.line(-11, 10, -1.6, 58); c.line(11, 10, 1.6, 58)
+    c.setLineWidth(0.9)
+    niveaux = [10, 22, 33, 43, 51, 58]
+    demi = lambda y: 11 - (y - 10) * (9.4 / 48)
+    for a, b in zip(niveaux, niveaux[1:]):
+        c.line(-demi(a), a, demi(b), b); c.line(demi(a), a, -demi(b), b)
+        c.line(-demi(b), b, demi(b), b)
+    c.setFillColor(RED); c.circle(0, 61, 2.6, stroke=0, fill=1)
+    for ang, d, lg in [(62, 6, 13), (118, 6, 13), (26, 6, 15), (154, 6, 15)]:
+        r = math.radians(ang)
+        _eclair(c, d * math.cos(r), 61 + d * math.sin(r), ang, lg, GOLD)
+    # banderole en sourire (centre de courbure au-dessus), bouts repliés derrière
+    R, ep, demi_l = 150.0, 8.5, 50.0
+    tm = demi_l / R
+    for sx in (-1, 1):
+        a = sx * tm
+        bx, by = R * math.sin(a), R - R * math.cos(a)
+        c.setFillColor(NAVY3); p = c.beginPath()
+        p.moveTo(bx - sx * 6, by + ep - 5); p.lineTo(bx + sx * 12, by + ep - 3)
+        p.lineTo(bx + sx * 7, by - 2); p.lineTo(bx + sx * 12, by - ep - 5)
+        p.lineTo(bx - sx * 6, by - ep - 5); p.close(); c.drawPath(p, stroke=0, fill=1)
+    pts = lambda r: [(r * math.sin(t), R - r * math.cos(t))
+                     for t in (-tm + 2 * tm * i / 24 for i in range(25))]
+    haut, bas = pts(R - ep), pts(R + ep)
+    p = c.beginPath(); p.moveTo(*haut[0])
+    for pt in haut[1:]: p.lineTo(*pt)
+    for pt in reversed(bas): p.lineTo(*pt)
+    p.close(); c.setFillColor(NAVY); c.setStrokeColor(GOLD); c.setLineWidth(1.2)
+    c.drawPath(p, stroke=1, fill=1)
+    # texte le long de la banderole, réduit pour tenir entre les bouts
+    texte = (texte or "HAM RADIO").upper()
+    fs = 9.0
+    while fs > 4.5 and pdfmetrics.stringWidth(texte, "PopBold", fs) > 2 * demi_l - 10:
+        fs -= 0.25
+    rt = R + fs * 0.34                       # rayon de la ligne de base
+    t = -pdfmetrics.stringWidth(texte, "PopBold", fs) / 2 / rt
+    c.setFillColor(white); c.setFont("PopBold", fs)
+    for ch in texte:
+        w = pdfmetrics.stringWidth(ch, "PopBold", fs)
+        tc = t + w / 2 / rt
+        c.saveState(); c.translate(rt * math.sin(tc), R - rt * math.cos(tc)); c.rotate(math.degrees(tc))
+        c.drawCentredString(0, 0, ch); c.restoreState()
+        t += w / rt
+    c.restoreState()
+
+
+def symbole_ra(c, cx, cy, h=56):
+    """Symbole international du radioamateur : losange, antenne, bobine, masse."""
+    w = h * 0.52
+    c.saveState(); c.translate(cx, cy)
+    def losange(hh, ww, col):
+        p = c.beginPath(); p.moveTo(0, hh / 2); p.lineTo(ww / 2, 0); p.lineTo(0, -hh / 2)
+        p.lineTo(-ww / 2, 0); p.close(); c.setFillColor(col); c.drawPath(p, stroke=0, fill=1)
+    c.saveState(); c.translate(1.5, -1.5); losange(h, w, A(HexColor("#000000"), 0.18)); c.restoreState()
+    losange(h, w, NAVY2); losange(h * 0.8, w * 0.8, GOLD2)
+    u = h / 56                                  # dessin prévu pour h = 56
+    c.setStrokeColor(NAVY2); c.setLineWidth(1.1 * u); c.setLineCap(1)
+    c.line(0, 16 * u, 0, 9 * u)                             # descente d'antenne
+    c.line(-3.5 * u, 19 * u, 0, 13 * u); c.line(3.5 * u, 19 * u, 0, 13 * u)
+    c.line(-3.5 * u, 19 * u, 3.5 * u, 19 * u)               # antenne en V fermé
+    for k in range(5):                                      # bobine
+        y = 7 * u - k * 3 * u
+        c.ellipse(-3 * u, y - 2.4 * u, 3 * u, y + 0.6 * u, stroke=1, fill=0)
+    c.line(0, -8.5 * u, 0, -13 * u)
+    for k, lg in enumerate((4.5, 3.2, 2, 0.9)):             # masse
+        y = -13 * u - k * 1.9 * u
+        c.line(-lg * u, y, lg * u, y)
+    c.restoreState()
+
+
 def decor(c, logo_path=None):
     """Dessine toute la couche statique (hors médaille)."""
     fond(c)

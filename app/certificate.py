@@ -154,6 +154,12 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
         data["drapeau"] = str(flag)
     if options["border"]:
         data["liseret"] = options["border_colors"]
+    if options["emblem"]:
+        data["embleme"] = {"texte": options["emblem_text"] or "HAM RADIO"}
+    if options["ham_symbol"]:
+        data["symbole_ra"] = True
+    if options["qr_url"]:
+        data["qr_url"] = options["qr_url"]
     return data
 
 

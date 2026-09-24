@@ -590,6 +590,8 @@ async def change_certificate_options(
     ranking: str = Form(""), mention: str = Form(""), max_qso: str = Form(""),
     annexe: str = Form(""), flag: str = Form(""), border: str = Form(""),
     border1: str = Form(""), border2: str = Form(""), border3: str = Form(""),
+    emblem: str = Form(""), emblem_text: str = Form(""), ham_symbol: str = Form(""),
+    qr_url: str = Form(""),
 ) -> Response:
     """Certificats des chasseurs : ouverture au public et contenu."""
     if (g := _require_admin(request)) is not None:
@@ -599,7 +601,10 @@ async def change_certificate_options(
                                         "max_qso": max_qso, "annexe": annexe,
                                         "flag": flag, "border": border,
                                         "border1": border1, "border2": border2,
-                                        "border3": border3})
+                                        "border3": border3, "emblem": emblem,
+                                        "emblem_text": emblem_text,
+                                        "ham_symbol": ham_symbol,
+                                        "qr_url": qr_url})
     return RedirectResponse("/activation/settings?ce=ok#certificats", status_code=303)
 
 
