@@ -206,6 +206,28 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39
   **surveillance** (`/admin/surveillance`, administrateur) montre le journal des
   connexions, les IP aux essais répétés et les robots bloqués.
 
+### Rôles et droits
+
+| | Opérateur | Admin | Superadmin | Administrateur (`/login`) |
+|---|:-:|:-:|:-:|:-:|
+| Loguer, planifier, importer et exporter sous son indicatif | ✓ | ✓ | ✓ | ✓ |
+| Loguer sous n'importe quel indicatif, modifier ou supprimer les QSO et créneaux des autres | | ✓ | ✓ | ✓ |
+| Rapport PDF de l'activation | | ✓ | ✓ | ✓ |
+| Réglages : options, logo, certificats, carte, QRZ, sauvegardes | | | ✓ | ✓ |
+| Indicatifs spéciaux, comptes opérateurs et rôles | | | ✓ | ✓ |
+| Surveillance des connexions (`/admin/surveillance`) | | | | ✓ |
+
+- **Opérateur** : tout compte qui se connecte sur `/activation/login` avec son
+  indicatif.
+- **Admin** et **superadmin** se donnent dans **Réglages → Comptes
+  opérateurs**, à autant d'opérateurs que nécessaire. Ils demandent les
+  comptes individuels (un mot de passe par opérateur) : avec le mot de passe
+  commun, ces rôles n'ouvrent rien de plus.
+- **Administrateur** : le mot de passe de `config.yml` (`auth.password`), sur
+  `/login`. Il a toujours un accès complet, même sans compte opérateur.
+- Personne ne peut se retirer ses propres droits : il faut qu'un autre
+  superadmin (ou l'administrateur) le fasse.
+
 ### Options (Réglages)
 
 Tout est activable ou désactivable depuis **Réglages** (superadmin) : rien
@@ -547,6 +569,8 @@ toujours sous n'importe quel indicatif et téléchargent le rapport PDF, mais
    qui garde un accès complet) ;
 2. **Réglages → Comptes opérateurs** : cliquer **Rendre superadmin** pour
    chaque opérateur qui doit garder la main sur les Réglages.
+
+Le détail de ce que permet chaque rôle : [Rôles et droits](#rôles-et-droits).
 
 Rien d'autre ne change : comptes, mots de passe et log sont conservés.
 

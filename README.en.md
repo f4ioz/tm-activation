@@ -198,6 +198,28 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.39
   (`/admin/surveillance`, administrator) shows the login log, the IPs with
   repeated attempts and the blocked robots.
 
+### Roles and permissions
+
+| | Operator | Admin | Superadmin | Administrator (`/login`) |
+|---|:-:|:-:|:-:|:-:|
+| Log, schedule, import and export under their own callsign | ✓ | ✓ | ✓ | ✓ |
+| Log under any callsign, edit or delete other operators' QSOs and slots | | ✓ | ✓ | ✓ |
+| Activation PDF report | | ✓ | ✓ | ✓ |
+| Settings: options, logo, certificates, map, QRZ, backups | | | ✓ | ✓ |
+| Special callsigns, operator accounts and roles | | | ✓ | ✓ |
+| Login monitoring (`/admin/surveillance`) | | | | ✓ |
+
+- **Operator**: any account logging in on `/activation/login` with their
+  callsign.
+- **Admin** and **superadmin** are given in **Settings → Operator accounts**,
+  to as many operators as needed. They require individual accounts (one
+  password per operator): with the shared password, these roles open nothing
+  more.
+- **Administrator**: the password from `config.yml` (`auth.password`), on
+  `/login`. Always has full access, even without an operator account.
+- Nobody can remove their own rights: another superadmin (or the
+  administrator) has to do it.
+
 ### Options (Settings)
 
 Everything can be switched on or off from **Settings** (superadmin): nothing
@@ -533,6 +555,8 @@ After the update:
    keeps full access);
 2. **Settings → Operator accounts**: click **Make superadmin** for each
    operator who should keep control over the Settings.
+
+What each role allows: [Roles and permissions](#roles-and-permissions).
 
 Nothing else changes: accounts, passwords and the log are kept.
 
