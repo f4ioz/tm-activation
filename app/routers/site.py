@@ -1,4 +1,4 @@
-"""Racine du site, robots.txt et sonde de santé."""
+"""Site root, robots.txt and health probe."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def version() -> str:
 
 @router.get("/")
 async def home() -> RedirectResponse:
-    """Page publique de l'indicatif en cours si elle est en ligne, sinon la liste."""
+    """Public page of the current callsign if it is online, else the list."""
     st = activation.current_station()
     return RedirectResponse(f"/{st['slug']}" if st["public"] else "/activations", status_code=302)
 
@@ -37,6 +37,6 @@ async def robots() -> str:
 
 @router.get("/healthz")
 async def healthz() -> JSONResponse:
-    """Sonde pour install.sh / supervision : l'application répond et lit sa base."""
+    """Probe for install.sh / monitoring: the app answers and can read its database."""
     return JSONResponse({"status": "ok", "version": version(), "station": activation.callsign()},
                         headers={"Cache-Control": "no-store"})

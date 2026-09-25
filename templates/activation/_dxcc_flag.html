@@ -1,9 +1,9 @@
-{# Vignette de drapeau d'une entité DXCC. Servie par l'application (les emojis
-   drapeaux ne s'affichent pas sous Windows) ; rien si l'entité est inconnue.
+{# Flag thumbnail for a DXCC entity. Served by the app (flag emojis do not
+   render on Windows); nothing if the entity is unknown.
 
    {% from "activation/_dxcc_flag.html" import dxcc_flag, call_flag %}
-   {{ dxcc_flag(e.code, e.dxcc_name) }}   — code connu (tableau DXCC)
-   {{ call_flag(q.call) }}                — d'après l'indicatif (ligne de log)
+   {{ dxcc_flag(e.code, e.dxcc_name) }}   — known code (DXCC table)
+   {{ call_flag(q.call) }}                — from the callsign (log line)
 #}
 {% macro dxcc_flag(code, name="") -%}
   {%- if code %}<img class="act-dxcc-flag" src="{{ asset('/static/vendor/flags/' ~ dxcc_flag_file(code) ~ '.png') }}"

@@ -1,4 +1,4 @@
-"""Instance Jinja2Templates partagée + globals communs aux templates."""
+"""Shared Jinja2Templates instance + globals common to all templates."""
 
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 def asset(path: str) -> str:
-    """URL d'un asset statique suffixée d'un cache-buster ?v=<mtime>.
+    """Static asset URL with a ?v=<mtime> cache-buster suffix.
 
-    Évite que le navigateur (ou nginx) serve un JS/CSS périmé après une mise
-    à jour : le suffixe change automatiquement à chaque modification du fichier."""
+    Keeps the browser (or nginx) from serving stale JS/CSS after an
+    update: the suffix changes automatically whenever the file is modified."""
     rel = path[len("/static/"):] if path.startswith("/static/") else path.lstrip("/")
     try:
         v = int((STATIC_DIR / rel).stat().st_mtime)
@@ -31,7 +31,7 @@ _FR_DOW = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
 
 
 def dow_fr(dt) -> str:
-    """Jour de la semaine abrégé en français ('lun'…'dim'). '' si invalide."""
+    """Abbreviated French weekday name ('lun'…'dim'). '' if invalid."""
     try:
         return _FR_DOW[dt.weekday()]
     except (AttributeError, IndexError, TypeError):
@@ -44,8 +44,8 @@ templates.env.globals["asset"] = asset
 templates.env.globals["dow_fr"] = dow_fr
 templates.env.globals["flag_prefixes"] = activation.FLAG_PREFIXES
 templates.env.globals["note_is_sat"] = activation.note_is_sat
-# Logo du club (Réglages) : 0 s'il n'y en a pas, sinon la date du fichier, qui
-# sert aussi de numéro de version pour le cache du navigateur.
+# Club logo (Settings): 0 if there is none, else the file's mtime, which
+# also serves as a version number for the browser cache.
 templates.env.globals["logo_version"] = lambda: (
     (activation.logo_info() or {}).get("mtime", 0) if activation.logo_on_pages() else 0
 )

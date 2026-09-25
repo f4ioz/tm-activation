@@ -1,6 +1,6 @@
-# TM Activation — messages anglais de install.sh (clé = texte français).
-# Chargé par install.sh quand la langue est « en ». Un texte sans entrée ici
-# reste en français. Les valeurs variables sont {1}, {2}…
+# TM Activation — English messages for install.sh (key = French text).
+# Loaded by install.sh when the language is "en". A text with no entry here
+# stays in French. Variable values are {1}, {2}…
 
 MSG["(les intitulés peuvent varier un peu selon la version de la box)."]="(wording may vary slightly with the router's firmware)."
 MSG["(à noter ; il reste lisible dans {1}/config.yml, clé auth.password)"]="(write it down; it stays readable in {1}/config.yml, key auth.password)"

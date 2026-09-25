@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# TM Activation — installation ou mise à jour depuis GitHub.
+# TM Activation — installation or upgrade from GitHub.
 #
-#   sudo bash update-from-github.sh [options d'install.sh]
+#   sudo bash update-from-github.sh [install.sh options]
 #
-# Télécharge la dernière version publiée (releases/ du dépôt GitHub), vérifie
-# son empreinte SHA-256, puis lance install.sh avec les options données :
-#   - première installation : installation guidée (ou --lan, --domain…) ;
-#   - installation existante : mise à jour, réglages repris d'install.env,
-#     config.yml et var/ jamais touchés.
+# Downloads the latest published version (releases/ of the GitHub repo), checks
+# its SHA-256 checksum, then runs install.sh with the given options:
+#   - first installation: guided installation (or --lan, --domain…);
+#   - existing installation: upgrade, settings taken from install.env,
+#     config.yml and var/ never touched.
 #
-# Déjà à jour → rien n'est fait (--force pour réinstaller la même version).
+# Already up to date → nothing is done (--force reinstalls the same version).
 # Variables : TM_REPO (f4ioz/tm-activation), TM_BRANCH (main), TM_VERSION
-# (version précise au lieu de la dernière), TM_RAW_URL (miroir), TM_DIR
-# (dossier d'installation, /opt/tm-activation).
+# (specific version instead of the latest), TM_RAW_URL (mirror), TM_DIR
+# (installation directory, /opt/tm-activation).
 set -euo pipefail
 
 REPO="${TM_REPO:-f4ioz/tm-activation}"
@@ -47,7 +47,7 @@ main() {
   fi
 
   tmp="$(mktemp -d)"
-  TMP_DIR="$tmp"   # global : la variable locale n'existe plus quand le trap EXIT s'exécute
+  TMP_DIR="$tmp"   # global: the local variable no longer exists when the EXIT trap runs
   trap 'rm -rf "$TMP_DIR"' EXIT
   archive="tm-activation-$version.tar.gz"
   info "Téléchargement de TM Activation $version ($REPO)"

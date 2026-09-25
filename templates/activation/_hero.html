@@ -1,5 +1,5 @@
-{# Bandeau d'un indicatif spécial, d'après sa fiche (station). Variable
-   optionnelle hero_sub : remplace le libellé (ex. « Espace opérateurs »). #}
+{# Banner for a special callsign, built from its record (station). Optional
+   variable hero_sub: replaces the label (e.g. « Espace opérateurs »). #}
 {% set _logo = logo_version() %}
 <header class="act-hero{% if _logo %} has-logo{% endif %}">
   {% if _logo %}<img class="act-hero-logo" src="/logo?v={{ _logo }}" alt="">{% endif %}

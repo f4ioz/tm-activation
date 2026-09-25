@@ -1,4 +1,4 @@
-"""Tests propres à l'application autonome : racine, admin, proxy, marque du club."""
+"""Tests specific to the standalone app: root, admin, proxy, club branding."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from app import activation, auth as auth_mod, config, security, templating
 from app.main import app
 from app.routers import activation as activation_router
 
-PUBLIC_PEER = ("203.0.113.5", 50000)   # IP publique (plage de documentation)
-PROXY_PEER = ("127.0.0.1", 50000)      # nginx local (proxy de confiance par défaut)
+PUBLIC_PEER = ("203.0.113.5", 50000)   # public IP (documentation range)
+PROXY_PEER = ("127.0.0.1", 50000)      # local nginx (trusted proxy by default)
 
 
 @pytest.fixture
@@ -79,12 +79,12 @@ def test_admin_without_password_configured() -> None:
 def test_bruteforce_blocked_for_public_ip(admin_pw) -> None:
     client = TestClient(app, follow_redirects=False, client=PUBLIC_PEER)
     assert _fail(client, 5) == [401] * 5
-    # Bloqué, même avec le bon mot de passe.
+    # Blocked, even with the right password.
     assert client.post("/login", data={"password": "adminpw"}).status_code == 429
 
 
 def test_spoofed_forwarded_for_is_ignored(admin_pw) -> None:
-    """Un client direct ne peut pas se faire passer pour le LAN (jamais bloqué)."""
+    """A direct client cannot pretend to be on the LAN (never blocked)."""
     client = TestClient(app, follow_redirects=False, client=PUBLIC_PEER)
     spoof = {"X-Forwarded-For": "192.168.1.10"}
     assert _fail(client, 5, headers=spoof) == [401] * 5
@@ -96,15 +96,15 @@ def test_trusted_proxy_forwards_real_ip_and_https(admin_pw) -> None:
     bad = {"X-Forwarded-For": "203.0.113.77", "X-Forwarded-Proto": "https"}
     assert _fail(client, 5, headers=bad) == [401] * 5
     assert client.post("/login", data={"password": "adminpw"}, headers=bad).status_code == 429
-    # Un autre visiteur derrière le même proxy n'est pas pénalisé ; cookie Secure en https.
+    # Another visitor behind the same proxy is not penalized; Secure cookie over https.
     other = {"X-Forwarded-For": "198.51.100.8", "X-Forwarded-Proto": "https"}
     ok = client.post("/login", data={"password": "adminpw"}, headers=other)
     assert ok.status_code == 303 and "secure" in ok.headers["set-cookie"].lower()
 
 
 def test_local_web_assets_never_trigger_scan_ban() -> None:
-    """htmx, Leaflet, polices et drapeaux sont servis depuis /static/vendor/ :
-    « /vendor/ » est un motif de scan, un visiteur ne doit pas être banni."""
+    """htmx, Leaflet, fonts and flags are served from /static/vendor/:
+    "/vendor/" is a scan pattern, a visitor must not get banned."""
     client = TestClient(app, follow_redirects=False, client=PUBLIC_PEER)
     for name in ("htmx/a.js", "leaflet/b.js", "leaflet/c.css", "fonts/d.woff2", "flags/fr.png", "flags/de.png"):
         client.get(f"/static/vendor/{name}")
@@ -145,7 +145,7 @@ def test_no_branding_of_the_origin_site(admin_pw) -> None:
 
 
 def test_web_assets_are_served_locally(admin_pw) -> None:
-    """Réseau local sans Internet : htmx, Leaflet et polices servis par l'application."""
+    """Local network without Internet: htmx, Leaflet and fonts served by the app."""
     st = activation.update_station(activation.callsign(), public=True)
     anon = TestClient(app)
     pub = anon.get(f"/{st['slug']}").text
@@ -154,7 +154,7 @@ def test_web_assets_are_served_locally(admin_pw) -> None:
         assert not re.search(r"unpkg\.com|fonts\.(googleapis|gstatic)\.com", text)
         assert "/static/vendor/fonts/fonts.css" in text
     assert "/static/vendor/leaflet/leaflet.js" in pub and "/static/vendor/leaflet/leaflet.css" in pub
-    # Calendrier de saisie : servi localement lui aussi (planning).
+    # Date picker: also served locally (planning).
     planning = _admin_client().get("/activation/planning").text
     for asset in ("/static/vendor/flatpickr/flatpickr.min.js", "/static/vendor/flatpickr/flatpickr.min.css",
                   "/static/vendor/flatpickr/fr.js", "/static/js/activation-datetime.js"):
@@ -191,7 +191,7 @@ def test_config_path_from_environment(tmp_path, monkeypatch) -> None:
 
 
 def test_admin_pages_in_english(admin_pw) -> None:
-    """Pages propres au package (connexion admin, journal des connexions) en anglais."""
+    """Package-specific pages (admin login, login log) in English."""
     en = {"Accept-Language": "en-US,en;q=0.9"}
     anon = TestClient(app, follow_redirects=False, headers=en)
     login = anon.get("/login").text
@@ -205,11 +205,11 @@ def test_admin_pages_in_english(admin_pw) -> None:
 
 
 def test_surveillance_page(admin_pw) -> None:
-    """Page de surveillance : connexions, robots bloqués, réservée à l'admin."""
+    """Monitoring page: logins, blocked bots, admin only."""
     anon = TestClient(app, follow_redirects=False)
     r = anon.get("/admin/surveillance")
     assert r.status_code == 303 and r.headers["location"].startswith("/login")
-    # Quelques essais ratés + une connexion réussie depuis une IP publique.
+    # A few failed attempts + one successful login from a public IP.
     public = TestClient(app, follow_redirects=False, client=PUBLIC_PEER)
     _fail(public, 2)
     public.post("/login", data={"password": "adminpw"})
@@ -218,10 +218,10 @@ def test_surveillance_page(admin_pw) -> None:
     for expected in ("Surveillance", "Journal des connexions", "Robots bloqués",
                      PUBLIC_PEER[0], "échec", "réussie"):
         assert expected in page.text, expected
-    # Filtres : période et échecs seuls.
+    # Filters: period and failures only.
     assert _admin_client().get("/admin/surveillance?days=30&failures=1").status_code == 200
-    assert "Aucune IP bloquée" in page.text                      # rien de bloqué pour l'instant
-    # Un scanner se fait bloquer : il apparaît dans la page.
+    assert "Aucune IP bloquée" in page.text                      # nothing blocked yet
+    # A scanner gets blocked: it shows up on the page.
     scanner = TestClient(app, follow_redirects=False, client=("203.0.113.9", 4000))
     for path in ("/wp-admin/setup-config.php", "/.env", "/vendor/phpunit/phpunit.php",
                  "/wp-login.php", "/.git/config", "/phpinfo.php"):

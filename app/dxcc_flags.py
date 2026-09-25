@@ -1,12 +1,12 @@
-"""Drapeau d'une station d'après son indicatif (entités DXCC les plus courantes).
+"""Flag of a station from its callsign (most common DXCC entities).
 
-Sert à montrer, pendant la saisie du log, les pays déjà contactés. Le drapeau
-est un emoji (deux lettres « indicateur régional ») : rien à télécharger, donc
-utilisable sans Internet, et lisible sur tous les systèmes récents.
+Used to show, while logging, the countries already worked. The flag is an emoji
+(two "regional indicator" letters): nothing to download, so usable without
+Internet, and readable on all recent systems.
 
-La table couvre les préfixes les plus fréquents en Europe et les grandes zones
-DX. Un préfixe inconnu ne renvoie pas de drapeau : la fiche QRZ, quand elle est
-disponible, donne de toute façon le nom exact de l'entité.
+The table covers the most frequent prefixes in Europe and the main DX areas. An
+unknown prefix returns no flag: the QRZ record, when available, gives the exact
+entity name anyway.
 """
 
 from __future__ import annotations
@@ -14,9 +14,9 @@ from __future__ import annotations
 import re
 import unicodedata
 
-# Préfixe d'appel → (code du drapeau, nom de l'entité). Le code est un ISO 3166-1
-# alpha-2, ou un code de subdivision pour les nations du Royaume-Uni (GB-SCT…),
-# chacune étant une entité DXCC à part entière.
+# Callsign prefix → (flag code, entity name). The code is an ISO 3166-1 alpha-2,
+# or a subdivision code for the nations of the United Kingdom (GB-SCT…), each
+# being a DXCC entity in its own right.
 PREFIXES: dict[str, tuple[str, str]] = {
     # ── Europe ──
     "F": ("FR", "France"), "TM": ("FR", "France"), "TK": ("FR-COR", "Corsica"),
@@ -89,7 +89,7 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "HV": ("VA", "Vatican"), "1A": ("SMOM", "Sov. Military Order of Malta"), "Z6": ("XK", "Kosovo"),
     "TA": ("TR", "Türkiye"), "TB": ("TR", "Türkiye"), "TC": ("TR", "Türkiye"),
     "4X": ("IL", "Israel"), "4Z": ("IL", "Israel"), "ZB": ("GI", "Gibraltar"),
-    # ── Amériques ──
+    # ── Americas ──
     "K": ("US", "United States"), "W": ("US", "United States"), "N": ("US", "United States"),
     "AA": ("US", "United States"), "AB": ("US", "United States"), "AC": ("US", "United States"),
     "AD": ("US", "United States"), "AE": ("US", "United States"), "AF": ("US", "United States"),
@@ -115,7 +115,7 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "J7": ("DM", "Dominica"), "J8": ("VC", "St Vincent"), "VP2": ("VG", "British Virgin Islands"),
     "VP5": ("TC", "Turks & Caicos"), "VP9": ("BM", "Bermuda"), "C6": ("BS", "Bahamas"),
     "ZF": ("KY", "Cayman Islands"), "P4": ("AW", "Aruba"), "PJ2": ("CW", "Curaçao"),
-    # ── Afrique ──
+    # ── Africa ──
     "CN": ("MA", "Morocco"), "7X": ("DZ", "Algeria"), "3V": ("TN", "Tunisia"), "5A": ("LY", "Libya"),
     "SU": ("EG", "Egypt"), "ST": ("SD", "Sudan"), "ET": ("ET", "Ethiopia"), "5Z": ("KE", "Kenya"),
     "5H": ("TZ", "Tanzania"), "5X": ("UG", "Uganda"), "9J": ("ZM", "Zambia"), "Z2": ("ZW", "Zimbabwe"),
@@ -129,7 +129,7 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "5V": ("TG", "Togo"), "9L": ("SL", "Sierra Leone"), "EL": ("LR", "Liberia"),
     "S9": ("ST", "São Tomé"), "D2": ("AO", "Angola"), "9X": ("RW", "Rwanda"), "9U": ("BI", "Burundi"),
     "IH9": ("IT-AFR", "African Italy"), "IG9": ("IT-AFR", "African Italy"),
-    # ── Asie et Océanie ──
+    # ── Asia and Oceania ──
     "JA": ("JP", "Japan"), "JE": ("JP", "Japan"), "JF": ("JP", "Japan"), "JG": ("JP", "Japan"),
     "JH": ("JP", "Japan"), "JI": ("JP", "Japan"), "JJ": ("JP", "Japan"), "JK": ("JP", "Japan"),
     "JL": ("JP", "Japan"), "JM": ("JP", "Japan"), "JN": ("JP", "Japan"), "JO": ("JP", "Japan"),
@@ -156,24 +156,24 @@ PREFIXES: dict[str, tuple[str, str]] = {
     "P2": ("PG", "Papua New Guinea"), "V7": ("MH", "Marshall Islands"), "T8": ("PW", "Palau"),
 }
 
-# Entité DXCC → nom de la vignette dans static/vendor/flags/. Par défaut le
-# code en minuscules ; ces entités-là n'ont pas de code ISO, elles ont soit un
-# drapeau propre (Corse, Canaries, Sicile…), soit celui du pays de rattachement.
+# DXCC entity → thumbnail name in static/vendor/flags/. Defaults to the lowercase
+# code; these entities have no ISO code, they have either their own flag
+# (Corsica, Canaries, Sicily…) or that of their parent country.
 FLAG_FILES = {
     "FR-COR": "fr-cor", "ES-CN": "es-cn", "ES-IB": "es-ib", "ES-CE": "es-ce",
     "PT-MAD": "pt-mad", "PT-AZO": "pt-azo", "IT-SIC": "it-sic", "IT-SAR": "it-sar",
     "RU-KGD": "ru-kgd", "MU-ROD": "mu-rod", "SMOM": "smom",
-    # Crète et Dodécanèse arborent le drapeau grec : pas de drapeau propre.
+    # Crete and the Dodecanese fly the Greek flag: no flag of their own.
     "GR-CRE": "gr", "GR-DOD": "gr",
     "IT-AFR": "it",          # Pantelleria / Lampedusa
     "NO-JAN": "no",          # Jan Mayen
 }
 
 
-# Nom d'entité (celui que renvoie le callbook QRZ) → code du drapeau. Sans ce
-# repli, une station au préfixe absent de la table formerait une entité à part,
-# sans drapeau, à côté de la même entité trouvée par préfixe : le pays comptait
-# alors double (« Netherlands » deux fois pour PH0DV à côté des PA…).
+# Entity name (as returned by the QRZ callbook) → flag code. Without this
+# fallback, a station whose prefix is missing from the table would form a
+# separate, flagless entity next to the same entity found by prefix: the country
+# was then counted twice ("Netherlands" twice for PH0DV next to the PA…).
 NAME_ALIASES = {
     "fed rep of germany": "Germany", "federal republic of germany": "Germany",
     "czechia": "Czech Republic", "european russia": "Russia",
@@ -185,7 +185,7 @@ NAME_ALIASES = {
 
 
 def normalize_name(name: str) -> str:
-    """Clé de comparaison d'un nom d'entité : sans accent, ni ponctuation, ni casse."""
+    """Comparison key of an entity name: no accents, no punctuation, no case."""
     plain = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode()
     return " ".join(re.split(r"[^a-z0-9]+", plain.lower()))
 
@@ -196,7 +196,7 @@ for _code, _name in PREFIXES.values():
 
 
 def code_for_name(name: str) -> str:
-    """Code du drapeau d'après le nom de l'entité ('' si le nom est inconnu)."""
+    """Flag code from the entity name ('' if the name is unknown)."""
     key = normalize_name(name)
     if not key:
         return ""
@@ -204,12 +204,12 @@ def code_for_name(name: str) -> str:
 
 
 def entity_key(call: str, qrz_name: str = "") -> tuple[str, str, str]:
-    """(clé de regroupement, code du drapeau, nom d'après le préfixe).
+    """(grouping key, flag code, name from the prefix).
 
-    La clé est le code de l'entité — du préfixe de l'indicatif, sinon du nom
-    donné par le callbook — pour que la même entité ne soit jamais comptée deux
-    fois. Un pays inconnu de la table des préfixes mais nommé par QRZ est
-    regroupé sur son nom ; sans nom ni préfixe connus, la clé est vide.
+    The key is the entity code — from the callsign prefix, otherwise from the
+    name given by the callbook — so that the same entity is never counted twice.
+    A country unknown to the prefix table but named by QRZ is grouped by its
+    name; with neither a known name nor prefix, the key is empty.
     """
     code, prefix_name = entity_for_call(call)
     if not code:
@@ -218,7 +218,7 @@ def entity_key(call: str, qrz_name: str = "") -> tuple[str, str, str]:
 
 
 def flag_file(code: str) -> str:
-    """Nom de la vignette d'une entité (« FR-COR » → « fr-cor »)."""
+    """Thumbnail name of an entity ("FR-COR" → "fr-cor")."""
     key = (code or "").strip().upper()
     return FLAG_FILES.get(key, key.lower())
 
@@ -227,23 +227,23 @@ _MAX_PREFIX = max(len(p) for p in PREFIXES)
 
 
 def base_call(call: str) -> str:
-    """Indicatif sans suffixe ni préfixe portable : « F4IOZ/P » → « F4IOZ »,
-    « F/DL1ABC » → « DL1ABC » (c'est le pays d'émission qui compte)."""
+    """Callsign without suffix or portable prefix: "F4IOZ/P" → "F4IOZ",
+    "F/DL1ABC" → "DL1ABC" (the country of operation is what counts)."""
     cs = (call or "").strip().upper()
     if "/" not in cs:
         return cs
     parts = [p for p in cs.split("/") if p]
     if not parts:
         return ""
-    # Un préfixe portable (« F/DL1ABC ») est plus court que l'indicatif ; les
-    # suffixes usuels (P, M, QRP, 9…) ne changent pas l'entité.
+    # A portable prefix ("F/DL1ABC") is shorter than the callsign; the usual
+    # suffixes (P, M, QRP, 9…) do not change the entity.
     if len(parts) >= 2 and len(parts[0]) < len(parts[1]) and len(parts[0]) <= 3:
-        return parts[0] + "0AA"          # le préfixe seul suffit à trouver l'entité
+        return parts[0] + "0AA"          # the prefix alone is enough to find the entity
     return parts[0]
 
 
 def entity_for_call(call: str) -> tuple[str, str]:
-    """(code ISO, nom de l'entité) d'après le préfixe ; ('', '') si inconnu."""
+    """(ISO code, entity name) from the prefix; ('', '') if unknown."""
     cs = base_call(call)
     if not cs:
         return "", ""
@@ -255,7 +255,7 @@ def entity_for_call(call: str) -> tuple[str, str]:
 
 
 def flag(iso: str) -> str:
-    """Code ISO → drapeau emoji (« FR » → 🇫🇷). '' si le code n'est pas utilisable."""
+    """ISO code → emoji flag ("FR" → 🇫🇷). '' if the code is not usable."""
     code = (iso or "").strip().upper()
     if len(code) != 2 or not code.isalpha():
         return ""
@@ -263,6 +263,6 @@ def flag(iso: str) -> str:
 
 
 def flag_for_call(call: str) -> tuple[str, str]:
-    """(drapeau, nom de l'entité) d'après l'indicatif ; ('', '') si inconnu."""
+    """(flag, entity name) from the callsign; ('', '') if unknown."""
     iso, name = entity_for_call(call)
     return flag(iso), name

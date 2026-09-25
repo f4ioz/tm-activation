@@ -1,11 +1,11 @@
-"""Spots DX de l'indicatif activé (« suis-je spotté ? »).
+"""DX spots of the activated callsign ("am I spotted?").
 
-Interroge un réseau de spots public — DXWatch, puis HamQTH en secours — et
-garde le résultat en mémoire quelques dizaines de secondes : la page de log
-demande toutes les minutes, sans charger les serveurs.
+Queries a public spot network — DXWatch, then HamQTH as a fallback — and keeps
+the result in memory for a few tens of seconds: the log page asks every minute
+without loading the servers.
 
-Sans Internet (réseau du club isolé), rien ne casse : la liste est vide et le
-panneau disparaît. Aucune clé ni inscription n'est nécessaire.
+Without Internet (isolated club network), nothing breaks: the list is empty and
+the panel disappears. No key or registration is required.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL = 60.0          # une interrogation par minute et par indicatif
-MAX_AGE_MIN = 360         # « suis-je spotté ? » : au-delà de 6 h, ce n'est plus l'actualité
+CACHE_TTL = 60.0          # one query per minute and per callsign
+MAX_AGE_MIN = 360         # "am I spotted?": beyond 6 h, it is no longer current news
 REQUEST_TIMEOUT = 6.0
 USER_AGENT = "tm-activation (ham radio special callsign logger)"
 DXWATCH_URL = "https://dxwatch.com/dxsd1/s.php"
@@ -36,7 +36,7 @@ _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct",
 
 
 def band_of(freq_khz: float) -> str:
-    """Bande amateur d'une fréquence en kHz (« 20M »), '' si hors bande connue."""
+    """Amateur band of a frequency in kHz ("20M"), '' if outside any known band."""
     plan = [(1800, 2000, "160M"), (3500, 4000, "80M"), (5250, 5450, "60M"), (7000, 7300, "40M"),
             (10100, 10150, "30M"), (14000, 14350, "20M"), (18068, 18168, "17M"),
             (21000, 21450, "15M"), (24890, 24990, "12M"), (28000, 29700, "10M"),
@@ -48,16 +48,16 @@ def band_of(freq_khz: float) -> str:
     return ""
 
 
-# ── Mode d'un spot ─────────────────────────────────────────────────────────
-# Le cluster ne donne pas le mode : il se lit dans le commentaire (« CQ LSB »,
-# « FT8 -06db ») et, à défaut, dans le plan de bande. On ne retient que la
-# grande famille — télégraphie, phonie, numérique —, seule utile pour savoir
-# si un spot concerne le trafic en cours.
+# ── Mode of a spot ─────────────────────────────────────────────────────────
+# The cluster does not give the mode: it is read from the comment ("CQ LSB",
+# "FT8 -06db") and, failing that, from the band plan. Only the broad family is
+# kept — telegraphy, phone, digital —, the only thing useful to know whether a
+# spot concerns the current traffic.
 
 CW, PHONE, DIGI = "CW", "PHONE", "DIGI"
 
-# bande → (fin de la portion télégraphie, fin de la portion numérique) en kHz ;
-# au-dessus, c'est de la phonie (IARU région 1).
+# band → (end of the CW segment, end of the digital segment) in kHz;
+# above that, it is phone (IARU Region 1).
 SEGMENTS = {
     "160M": (1838, 1843), "80M": (3570, 3600), "60M": (5354, 5366),
     "40M": (7040, 7050), "30M": (10130, 10150), "20M": (14070, 14112),
@@ -72,34 +72,34 @@ _WORDS = {
     PHONE: ("SSB", "LSB", "USB", "FM", "AM", "PHONE", "FONE", "VOICE", "PHONIE"),
 }
 _RE_WORD = re.compile(r"[A-Z0-9]+")
-# Mode choisi dans le log → famille correspondante.
+# Mode selected in the log → matching family.
 MODE_FAMILY = {"CW": CW, "SSB": PHONE, "LSB": PHONE, "USB": PHONE, "FM": PHONE, "AM": PHONE,
                "FT8": DIGI, "FT4": DIGI, "RTTY": DIGI, "PSK31": DIGI, "PSK": DIGI,
                "SSTV": DIGI, "DIGI": DIGI, "JS8": DIGI}
 
 
 def family_of_mode(mode: str) -> str:
-    """Mode du log (« SSB », « FT8 ») → famille (« PHONE », « DIGI »). '' si inconnu."""
+    """Log mode ("SSB", "FT8") → family ("PHONE", "DIGI"). '' if unknown."""
     return MODE_FAMILY.get((mode or "").strip().upper(), "")
 
 
 def mode_family(freq_khz: float, comment: str = "") -> str:
-    """Famille de modes d'un spot, d'après son commentaire puis le plan de bande."""
+    """Mode family of a spot, from its comment and then from the band plan."""
     words = set(_RE_WORD.findall((comment or "").upper()))
-    for family in (DIGI, CW, PHONE):        # « FT8 CW skimmer » : le numérique l'emporte
+    for family in (DIGI, CW, PHONE):        # "FT8 CW skimmer": digital wins
         if words & set(_WORDS[family]):
             return family
     limits = SEGMENTS.get(band_of(freq_khz))
     if not limits:
         return ""
-    cw_end, digi_end = limits            # bornes exclues : 7040 = début RTTY, 3600 = début phonie
+    cw_end, digi_end = limits            # exclusive bounds: 7040 = RTTY start, 3600 = phone start
     if freq_khz < cw_end:
         return CW
     return DIGI if freq_khz < digi_end else PHONE
 
 
 def _age_minutes(when: str) -> int | None:
-    """« 1433z 20 Sep » → âge en minutes (None si illisible)."""
+    """"1433z 20 Sep" → age in minutes (None if unreadable)."""
     match = _RE_WHEN.match((when or "").strip())
     if not match:
         return None
@@ -113,7 +113,7 @@ def _age_minutes(when: str) -> int | None:
         stamp = datetime(now.year, index, int(day), int(hour), int(minute), tzinfo=timezone.utc)
     except ValueError:
         return None
-    if stamp - now > _ONE_DAY:          # spot de l'an dernier (passage de janvier)
+    if stamp - now > _ONE_DAY:          # spot from last year (January rollover)
         stamp = stamp.replace(year=now.year - 1)
     return max(0, int((now - stamp).total_seconds() // 60))
 
@@ -122,14 +122,14 @@ _ONE_DAY = (datetime(2000, 1, 2, tzinfo=timezone.utc) - datetime(2000, 1, 1, tzi
 
 
 def _from_dxwatch(call: str, limit: int) -> list[dict[str, Any]]:
-    """Spots dont ``call`` est la station entendue.
+    """Spots where ``call`` is the station heard.
 
-    Le paramètre est ``cdx`` (le DX) : ``cde`` filtrerait sur le spotteur — le
-    « DE » du cluster —, c'est-à-dire les spots *envoyés par* l'indicatif, ce
-    qu'une station spéciale ne fait justement jamais.
+    The parameter is ``cdx`` (the DX): ``cde`` would filter on the spotter — the
+    cluster "DE" —, i.e. spots *sent by* the callsign, which is precisely what a
+    special event station never does.
 
-    Chaque ligne de la réponse est ``[spotteur, fréquence, DX, commentaire,
-    horodatage, âge en secondes, …]``.
+    Each row of the response is ``[spotter, frequency, DX, comment,
+    timestamp, age in seconds, …]``.
     """
     response = httpx.get(DXWATCH_URL, params={"s": 0, "r": limit, "cdx": call},
                          timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT})
@@ -150,7 +150,7 @@ def _from_dxwatch(call: str, limit: int) -> list[dict[str, Any]]:
 
 
 def _clean(comment: Any) -> str:
-    """Commentaire du spot : entités HTML décodées, longueur raisonnable."""
+    """Spot comment: HTML entities decoded, reasonable length."""
     text = str(comment or "")
     for entity, char in (("&gt;", ">"), ("&lt;", "<"), ("&amp;", "&"), ("&quot;", '"')):
         text = text.replace(entity, char)
@@ -158,7 +158,7 @@ def _clean(comment: Any) -> str:
 
 
 def _age_of(row: list[Any]) -> int | None:
-    """Âge du spot en minutes : DXWatch le donne en secondes (6e colonne)."""
+    """Spot age in minutes: DXWatch gives it in seconds (6th column)."""
     if len(row) > 5:
         try:
             return max(0, int(row[5]) // 60)
@@ -168,9 +168,9 @@ def _age_of(row: list[Any]) -> int | None:
 
 
 def _from_hamqth(call: str, limit: int) -> list[dict[str, Any]]:
-    """Secours : les derniers spots mondiaux, filtrés sur notre indicatif.
+    """Fallback: the latest worldwide spots, filtered on our callsign.
 
-    Une ligne vaut ``DX^fréquence^spotteur^commentaire^HHMM AAAA-MM-JJ^…``.
+    A line reads ``DX^frequency^spotter^comment^HHMM YYYY-MM-DD^…``.
     """
     response = httpx.get(HAMQTH_URL, params={"limit": 300}, timeout=REQUEST_TIMEOUT,
                          headers={"User-Agent": USER_AGENT})
@@ -192,7 +192,7 @@ def _from_hamqth(call: str, limit: int) -> list[dict[str, Any]]:
 
 
 def _age_hamqth(when: str) -> int | None:
-    """« 1710 2026-09-20 » → âge en minutes (None si illisible)."""
+    """"1710 2026-09-20" → age in minutes (None if unreadable)."""
     match = _RE_HAMQTH.match((when or "").strip())
     if not match:
         return None
@@ -205,8 +205,8 @@ def _age_hamqth(when: str) -> int | None:
 
 
 def recent_spots(call: str, limit: int = 5, force: bool = False) -> list[dict[str, Any]]:
-    """Derniers spots de cet indicatif, du plus récent au plus ancien ([] si
-    Internet manque ou si personne ne nous a spotté)."""
+    """Latest spots of this callsign, newest first ([] if there is no
+    Internet or if nobody has spotted us)."""
     cs = (call or "").strip().upper()
     if not cs:
         return []
@@ -219,7 +219,7 @@ def recent_spots(call: str, limit: int = 5, force: bool = False) -> list[dict[st
     for source in (_from_dxwatch, _from_hamqth):
         try:
             spots = source(cs, max(limit, 5))
-        except Exception:  # noqa: BLE001 — pas de réseau, source en panne : on passe
+        except Exception:  # noqa: BLE001 — no network, source down: move on
             logger.debug("spots : source %s indisponible", source.__name__, exc_info=True)
             continue
         if spots:

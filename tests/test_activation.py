@@ -1,4 +1,4 @@
-"""Tests du module d'activation d'indicatif temporaire (TM25TEST)."""
+"""Tests for the temporary callsign activation module (TM25TEST)."""
 
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ from app.qrz_xml import QrzXmlClient, XmlLookup
 from app.wavelog_client import parse_adif
 
 
-_REAL_QRZ_CLIENT = activation.qrz_client   # avant sa neutralisation par _isolate
+_REAL_QRZ_CLIENT = activation.qrz_client   # before it gets neutralized by _isolate
 
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    """Base SQLite temporaire + config d'activation déterministe."""
+    """Temporary SQLite database + deterministic activation config."""
     monkeypatch.setattr(activation, "DB_PATH", tmp_path / "activation.sqlite")
     monkeypatch.setattr(activation, "OP_PASSWORD_FILE", tmp_path / "activation_password")
     monkeypatch.setattr(activation, "BACKUP_DIR", tmp_path / "backups")
@@ -42,7 +42,7 @@ def _isolate(tmp_path, monkeypatch):
             "operators": ["F4IOZ"],
         },
     )
-    monkeypatch.setattr(activation, "qrz_client", lambda: None)  # jamais de vrai QRZ en test
+    monkeypatch.setattr(activation, "qrz_client", lambda: None)  # never hit the real QRZ in tests
     monkeypatch.setattr(activation, "QRZ_ACCOUNT_FILE", tmp_path / "activation_qrz.json")
     monkeypatch.setattr(activation, "_qrz_own", None)
     monkeypatch.setattr(activation, "IMPORT_TMP_DIR", tmp_path / "import")
@@ -51,27 +51,27 @@ def _isolate(tmp_path, monkeypatch):
 
 
 def _public(grid: str = "") -> None:
-    """Met en ligne la page publique de l'indicatif en cours (+ locator station)."""
+    """Publish the public page of the current callsign (+ station locator)."""
     activation.update_station("TM25TEST", public=True, **({"gridsquare": grid} if grid else {}))
 
 
-# ── Couche données ─────────────────────────────────────────────────────────
+# ── Data layer ─────────────────────────────────────────────────────────────
 
 
 def test_seed_and_add_operator() -> None:
     calls = {o["callsign"] for o in activation.list_operators()}
-    assert "F4IOZ" in calls  # seed depuis la config
+    assert "F4IOZ" in calls  # seeded from the config
     activation.add_operator("f6abc", "Radioclub")
     assert "F6ABC" in {o["callsign"] for o in activation.list_operators()}
 
 
 def test_active_operators_excludes_dormant_roster() -> None:
-    activation.add_operator("F9ZZZ")  # au roster mais sans activité
+    activation.add_operator("F9ZZZ")  # on the roster but no activity
     activation.add_slot("F5RRO", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F1OGV")
     active = set(activation.active_operators())
     assert active == {"F5RRO", "F1OGV"}
-    assert "F4IOZ" not in active   # seedé au roster mais aucun créneau/QSO
+    assert "F4IOZ" not in active   # seeded on the roster but no slot/QSO
     assert "F9ZZZ" not in active
 
 
@@ -82,11 +82,11 @@ def test_add_operator_rejects_bad_callsign() -> None:
 
 def test_slot_conflict_detection() -> None:
     activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
-    # Chevauchement même bande → conflit
+    # Overlap on the same band → conflict
     assert activation.slot_conflicts("2026-09-07T11:00", "2026-09-07T13:00", "20M")
-    # Autre bande → pas de conflit
+    # Different band → no conflict
     assert not activation.slot_conflicts("2026-09-07T11:00", "2026-09-07T13:00", "40M")
-    # Adjacent (fin = début) → pas de conflit
+    # Adjacent (end = start) → no conflict
     assert not activation.slot_conflicts("2026-09-07T12:00", "2026-09-07T13:00", "20M")
 
 
@@ -114,19 +114,19 @@ def test_add_contact_rejects_bad_grid() -> None:
 
 
 def test_paris_to_utc_conversion() -> None:
-    # Été : Europe/Paris = UTC+2 → 12:00 local = 10:00 UTC
+    # Summer: Europe/Paris = UTC+2 → 12:00 local = 10:00 UTC
     assert activation.paris_local_to_utc_iso("2026-07-01T12:00") == "2026-07-01T10:00"
     assert activation.paris_local_to_utc_iso("garbage") is None
 
 
 def test_display_modes_local_vs_utc() -> None:
-    # Été : Paris = UTC+2. Un créneau stocké 10:00 UTC…
+    # Summer: Paris = UTC+2. A slot stored at 10:00 UTC…
     assert activation.disp("2026-07-01T10:00", "utc").strftime("%H:%M") == "10:00"
     assert activation.disp("2026-07-01T10:00", "local").strftime("%H:%M") == "12:00"
-    # Saisie interprétée dans le mode → UTC
+    # Input interpreted in the given mode → UTC
     assert activation.input_to_utc_iso("2026-07-01T12:00", "local") == "2026-07-01T10:00"
     assert activation.input_to_utc_iso("2026-07-01T12:00", "utc") == "2026-07-01T12:00"
-    # Contact (qso_date/time_on UTC) affiché en local
+    # Contact (qso_date/time_on UTC) displayed in local time
     d = activation.contact_disp("20260701", "1000", "local")
     assert d.strftime("%H:%M") == "12:00"
 
@@ -147,14 +147,14 @@ def test_tz_route_sets_cookie() -> None:
     r = client.get("/activation/tz?mode=utc&next=/activation")
     assert r.status_code == 303
     assert "tm_tz=utc" in r.headers.get("set-cookie", "")
-    # valeur invalide → retombe sur local, next non interne → /activation
+    # invalid value → falls back to local, non-internal next → /activation
     r2 = client.get("/activation/tz?mode=bogus&next=https://evil/")
     assert "tm_tz=local" in r2.headers.get("set-cookie", "")
     assert r2.headers["location"] == "/activation"
-    # « /\hote » : certains navigateurs le lisent comme « //hote » (externe)
+    # « /\hote »: some browsers read it as « //hote » (external)
     for evil in ("//evil.example/", "/%5Cevil.example/"):
         assert client.get(f"/activation/tz?mode=utc&next={evil}").headers["location"] == "/activation"
-    # page publique d'un indicatif : chemin interne accepté
+    # a callsign's public page: internal path accepted
     assert client.get("/activation/tz?mode=utc&next=/tm61xyz").headers["location"] == "/tm61xyz"
 
 
@@ -228,13 +228,13 @@ def test_import_adif_adds_and_dedupes() -> None:
     adif = (
         "<CALL:5>DL1XX <BAND:3>20M <MODE:3>SSB <QSO_DATE:8>20260907 <TIME_ON:4>1015 <EOR>\n"
         "<CALL:5>DL2XX <BAND:3>40M <MODE:2>CW <QSO_DATE:8>20260907 <TIME_ON:6>101700 <EOR>\n"
-        "<CALL:3>!!! <BAND:3>20M <MODE:3>SSB <QSO_DATE:8>20260907 <TIME_ON:4>1015 <EOR>\n"  # call invalide
-        "<CALL:5>DL3XX <BAND:3>20M <MODE:3>SSB <EOR>\n"  # sans date/heure
+        "<CALL:3>!!! <BAND:3>20M <MODE:3>SSB <QSO_DATE:8>20260907 <TIME_ON:4>1015 <EOR>\n"  # invalid call
+        "<CALL:5>DL3XX <BAND:3>20M <MODE:3>SSB <EOR>\n"  # no date/time
     )
     res = activation.import_adif(adif, operator_call="F4IOZ")
     assert res["added"] == 2
     assert res["invalid"] == 2
-    # Ré-import : QSO déjà au log ignorés
+    # Re-import: QSOs already in the log are skipped
     res2 = activation.import_adif(adif, operator_call="F4IOZ")
     assert res2["added"] == 0
     assert res2["skipped"] == 2
@@ -244,7 +244,7 @@ def test_import_uses_adif_operator_field() -> None:
     adif = "<CALL:5>DL3XX <BAND:3>20M <MODE:3>SSB <QSO_DATE:8>20260907 <TIME_ON:4>1015 <OPERATOR:5>F6ABC <EOR>"
     activation.import_adif(adif, operator_call="F4IOZ")
     ops = {c["operator_call"] for c in activation.list_contacts()}
-    assert "F6ABC" in ops  # champ ADIF prioritaire sur le défaut (import direct)
+    assert "F6ABC" in ops  # ADIF field takes precedence over the default (direct import)
 
 
 def test_public_board_404_when_disabled() -> None:
@@ -255,7 +255,7 @@ def test_public_board_404_when_disabled() -> None:
 def test_public_board_ok_when_enabled(monkeypatch) -> None:
     _public()
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
-    activation.set_flag("show_contacts", True)  # rendre la liste visible pour ce test
+    activation.set_flag("show_contacts", True)  # make the list visible for this test
     client = TestClient(app)
     r = client.get("/tm25test")
     assert r.status_code == 200
@@ -269,12 +269,12 @@ def test_import_preview_then_confirm_selected_only() -> None:
         client = _private_client()
         r, token = _import_preview(client, _adif(_rec_adif("G0ABC"), _rec_adif("G0DEF", band="40M")))
         assert "Aperçu" in r.text and "G0DEF" in r.text
-        assert activation.stats()["total"] == 0          # rien avant confirmation
+        assert activation.stats()["total"] == 0          # nothing before confirmation
         r2 = client.post("/activation/import/confirm", data={
             "token": token, "operator": "F4IOZ", "op_source": "form", "sel": ["0"]})
         assert r2.status_code == 303 and "imported=1" in r2.headers["location"]
         assert [c["call"] for c in activation.list_contacts()] == ["G0ABC"]
-        # Jeton consommé : une 2e confirmation n'importe rien
+        # Token consumed: a 2nd confirmation imports nothing
         r3 = client.post("/activation/import/confirm", data={
             "token": token, "operator": "F4IOZ", "op_source": "form", "sel": ["0", "1"]})
         assert "err=expired" in r3.headers["location"]
@@ -346,17 +346,17 @@ def test_edit_contact_route() -> None:
 
 
 def test_set_operator_password_persists(tmp_path, monkeypatch) -> None:
-    # OP_PASSWORD_FILE déjà patché par le fixture ; on vérifie l'écriture + lecture.
+    # OP_PASSWORD_FILE already patched by the fixture; check write + read.
     activation.set_operator_password("club2026!")
     assert activation.operator_password() == "club2026!"
 
 
 def test_operator_token_domain_separation() -> None:
-    """Un jeton opérateur ne doit JAMAIS être accepté comme jeton admin site."""
+    """An operator token must NEVER be accepted as a site admin token."""
     tok = activation.make_op_token()
     assert activation.verify_op_token(tok)
-    assert not auth_mod.verify_token(tok)  # signé "activation:{ts}", pas "{ts}"
-    # Inversement, un jeton admin n'ouvre pas la session opérateur.
+    assert not auth_mod.verify_token(tok)  # signed "activation:{ts}", not "{ts}"
+    # Conversely, an admin token does not open the operator session.
     admin_tok = auth_mod.make_token()
     assert not activation.verify_op_token(admin_tok)
 
@@ -364,19 +364,19 @@ def test_operator_token_domain_separation() -> None:
 def test_operator_login_registers_call_and_grants_access() -> None:
     activation.set_operator_password("oppass")
     client = TestClient(app, follow_redirects=False)
-    # Sans session → redirection vers le login opérateur
+    # No session → redirect to the operator login
     assert client.get("/activation").headers["location"].startswith("/activation/login")
-    # Indicatif manquant → 401
+    # Missing callsign → 401
     assert client.post("/activation/login", data={"password": "oppass"}).status_code == 401
-    # Mauvais mot de passe → 401
+    # Wrong password → 401
     assert client.post("/activation/login", data={"callsign": "F5TEST", "password": "nope"}).status_code == 401
-    # Indicatif + bon mot de passe → 303, cookies posés, indicatif enrôlé
+    # Callsign + correct password → 303, cookies set, callsign enrolled
     r = client.post("/activation/login", data={"callsign": "f5test", "password": "oppass", "next": "/activation/log"})
     assert r.status_code == 303
     sc = r.headers.get("set-cookie", "")
     assert activation.OP_COOKIE in sc and "tm_op" in sc
     assert "F5TEST" in {o["callsign"] for o in activation.list_operators()}
-    # Session opérateur → accès à l'espace
+    # Operator session → access to the operator area
     assert client.get("/activation").status_code == 200
 
 
@@ -384,7 +384,7 @@ def test_settings_reserved_to_admin() -> None:
     activation.set_operator_password("oppass")
     client = TestClient(app, follow_redirects=False)
     client.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
-    # Opérateur : accès au log oui, aux réglages non (→ /login admin)
+    # Operator: access to the log yes, to the settings no (→ admin /login)
     assert client.get("/activation/log").status_code == 200
     assert client.get("/activation/settings").headers["location"].startswith("/login")
     assert client.post(
@@ -393,7 +393,7 @@ def test_settings_reserved_to_admin() -> None:
 
 
 def test_admin_bypass_without_operator_password() -> None:
-    """Sans mot de passe opérateur configuré, l'admin site accède quand même."""
+    """With no operator password configured, the site admin still gets in."""
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(auth_mod, "auth_password", lambda: "secret")
         client = _private_client()
@@ -410,7 +410,7 @@ def test_update_slot() -> None:
 def test_conflicting_slot_ids() -> None:
     a = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
     b = activation.add_slot("F6ABC", "2026-09-07T11:00", "2026-09-07T13:00", "20M", "CW")  # overlap same band
-    c = activation.add_slot("F4IOZ", "2026-09-07T11:00", "2026-09-07T13:00", "40M", "CW")  # autre bande
+    c = activation.add_slot("F4IOZ", "2026-09-07T11:00", "2026-09-07T13:00", "40M", "CW")  # other band
     bad = activation.conflicting_slot_ids()
     assert a in bad and b in bad
     assert c not in bad
@@ -423,7 +423,7 @@ def test_future_slots_excludes_current() -> None:
     fut = activation.add_slot("F6ABC", fmt(now + timedelta(hours=2)), fmt(now + timedelta(hours=3)), "40M", "CW")
     ids = {s["id"] for s in activation.future_slots()}
     assert fut in ids
-    assert cur not in ids  # l'activation en cours n'est PAS dans « à venir »
+    assert cur not in ids  # the current activation is NOT in « à venir » (upcoming)
     current, _ = activation.current_and_next_slot()
     assert current and current["id"] == cur
 
@@ -436,10 +436,10 @@ def test_live_slots_handles_multiple_simultaneous() -> None:
     c = activation.add_slot("F6ABC", fmt(now + timedelta(hours=5)), fmt(now + timedelta(hours=6)), "10M", "CW")
     live = {s["id"] for s in activation.live_slots()}
     fut = {s["id"] for s in activation.future_slots()}
-    assert a in live and b in live  # DEUX activations en cours affichées
+    assert a in live and b in live  # TWO current activations displayed
     assert c not in live
     assert c in fut and a not in fut and b not in fut
-    # ensemble : tout créneau non terminé est couvert (en cours ∪ à venir)
+    # together: every unfinished slot is covered (current ∪ upcoming)
     assert {a, b, c} <= (live | fut)
 
 
@@ -472,9 +472,9 @@ def test_public_search_route(monkeypatch) -> None:
     client = TestClient(app)
     r = client.get("/tm25test?call=F1ABC")
     assert r.status_code == 200
-    assert "F1ABC" in r.text           # indicatif recherché affiché
-    assert "Opérateur" in r.text        # colonne opérateur
-    assert "F5RRO" in r.text            # opérateur TM25TEST qui l'a contacté
+    assert "F1ABC" in r.text           # searched callsign displayed
+    assert "Opérateur" in r.text        # operator column
+    assert "F5RRO" in r.text            # TM25TEST operator who worked them
 
 
 def test_show_contacts_flag_default_off_and_toggle() -> None:
@@ -489,10 +489,10 @@ def test_public_hides_contacts_unless_enabled(monkeypatch) -> None:
     _public()
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
     client = TestClient(app)
-    # Par défaut : liste des contacts masquée
+    # By default: contact list hidden
     t = client.get("/tm25test").text
     assert "Derniers contacts" not in t
-    # Activée → visible
+    # Enabled → visible
     activation.set_flag("show_contacts", True)
     t2 = client.get("/tm25test").text
     assert "Derniers contacts" in t2 and "DL1ABC" in t2
@@ -505,7 +505,7 @@ def test_change_flags_route_admin_only() -> None:
         r = admin.post("/activation/settings/flags", data={"show_contacts": "1"})
         assert r.status_code == 303
         assert activation.show_contacts() is True
-    # opérateur non-admin → redirigé /login
+    # non-admin operator → redirected to /login
     activation.set_operator_password("oppass")
     op = TestClient(app, follow_redirects=False)
     op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
@@ -521,7 +521,7 @@ def test_log_contact_with_explicit_datetime() -> None:
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(auth_mod, "auth_password", lambda: "secret")
         client = _private_client()
-        # Mode local (défaut) : 12:00 Paris (été) → 10:00 UTC stocké
+        # Local mode (default): 12:00 Paris (summer) → 10:00 UTC stored
         r = client.post("/activation/contacts", data={
             "call": "G0ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ",
             "when": "2026-07-01T12:00",
@@ -545,7 +545,7 @@ def test_backup_now_creates_snapshot() -> None:
 
 
 def test_backup_includes_password() -> None:
-    activation.set_operator_password("clubsecret")  # déclenche backup_now()
+    activation.set_operator_password("clubsecret")  # triggers backup_now()
     pw = list(activation.BACKUP_DIR.glob("password-*.txt"))
     assert pw
     assert pw[0].read_text() == "clubsecret"
@@ -566,14 +566,14 @@ def test_maybe_backup_throttles() -> None:
     n1 = len(activation.list_backups())
     activation.add_contact(call="DL2ABC", band="20M", mode="SSB", operator_call="F4IOZ")
     n2 = len(activation.list_backups())
-    assert n2 == n1  # 2e écriture dans la fenêtre de throttle → pas de nouveau snapshot
+    assert n2 == n1  # 2nd write within the throttle window → no new snapshot
 
 
 def test_backup_download_admin_only() -> None:
     activation.set_operator_password("oppass")
     client = TestClient(app, follow_redirects=False)
     client.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
-    # opérateur (pas admin) → redirigé vers /login
+    # operator (not admin) → redirected to /login
     assert client.get("/activation/settings/backup.sqlite").headers["location"].startswith("/login")
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(auth_mod, "auth_password", lambda: "secret")
@@ -584,7 +584,7 @@ def test_backup_download_admin_only() -> None:
 
 
 def test_change_operator_password_route(monkeypatch) -> None:
-    # Accès via admin site (bypass) pour l'amorçage
+    # Access via site admin (bypass) for bootstrapping
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     client = _private_client()
     r = client.post("/activation/settings/password",
@@ -596,11 +596,11 @@ def test_change_operator_password_route(monkeypatch) -> None:
     assert activation.operator_password() == "club2026!"
 
 
-# ── Callbook QRZ / carte / DXCC / classement ───────────────────────────────
+# ── QRZ callbook / map / DXCC / ranking ────────────────────────────────────
 
 
 class _FakeQrz:
-    """Client QRZ XML simulé : fiches fixes, compte les interrogations."""
+    """Mocked QRZ XML client: fixed records, counts the lookups."""
 
     def __init__(self, records: dict | None = None, error: bool = False) -> None:
         self.records = records or {}
@@ -645,7 +645,7 @@ def test_qrz_lookup_caches_in_callbook() -> None:
     assert row["fname"] == "Hans" and row["name"] == "Muster"
     assert row["grid"] == "JO31AB" and row["dxcc"] == 230 and row["dxcc_name"] == "Germany"
     assert activation.qrz_lookup("DL1ABC", fake)["grid"] == "JO31AB"
-    assert fake.asked == ["DL1ABC"]  # 2e appel servi par le callbook
+    assert fake.asked == ["DL1ABC"]  # 2nd call served by the callbook
 
 
 def test_qrz_lookup_notfound_retried_after_24h() -> None:
@@ -670,8 +670,8 @@ def test_enrich_one_walks_pending_calls() -> None:
         _qso(call)
     fake = _FakeQrz({"DL1ABC": _rec("DL1ABC")})
     assert activation.enrich_one(fake) == "ok"
-    assert activation.enrich_one(fake) == "notfound"   # G0XYZ inconnu de QRZ
-    assert activation.enrich_one(fake) is None         # plus rien en attente
+    assert activation.enrich_one(fake) == "notfound"   # G0XYZ unknown to QRZ
+    assert activation.enrich_one(fake) is None         # nothing pending anymore
     assert fake.asked == ["DL1ABC", "G0XYZ"]
     assert activation.callbook_progress() == {"stations": 2, "ok": 1, "notfound": 1, "pending": 0}
 
@@ -682,7 +682,7 @@ def test_enrich_error_is_retried_sooner() -> None:
     assert activation.pending_callbook_calls() == []
     _age_callbook("DL1ABC", activation.CALLBOOK_RETRY_ERROR + 1)
     assert activation.pending_callbook_calls() == ["DL1ABC"]
-    assert activation.enrich_one(None) is None  # sans compte QRZ : rien
+    assert activation.enrich_one(None) is None  # no QRZ account: nothing
 
 
 def test_map_data_prefers_logged_grid_and_hides_names() -> None:
@@ -700,9 +700,9 @@ def test_map_data_prefers_logged_grid_and_hides_names() -> None:
     assert data["stations"] == 5 and data["located"] == 4
     by_grid = {p["grid"]: p["calls"] for p in data["points"]}
     assert by_grid == {
-        "JO31AB": ["DL1ABC", "DL2ABC"],  # locator saisi > QRZ (autre carré)
-        "IO91": ["G0XYZ"],               # rien de saisi → QRZ
-        "JO20CD": ["ON4ZZ"],             # saisi à 4 car., QRZ précise le même carré
+        "JO31AB": ["DL1ABC", "DL2ABC"],  # entered locator > QRZ (different square)
+        "IO91": ["G0XYZ"],               # nothing entered → QRZ
+        "JO20CD": ["ON4ZZ"],             # entered with 4 chars, QRZ refines the same square
     }
     dumped = json.dumps(data)
     assert "Hans" not in dumped and "Muster" not in dumped
@@ -716,7 +716,7 @@ def test_dxcc_table_counts_entities() -> None:
     for call in ("DL1ABC", "DL2ABC", "G0XYZ", "F1ZZZ"):
         activation.qrz_lookup(call, fake)
     t = activation.dxcc_table()
-    # F1ZZZ est inconnu de QRZ, mais son préfixe suffit à l'identifier.
+    # F1ZZZ is unknown to QRZ, but its prefix is enough to identify it.
     assert t["count"] == 3 and t["unidentified"] == 0
     first = t["entities"][0]
     assert first["dxcc_name"] == "Germany" and first["code"] == "DE"
@@ -725,22 +725,22 @@ def test_dxcc_table_counts_entities() -> None:
 
 
 def test_dxcc_table_works_without_qrz() -> None:
-    """Sans compte QRZ (callbook vide), l'entité vient du préfixe de l'indicatif."""
+    """Without a QRZ account (empty callbook), the entity comes from the callsign prefix."""
     for call in ("DL1ABC", "G0XYZ", "F1ZZZ", "VE1ZZ", "XYZZY9"):
         _qso(call)
     t = activation.dxcc_table()
     assert [(e["dxcc_name"], e["code"]) for e in t["entities"]] == [
         ("Canada", "CA"), ("England", "GB-ENG"), ("France", "FR"), ("Germany", "DE")]
-    assert t["unidentified"] == 1                    # XYZZY9 : préfixe inconnu
+    assert t["unidentified"] == 1                    # XYZZY9: unknown prefix
     assert all(not e["from_qrz"] for e in t["entities"])
 
 
 def test_dxcc_table_merges_an_entity_known_only_by_qrz() -> None:
-    """Préfixe absent de la table + entité donnée par QRZ = MÊME pays.
+    """Prefix missing from the table + entity given by QRZ = SAME country.
 
-    Sans cela, PH0DV formait un second « Netherlands », sans drapeau, à côté
-    des PA… : le pays comptait double, et le total dépendait de ce que le
-    callbook avait déjà récupéré (résultats différents d'une instance à l'autre).
+    Without this, PH0DV formed a second « Netherlands », with no flag, next to
+    the PA… calls: the country was counted twice, and the total depended on what
+    the callbook had already fetched (different results from one instance to another).
     """
     for call in ("PA1MV", "XYZZY9"):
         _qso(call)
@@ -751,12 +751,12 @@ def test_dxcc_table_merges_an_entity_known_only_by_qrz() -> None:
     entity = t["entities"][0]
     assert (entity["code"], entity["dxcc_name"]) == ("NL", "Netherlands")
     assert (entity["stations"], entity["qsos"]) == (2, 2)
-    # Le classement des chasseurs montre alors le même drapeau pour les deux.
+    # The hunter ranking then shows the same flag for both.
     assert {h["dxcc_code"] for h in activation.hunters_ranking()} == {"NL"}
 
 
 def test_dutch_and_british_secondary_prefixes_are_known() -> None:
-    """Préfixes qui manquaient à la table : PH0DV n'avait pas de drapeau."""
+    """Prefixes that were missing from the table: PH0DV had no flag."""
     from app import dxcc_flags
 
     for call, code in (("PH0DV", "NL"), ("PC5Q", "NL"), ("2W0ABC", "GB-WLS"),
@@ -770,7 +770,7 @@ def test_entity_key_falls_back_on_the_callbook_name() -> None:
     assert dxcc_flags.code_for_name("Fed. Rep. of Germany") == "DE"
     assert dxcc_flags.code_for_name("Neverland") == ""
     assert dxcc_flags.entity_key("XYZZY9", "Netherlands")[:2] == ("NL", "NL")
-    # Pays inconnu de la table : regroupé sur son nom, mais sans drapeau.
+    # Country unknown to the table: grouped by name, but without a flag.
     assert dxcc_flags.entity_key("XYZZY9", "Neverland") == ("neverland", "", "")
     assert dxcc_flags.entity_key("XYZZY9", "") == ("", "", "")
 
@@ -781,16 +781,16 @@ def test_public_page_shows_the_country_flags() -> None:
     activation.set_flag("show_contacts", True)
     page = TestClient(app).get("/tm25test").text
     assert "/static/vendor/flags/de.png" in page and "Germany" in page
-    assert "pas encore identifiée" not in page      # le préfixe suffit, sans QRZ
+    assert "pas encore identifiée" not in page      # the prefix is enough, no QRZ needed
 
 
 def test_hunters_ranking_order() -> None:
     _qso("DL1ABC", time_on="1000")
-    _qso("DL1ABC", time_on="1010")                  # 1 bande×mode, 2 QSO
+    _qso("DL1ABC", time_on="1010")                  # 1 band×mode, 2 QSOs
     _qso("G0XYZ", time_on="1100")
-    _qso("G0XYZ", band="40M", mode="CW", time_on="1110")  # 2 bande×mode
-    _qso("F1ZZZ", time_on="0900")                   # 1 bande×mode, 1 QSO
-    _qso("F2ZZZ", time_on="0800")                   # ex aequo avec F1ZZZ, mais plus tôt
+    _qso("G0XYZ", band="40M", mode="CW", time_on="1110")  # 2 band×mode
+    _qso("F1ZZZ", time_on="0900")                   # 1 band×mode, 1 QSO
+    _qso("F2ZZZ", time_on="0800")                   # tied with F1ZZZ, but earlier
     r = activation.hunters_ranking()
     assert [h["call"] for h in r] == ["G0XYZ", "DL1ABC", "F2ZZZ", "F1ZZZ"]
     assert [h["rank"] for h in r] == [1, 2, 3, 4]
@@ -821,7 +821,7 @@ def test_qrz_route_auth_and_json(monkeypatch) -> None:
     assert {k: d[k] for k in ("call", "found", "fname", "name", "grid", "country")} == {
         "call": "DL1ABC", "found": True, "fname": "Hans", "name": "Muster",
         "grid": "JO31AB", "country": "Germany"}
-    # Pour la fiche du correspondant : photo, distance et azimut depuis chez nous.
+    # For the contact card: photo, distance and azimuth from our station.
     assert d["image"] == "" and 300 < d["distance_km"] < 500 and 20 < d["bearing"] < 70
     d = client.get("/activation/qrz?call=ZZ9ZZZ").json()
     assert d["found"] is False and d["configured"] is True
@@ -836,14 +836,14 @@ def test_public_board_map_dxcc_ranking(monkeypatch) -> None:
     t = client.get("/tm25test").text
     assert 'id="act-map"' in t and "JO31AB" in t and "Classement des chasseurs" in t
     assert "Germany" in t and "DL1ABC" in t
-    assert "Hans" not in t and "Muster" not in t     # jamais de nom en public
+    assert "Hans" not in t and "Muster" not in t     # never a name in public
     activation.set_flag("show_map_stats", False)
     t2 = client.get("/tm25test").text
     assert 'id="act-map"' not in t2 and "DL1ABC" not in t2
 
 
 def test_change_flags_route_sets_map_flag() -> None:
-    assert activation.show_map_stats() is True   # défaut : visible
+    assert activation.show_map_stats() is True   # default: visible
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(auth_mod, "auth_password", lambda: "secret")
         admin = _private_client()
@@ -874,15 +874,15 @@ def test_scoring_defaults_and_save_clamps() -> None:
     assert saved["per_qso"] == 1000 and saved["mode_points"]["CW"] == 5 and saved["km_per_point"] == 1
     rule = activation.get_scoring()
     assert rule["enabled"] is True and rule["distance_on"] is False
-    assert rule["mode_points"]["SSB"] == 2    # champ absent → défaut
+    assert rule["mode_points"]["SSB"] == 2    # missing field → default
 
 
 def test_hunters_ranking_with_points() -> None:
     activation.set_scoring(_RULE)
-    _qso("VK2ABC", grid="QF56")              # ~16 900 km, SSB : 1 + 2 + 16
-    _qso("DL1ABC", mode="CW", grid="JO31")   # < 1000 km, CW : 1 + 3
-    _qso("DL1ABC", mode="CW", grid="JO31")   # doublon bande×mode : 0
-    _qso("G0XYZ")                            # locator inconnu : 1 + 2
+    _qso("VK2ABC", grid="QF56")              # ~16,900 km, SSB: 1 + 2 + 16
+    _qso("DL1ABC", mode="CW", grid="JO31")   # < 1000 km, CW: 1 + 3
+    _qso("DL1ABC", mode="CW", grid="JO31")   # band×mode duplicate: 0
+    _qso("G0XYZ")                            # unknown locator: 1 + 2
     r = {h["call"]: h for h in activation.hunters_ranking()}
     assert r["VK2ABC"]["points"] == 19 and r["VK2ABC"]["km"] > 16000
     assert r["DL1ABC"]["points"] == 4
@@ -909,11 +909,11 @@ def test_scoring_settings_route_admin_only(monkeypatch) -> None:
 
 
 def test_map_data_splits_points_by_band_and_mode() -> None:
-    """Un point par locator × bande × mode ; deux stations du même carré sur la
-    même bande et le même mode ne font qu'un point."""
+    """One point per locator × band × mode; two stations in the same square on the
+    same band and mode make a single point."""
     _qso("DL1ABC", band="20M", mode="SSB", grid="JO31AB")
     _qso("DL1ABC", band="40M", mode="CW", grid="JO31AB")
-    _qso("DL2ABC", band="20M", mode="SSB", grid="JO31CD")   # autre carré : son propre point
+    _qso("DL2ABC", band="20M", mode="SSB", grid="JO31CD")   # different square: its own point
     _qso("DL3ABC", band="20M", mode="SSB", grid="JO31AB")
     data = activation.map_data()
     keyed = {(p["grid"], p["band"], p["mode"]): p for p in data["points"]}
@@ -932,7 +932,7 @@ def test_map_style_defaults_and_reset() -> None:
                                       "shape_20M": "star", "color_CW": "rouge vif",
                                       "shape_40M": "banane"})
     assert saved["mode_colors"]["SSB"] == "#123456" and saved["band_shapes"]["20M"] == "star"
-    # Valeurs refusées : on garde les défauts plutôt qu'un style cassé.
+    # Rejected values: keep the defaults rather than a broken style.
     assert saved["mode_colors"]["CW"] == activation.DEFAULT_MAP_STYLE["mode_colors"]["CW"]
     assert saved["band_shapes"]["40M"] == activation.DEFAULT_MAP_STYLE["band_shapes"]["40M"]
     off = activation.set_map_style({"color_SSB": "#123456"})
@@ -965,8 +965,8 @@ def test_public_map_carries_the_style(monkeypatch) -> None:
                               "shape_20M": "diamond"})
     page = TestClient(app).get("/tm25test").text
     assert "act-map-legend" in page and "#abcdef" in page and "diamond" in page
-    assert '"filters": true' in page and 'data-all=' in page   # cases à cocher bande/mode
-    activation.set_map_style({"enabled": "1"})                 # filtres décochés
+    assert '"filters": true' in page and 'data-all=' in page   # band/mode checkboxes
+    activation.set_map_style({"enabled": "1"})                 # unchecked filters
     assert '"filters": false' in TestClient(app).get("/tm25test").text
 
 
@@ -982,26 +982,26 @@ def test_public_board_shows_points_when_enabled(monkeypatch) -> None:
 
 
 def test_call_grids_prefers_qrz_when_logged_locator_is_far() -> None:
-    _qso("RA1AVP", grid="FN14NX")   # Canada saisi pour une station de Saint-Pétersbourg
-    _qso("F5AYZ", grid="JN18EU")    # à ~40 km de QRZ : la saisie est gardée
+    _qso("RA1AVP", grid="FN14NX")   # Canada entered for a station in Saint Petersburg
+    _qso("F5AYZ", grid="JN18EU")    # ~40 km from QRZ: the entry is kept
     fake = _FakeQrz({"RA1AVP": _rec("RA1AVP", grid="KP50EA", land="Russia", dxcc="54"),
                      "F5AYZ": _rec("F5AYZ", grid="JN18HM", land="France", dxcc="227")})
     for call in ("RA1AVP", "F5AYZ"):
         activation.qrz_lookup(call, fake)
     assert activation.call_grids() == {"F5AYZ": "JN18EU", "RA1AVP": "KP50EA"}
-    # Le log lui-même n'est pas modifié (export ADIF = ce qui a été saisi)
+    # The log itself is not modified (ADIF export = what was entered)
     assert {c["call"]: c["gridsquare"] for c in activation.list_contacts()}["RA1AVP"] == "FN14NX"
 
 
 def test_map_data_distrusts_aa_locators() -> None:
-    _qso("F1ACK", grid="JN16AA")   # « AA » inventé par un logiciel de log
-    _qso("F1HOM", grid="JN16AA")   # idem, mais pas (encore) de fiche QRZ
+    _qso("F1ACK", grid="JN16AA")   # « AA » made up by a logging program
+    _qso("F1HOM", grid="JN16AA")   # same, but no QRZ record (yet)
     activation.qrz_lookup("F1ACK", _FakeQrz({"F1ACK": _rec("F1ACK", grid="JN18EU", land="France", dxcc="227")}))
     by_grid = {p["grid"]: p["calls"] for p in activation.map_data()["points"]}
     assert by_grid == {"JN18EU": ["F1ACK"], "JN16AA": ["F1HOM"]}
 
 
-# ── Import / export ADIF ───────────────────────────────────────────────────
+# ── ADIF import / export ───────────────────────────────────────────────────
 
 
 def _f(name: str, value: str) -> str:
@@ -1032,14 +1032,14 @@ def _import_preview(client: TestClient, text: str, operator: str = "F4IOZ", op_s
 
 
 def test_analyze_adif_statuses() -> None:
-    _qso("DL1ABC", time_on="1000")                                # au log : 20260910 10:00
+    _qso("DL1ABC", time_on="1000")                                # in the log: 20260910 10:00
     rows = activation.analyze_adif(_adif(
-        _rec_adif("DL1ABC", time="1005"),                         # même QSO à 5 min
-        _rec_adif("DL1ABC", date="20260911"),                     # autre jour
+        _rec_adif("DL1ABC", time="1005"),                         # same QSO 5 min later
+        _rec_adif("DL1ABC", date="20260911"),                     # different day
         _rec_adif("G0XYZ", band="40M", mode="CW"),
-        _rec_adif("G0XYZ", band="40M", mode="CW", time="1002"),   # 2 fois dans le fichier
-        _rec_adif("OK1AB", mode="MFSK", submode="FT4"),           # FT4 en ADIF 3
-        _rec_adif("OK2AB", date=""),                              # sans date
+        _rec_adif("G0XYZ", band="40M", mode="CW", time="1002"),   # twice in the file
+        _rec_adif("OK1AB", mode="MFSK", submode="FT4"),           # FT4 in ADIF 3
+        _rec_adif("OK2AB", date=""),                              # no date
     ), operator_call="F4IOZ")
     assert [r["status"] for r in rows] == ["in_log", "worked", "new", "file_dupe", "new", "invalid"]
     assert rows[4]["mode"] == "FT4"
@@ -1051,7 +1051,7 @@ def test_analyze_adif_operator_choice() -> None:
     forced = activation.analyze_adif(text, operator_call="F4IOZ")
     assert [r["operator_call"] for r in forced] == ["F4IOZ", "F4IOZ"]
     from_file = activation.analyze_adif(text, operator_call="F4IOZ", prefer_file_operator=True)
-    assert [r["operator_call"] for r in from_file] == ["F5RRO", "F4IOZ"]  # TM25TEST n'est pas un opérateur
+    assert [r["operator_call"] for r in from_file] == ["F5RRO", "F4IOZ"]  # TM25TEST is not an operator
     no_op = activation.analyze_adif(text, operator_call="")
     assert {r["status"] for r in no_op} == {"invalid"}
 
@@ -1086,7 +1086,7 @@ def test_adif_page_lists_contacts_with_group_filters() -> None:
         assert 'data-filter="op"' in r.text and 'data-filter="day"' in r.text
 
 
-# ── Indicatifs spéciaux (multi-indicatif) ──────────────────────────────────
+# ── Special callsigns (multi-callsign) ─────────────────────────────────────
 
 
 def test_first_station_seeded_from_config_with_hero() -> None:
@@ -1122,7 +1122,7 @@ def test_migration_from_single_callsign_base(tmp_path, monkeypatch) -> None:
     assert [q["call"] for q in qsos] == ["DL1ABC"] and qsos[0]["station"] == "TM25TEST"
     assert len(activation.list_slots()) == 1
     snaps = list(activation.BACKUP_DIR.glob("premigration-*.sqlite"))
-    assert len(snaps) == 1                               # copie intacte avant migration
+    assert len(snaps) == 1                               # intact copy before migration
     s = sqlite3.connect(snaps[0])
     try:
         assert "station" not in {r[1] for r in s.execute("PRAGMA table_info(contacts)")}
@@ -1135,7 +1135,7 @@ def test_stations_scope_log_planning_and_export() -> None:
     _qso("DL1ABC")
     activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
     activation.create_station("tm61test", label="Test 2", gridsquare="JN18FS89", public="1")
-    assert activation.callsign() == "TM25TEST"            # créer ne bascule pas
+    assert activation.callsign() == "TM25TEST"            # creating does not switch
     activation.set_current_station("TM61TEST")
     assert activation.list_contacts() == [] and activation.list_slots() == []
     assert activation.stats()["total"] == 0
@@ -1145,7 +1145,7 @@ def test_stations_scope_log_planning_and_export() -> None:
     adif = activation.to_adif()
     assert "<STATION_CALLSIGN:8>TM61TEST" in adif and "<MY_GRIDSQUARE:8>JN18FS89" in adif
     assert "DL1ABC" not in adif
-    assert not activation.is_dupe("DL1ABC", "20M", "SSB")  # doublons jugés par indicatif
+    assert not activation.is_dupe("DL1ABC", "20M", "SSB")  # duplicates judged by callsign
     activation.set_current_station("TM25TEST")
     assert activation.is_dupe("DL1ABC", "20M", "SSB")
 
@@ -1158,11 +1158,11 @@ def test_scoring_is_per_station() -> None:
 
 
 def test_create_station_validation() -> None:
-    for bad in ("!!", "GRID"):                            # invalide / sans chiffre (masquerait /grid)
+    for bad in ("!!", "GRID"):                            # invalid / no digit (would shadow /grid)
         with pytest.raises(ValueError):
             activation.create_station(bad)
     with pytest.raises(ValueError):
-        activation.create_station("TM25TEST")             # déjà enregistré
+        activation.create_station("TM25TEST")             # already registered
     with pytest.raises(ValueError):
         activation.create_station("TM61A", gridsquare="ZZ99")
     with pytest.raises(ValueError):
@@ -1175,20 +1175,20 @@ def test_public_pages_per_station_and_list() -> None:
     _public()
     _qso("DL1ABC")
     activation.create_station("TM61TEST", label="Deuxième", public="1", badge="10 ANS")
-    activation.create_station("TM62HIDE")                 # non publiée
+    activation.create_station("TM62HIDE")                 # not published
     client = TestClient(app, follow_redirects=False)
     t = client.get("/tm25test").text
     assert "50 ANS" in t and "DL1ABC" in t and "Activation terminée" not in t
     t61 = client.get("/tm61test")
     assert t61.status_code == 200 and "10 ANS" in t61.text and "Activation terminée" in t61.text
-    assert "DL1ABC" not in t61.text                       # le log de TM25TEST n'y est pas
+    assert "DL1ABC" not in t61.text                       # TM25TEST's log is not there
     r = client.get("/TM61TEST?call=F1ABC")
     assert r.status_code == 301 and r.headers["location"] == "/tm61test?call=F1ABC"
     assert client.get("/tm62hide").status_code == 404
     assert client.get("/zz9zzz").status_code == 404
     lst = client.get("/activations").text
     assert "TM25TEST" in lst and "TM61TEST" in lst and "TM62HIDE" not in lst
-    assert client.get("/robots.txt").status_code == 200   # la route générique ne masque rien
+    assert client.get("/robots.txt").status_code == 200   # the generic route hides nothing
 
 
 def test_station_admin_routes(monkeypatch) -> None:
@@ -1204,7 +1204,7 @@ def test_station_admin_routes(monkeypatch) -> None:
     r = admin.post("/activation/stations/tm61test", data={"label": "Renommé", "gridsquare": "JN18"})
     assert r.status_code == 303
     st = activation.get_station("TM61TEST")
-    assert st["label"] == "Renommé" and st["public"] == 0   # case décochée = masquée
+    assert st["label"] == "Renommé" and st["public"] == 0   # unchecked box = hidden
     r = admin.post("/activation/stations/tm61test/current")
     assert r.status_code == 303 and activation.callsign() == "TM61TEST"
     assert "EN COURS" in admin.get("/activation/settings").text
@@ -1230,27 +1230,27 @@ def test_delete_station_only_without_qso() -> None:
     activation.set_current_station("TM61EMPTY")
     activation.add_slot("F4IOZ", "2026-10-01T10:00", "2026-10-01T12:00", "20M", "SSB")
     with pytest.raises(ValueError):
-        activation.delete_station("TM61EMPTY")           # indicatif en cours
+        activation.delete_station("TM61EMPTY")           # current callsign
     activation.set_current_station("TM25TEST")
-    _qso("DL1ABC")                                       # QSO de TM25TEST
+    _qso("DL1ABC")                                       # TM25TEST QSOs
     with pytest.raises(ValueError):
-        activation.delete_station("TM25TEST")            # en cours ET avec QSO
+        activation.delete_station("TM25TEST")            # current AND with QSOs
     activation.create_station("TM61LOG")
     activation.set_current_station("TM61LOG")
     _qso("G0XYZ")
     activation.set_current_station("TM25TEST")
     with pytest.raises(ValueError, match="a des QSO"):
-        activation.delete_station("TM61LOG")             # fiche avec QSO conservée
+        activation.delete_station("TM61LOG")             # record with QSOs kept
     activation.set_scoring({"enabled": "1"}, station="TM61EMPTY")
     activation.delete_station("TM61EMPTY")
     assert activation.get_station("TM61EMPTY") is None
-    assert activation.list_slots(station="TM61EMPTY") == []           # créneaux partis avec
+    assert activation.list_slots(station="TM61EMPTY") == []           # slots removed along with it
     assert "TM61EMPTY" not in activation.load_settings().get("scoring_by_station", {})
     assert activation.get_station("TM61LOG") is not None
     assert [q["call"] for q in activation.list_contacts()] == ["DL1ABC"]
-    assert activation.list_backups()                                  # sauvegarde avant suppression
+    assert activation.list_backups()                                  # backup before deletion
     with pytest.raises(ValueError):
-        activation.delete_station("TM61EMPTY")           # inconnu
+        activation.delete_station("TM61EMPTY")           # unknown
 
 
 def test_delete_station_route(monkeypatch) -> None:
@@ -1262,9 +1262,9 @@ def test_delete_station_route(monkeypatch) -> None:
     activation.set_current_station("TM25TEST")
     admin = _private_client()
     page = admin.get("/activation/settings").text
-    assert "/activation/stations/tm61empty/delete" in page       # bouton ✕ : fiche vide
-    assert "/activation/stations/tm61log/delete" not in page     # pas de ✕ : a des QSO
-    assert "/activation/stations/tm25test/delete" not in page    # pas de ✕ : en cours
+    assert "/activation/stations/tm61empty/delete" in page       # ✕ button: empty record
+    assert "/activation/stations/tm61log/delete" not in page     # no ✕: has QSOs
+    assert "/activation/stations/tm25test/delete" not in page    # no ✕: current
     r = admin.post("/activation/stations/tm61log/delete")
     assert r.status_code == 400 and "a des QSO" in r.text
     r = admin.post("/activation/stations/tm61empty/delete")
@@ -1281,17 +1281,17 @@ def test_slot_notes_shown_in_cards(monkeypatch) -> None:
     now = datetime.now(timezone.utc)
     fmt = lambda dt: dt.strftime("%Y-%m-%dT%H:%M")  # noqa: E731
     activation.add_slot("F5RRO", fmt(now + timedelta(hours=2)), fmt(now + timedelta(hours=3)),
-                        "2M", "SSB", "QRV Sat FO-29")                        # à venir
+                        "2M", "SSB", "QRV Sat FO-29")                        # upcoming
     activation.add_slot("F5JRN", fmt(now - timedelta(hours=3)), fmt(now - timedelta(hours=2)),
-                        "40M", "CW", "Depuis le local du club")              # passée
+                        "40M", "CW", "Depuis le local du club")              # past
     _public()
     public = TestClient(app).get("/tm25test").text
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     dashboard = _private_client().get("/activation").text
     sat = '<p class="act-next-note"><span class="act-sat-icon" title="Satellite">🛰️</span> QRV Sat FO-29</p>'
     for page in (public, dashboard):
-        assert sat in page                                                    # note satellite : icône
-        assert '<p class="act-next-note">Depuis le local du club</p>' in page  # sans icône
+        assert sat in page                                                    # satellite note: icon
+        assert '<p class="act-next-note">Depuis le local du club</p>' in page  # no icon
 
 
 def test_note_is_sat() -> None:
@@ -1301,7 +1301,7 @@ def test_note_is_sat() -> None:
         assert not activation.note_is_sat(note), note
 
 
-# ── Compte QRZ.com (Réglages) ──────────────────────────────────────────────
+# ── QRZ.com account (Settings) ─────────────────────────────────────────────
 
 
 def test_qrz_account_from_settings_overrides_config(monkeypatch) -> None:
@@ -1316,9 +1316,9 @@ def test_qrz_account_from_settings_overrides_config(monkeypatch) -> None:
     assert activation.QRZ_ACCOUNT_FILE.stat().st_mode & 0o777 == 0o600
     client = _REAL_QRZ_CLIENT()
     assert isinstance(client, QrzXmlClient) and (client.username, client.password) == ("F6ABC", "clubpw")
-    assert _REAL_QRZ_CLIENT() is client                  # une seule session QRZ
+    assert _REAL_QRZ_CLIENT() is client                  # a single QRZ session
     activation.set_qrz_account("F6ABC", "newpw")
-    assert _REAL_QRZ_CLIENT().password == "newpw"        # nouveau mot de passe → nouveau client
+    assert _REAL_QRZ_CLIENT().password == "newpw"        # new password → new client
 
     activation.clear_qrz_account()
     assert activation.qrz_account()["source"] == "config" and _REAL_QRZ_CLIENT() is site_client
@@ -1351,17 +1351,17 @@ def test_qrz_settings_route(monkeypatch) -> None:
     page = admin.get("/activation/settings").text
     assert "F6ABC (saisi ici)" in page and "clubpw" not in page
 
-    # Mot de passe laissé vide, même identifiant : l'ancien est repris.
+    # Password left empty, same username: the previous one is reused.
     admin.post("/activation/settings/qrz", data={"username": "f6abc", "password": ""})
     assert checked[-1] == ("f6abc", "clubpw")
-    # Autre identifiant sans mot de passe : refusé.
+    # Different username without a password: rejected.
     r = admin.post("/activation/settings/qrz", data={"username": "F5NEW", "password": ""})
     assert r.headers["location"].endswith("qz=incomplete#qrz")
 
     answer["value"] = ("refused", "Username/password incorrect")
     r = admin.post("/activation/settings/qrz", data={"username": "F5BAD", "password": "x"})
     assert r.headers["location"].endswith("qz=refused#qrz")
-    assert activation.qrz_account()["username"] == "f6abc"           # compte précédent gardé
+    assert activation.qrz_account()["username"] == "f6abc"           # previous account kept
 
     answer["value"] = ("ok", "non-subscriber")
     r = admin.post("/activation/settings/qrz", data={"username": "F5FREE", "password": "y"})
@@ -1373,7 +1373,7 @@ def test_qrz_settings_route(monkeypatch) -> None:
     r = admin.post("/activation/settings/qrz", data={"action": "clear"})
     assert r.headers["location"].endswith("qz=cleared#qrz") and not activation.QRZ_ACCOUNT_FILE.exists()
 
-    # Opérateur non admin → /login, rien n'est changé.
+    # Non-admin operator → /login, nothing is changed.
     activation.set_operator_password("oppass")
     op = TestClient(app, follow_redirects=False)
     op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
@@ -1385,7 +1385,7 @@ _REAL_HTTPX_CLIENT = qrz_xml.httpx.Client
 
 
 def _qrz_transport(monkeypatch, handler) -> None:
-    """Réponses QRZ simulées : httpx.Client de qrz_xml branché sur un MockTransport."""
+    """Mocked QRZ responses: qrz_xml's httpx.Client wired to a MockTransport."""
     mock = qrz_xml.httpx.MockTransport(handler)
     monkeypatch.setattr(qrz_xml.httpx, "Client", lambda **kw: _REAL_HTTPX_CLIENT(transport=mock, **kw))
 
@@ -1408,10 +1408,10 @@ def test_qrz_check_login(monkeypatch) -> None:
     assert QrzXmlClient("F6ABC", "pw").check_login()[0] == "error"
 
 
-# ── Pages en anglais (i18n) ────────────────────────────────────────────────
+# ── English pages (i18n) ───────────────────────────────────────────────────
 
-# Mots français courants : leur présence sur une page anglaise trahit un texte
-# oublié (hors données saisies : les données de test sont neutres).
+# Common French words: their presence on an English page reveals a forgotten
+# text (excluding entered data: the test data is language-neutral).
 _FRENCH_WORDS = re.compile(
     r"(?i)(?<![\w-])(les|des|du|une|avec|pour|dans|sur|aucun|aucune|créneaux?|opérateurs?|réglages|"
     r"indicatifs?|bandes?|chasseurs|prochaines|tableau|contacté|mettre|supprimer|enregistrer|"
@@ -1436,7 +1436,7 @@ def test_pages_render_in_english(monkeypatch) -> None:
     monkeypatch.setattr(act_router, "club_config", lambda: club)
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     _public(grid="JN18")
-    activation.update_station("TM25TEST", subtitle="Town A · Town B")   # donnée saisie, pas l'interface
+    activation.update_station("TM25TEST", subtitle="Town A · Town B")   # entered data, not UI
     activation.set_flag("show_contacts", True)
     activation.set_flag("show_map_stats", True)
     now = datetime.now(timezone.utc)
@@ -1468,26 +1468,26 @@ def test_pages_render_in_english(monkeypatch) -> None:
 def test_language_switch_cookie_and_fallbacks() -> None:
     _public()
     client = TestClient(app, follow_redirects=False)
-    assert '<html lang="fr">' in client.get("/tm25test").text          # sans en-tête : français
+    assert '<html lang="fr">' in client.get("/tm25test").text          # no header: French
     r = client.get("/activation/lang/en?next=/tm25test%3Fcall%3DDL1ABC")
     assert r.status_code == 303 and r.headers["location"] == "/tm25test?call=DL1ABC"
     assert "lang=en" in r.headers["set-cookie"] and "Max-Age=31536000" in r.headers["set-cookie"]
     page = client.get("/tm25test", headers={"Accept-Language": "fr-FR"}).text
-    assert '<html lang="en">' in page                                  # le cookie prime sur le navigateur
+    assert '<html lang="en">' in page                                  # the cookie wins over the browser
     assert 'href="/activation/lang/fr?next=/tm25test"' in page
-    # Redirection externe refusée, langue inconnue ignorée.
+    # External redirect refused, unknown language ignored.
     assert client.get("/activation/lang/fr?next=//evil.example").headers["location"] == "/activations"
     assert "set-cookie" not in client.get("/activation/lang/xx").headers
-    # Messages d'erreur Python traduits (ValueError de la couche données).
+    # Translated Python error messages (ValueError from the data layer).
     r = TestClient(app).post("/activation/login", data={"callsign": "!!", "password": "x"},
                              headers={"Accept-Language": "en"})
     assert "Invalid callsign" in r.text
 
 
-# ── Comptes opérateurs (mot de passe par opérateur) ────────────────────────
+# ── Operator accounts (per-operator password) ──────────────────────────────
 
 
-# Mot de passe conforme à la règle (majuscule, chiffre, caractère spécial).
+# Password matching the rule (uppercase, digit, special character).
 PW = "Motdepasse1!"
 
 
@@ -1496,7 +1496,7 @@ def _op_client() -> TestClient:
 
 
 def _captcha_fields(answer_shift: int = 0, age: int = 5) -> dict[str, str]:
-    """Question anti-robot déjà résolue (jeton antidaté : un humain a pris son temps)."""
+    """Anti-bot question already solved (backdated token: a human took their time)."""
     ts, good = str(int(time.time()) - age), 7
     return {"captcha_token": f"{ts}.{activation._captcha_sig(ts, good)}",
             "captcha": str(good + answer_shift)}
@@ -1522,8 +1522,8 @@ def test_per_operator_account_is_created_at_first_login() -> None:
     acc = activation.get_operator("F5ABC")
     assert acc["status"] == "active" and acc["active"] == 1 and acc["is_admin"] == 0
     assert acc["password_hash"] and "motdepasse" not in acc["password_hash"]
-    assert client.get("/activation").status_code == 200          # session ouverte
-    # Mot de passe faux, puis bon : le compte reste celui créé.
+    assert client.get("/activation").status_code == 200          # session opened
+    # Wrong password, then right one: the account remains the one created.
     other = _op_client()
     bad = _login(other, "F5ABC", "AutreMdp2!")
     assert bad.status_code == 401 and "Mot de passe incorrect" in bad.text
@@ -1539,8 +1539,8 @@ def test_new_account_waits_for_approval_when_enabled() -> None:
     r = _login(client, "F5NEW", PW)
     assert r.status_code == 401 and "en attente de validation" in r.text
     assert activation.get_operator("F5NEW")["status"] == "pending"
-    assert client.get("/activation").status_code == 303          # pas de session
-    # Le même mot de passe reste refusé tant que l'admin n'a pas validé.
+    assert client.get("/activation").status_code == 303          # no session
+    # The same password is still refused until the admin has approved.
     assert _login(client, "F5NEW", PW).status_code == 401
     activation.approve_operator("F5NEW")
     assert _login(client, "F5NEW", PW).status_code == 303
@@ -1548,7 +1548,7 @@ def test_new_account_waits_for_approval_when_enabled() -> None:
 
 
 def test_roster_operator_sets_password_without_approval() -> None:
-    """Ajouté par un admin : déjà approuvé, il choisit juste son mot de passe."""
+    """Added by an admin: already approved, they just choose their password."""
     activation.set_flag("per_operator_auth", True)
     activation.set_flag("operator_approval", True)
     activation.add_operator("F5ROS", "Jean")
@@ -1558,37 +1558,37 @@ def test_roster_operator_sets_password_without_approval() -> None:
 
 
 def test_operator_superadmin_reaches_settings_but_not_site_stats(monkeypatch) -> None:
-    """Admin : tout sauf les Réglages. Superadmin : les Réglages en plus, sans
-    l'encart réservé à l'admin du site."""
+    """Admin: everything but the Settings. Superadmin: the Settings as well, without
+    the panel reserved for the site admin."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("per_operator_auth", True)
     op = _op_client()
     _login(op, "F5OP", PW)
     activation.add_operator("F5ABC")
-    assert op.get("/activation/settings").status_code == 303     # simple opérateur
-    # Admin : rapport PDF oui, Réglages non (ni la page, ni le lien, ni les actions).
+    assert op.get("/activation/settings").status_code == 303     # plain operator
+    # Admin: PDF report yes, Settings no (not the page, the link or the actions).
     activation.set_operator_admin("F5OP", True)
     assert activation.operator_is_admin("F5OP") and not activation.operator_is_superadmin("F5OP")
     assert op.get("/activation/settings").status_code == 303
     assert op.post("/activation/settings/operators/F5ABC", data={"action": "admin"}).status_code == 303
-    assert not activation.operator_is_admin("F5ABC")              # refusé, rien n'a bougé
+    assert not activation.operator_is_admin("F5ABC")              # refused, nothing changed
     assert op.post("/activation/stations", data={"callsign": "TM1X"}).status_code == 303
     assert activation.get_station("TM1X") is None
     assert 'href="/activation/settings"' not in op.get("/activation").text
     assert op.get("/activation/report.pdf").status_code == 200
-    # Superadmin : les Réglages s'ouvrent.
+    # Superadmin: the Settings open.
     activation.set_operator_superadmin("F5OP", True)
     page = op.get("/activation/settings")
     assert page.status_code == 200 and "Comptes opérateurs" in page.text
     assert 'href="/activation/settings"' in op.get("/activation").text
-    # Encart réservé à l'admin principal (journal des visites du site, ou des
-    # connexions dans l'application autonome) : invisible pour un superadmin du club.
+    # Panel reserved for the main admin (site visit log, or the login log in the
+    # standalone app): invisible to a club superadmin.
     site_page = _private_client().get("/activation/settings").text
     reserved = [t for t in ("Fréquentation du site", "Connexions") if t in site_page]
     assert reserved, "encart réservé à l'admin introuvable"
     for title in reserved:
         assert title not in page.text
-    # Il peut gérer les comptes et les rôles…
+    # They can manage accounts and roles…
     assert op.post("/activation/settings/operators/F5ABC", data={"action": "admin"}).status_code == 303
     assert activation.operator_is_admin("F5ABC")
     op.post("/activation/settings/operators/F5ABC", data={"action": "superadmin"})
@@ -1596,9 +1596,9 @@ def test_operator_superadmin_reaches_settings_but_not_site_stats(monkeypatch) ->
     op.post("/activation/settings/operators/F5ABC", data={"action": "unsuperadmin"})
     assert activation.operator_is_admin("F5ABC") and not activation.operator_is_superadmin("F5ABC")
     op.post("/activation/settings/operators/F5ABC", data={"action": "superadmin"})
-    op.post("/activation/settings/operators/F5ABC", data={"action": "unadmin"})   # retire les deux
+    op.post("/activation/settings/operators/F5ABC", data={"action": "unadmin"})   # removes both
     assert not activation.operator_is_admin("F5ABC") and not activation.operator_is_superadmin("F5ABC")
-    # …mais pas se retirer ses propres droits.
+    # …but not remove their own rights.
     for action in ("unsuperadmin", "unadmin"):
         r = op.post("/activation/settings/operators/F5OP", data={"action": action})
         assert r.headers["location"].endswith("ac=self#comptes")
@@ -1606,7 +1606,7 @@ def test_operator_superadmin_reaches_settings_but_not_site_stats(monkeypatch) ->
 
 
 def test_superadmin_needs_individual_password() -> None:
-    """Avec le mot de passe commun, se déclarer superadmin n'ouvre rien."""
+    """With the shared password, claiming superadmin opens nothing."""
     activation.set_operator_password("commun")
     op = _op_client()
     assert _login(op, "F5SUP", "commun").status_code == 303
@@ -1616,7 +1616,7 @@ def test_superadmin_needs_individual_password() -> None:
 
 
 def test_superadmin_column_added_to_old_database(tmp_path, monkeypatch) -> None:
-    """Base d'avant le superadmin : colonne ajoutée, les admins restent admins."""
+    """Pre-superadmin database: column added, admins stay admins."""
     import sqlite3
 
     db = tmp_path / "old.sqlite"
@@ -1638,8 +1638,8 @@ def test_disabled_account_loses_its_session() -> None:
     _login(client, "F5OFF", PW)
     assert client.get("/activation").status_code == 200
     activation.set_operator_active("F5OFF", False)
-    assert client.get("/activation").status_code == 303          # session invalidée
-    assert _login(client, "F5OFF", PW).status_code == 401      # et connexion refusée
+    assert client.get("/activation").status_code == 303          # session invalidated
+    assert _login(client, "F5OFF", PW).status_code == 401      # and login refused
     activation.set_operator_active("F5OFF", True)
     assert _login(client, "F5OFF", PW).status_code == 303
 
@@ -1647,11 +1647,11 @@ def test_disabled_account_loses_its_session() -> None:
 def test_session_token_is_bound_to_its_callsign() -> None:
     activation.set_flag("per_operator_auth", True)
     _login(_op_client(), "F5BOB", PW)
-    # Jeton du mot de passe commun (sans indicatif) : refusé en mode comptes.
+    # Shared-password token (no callsign): refused in accounts mode.
     shared = TestClient(app, follow_redirects=False)
     shared.cookies.set(activation.OP_COOKIE, activation.make_op_token())
     assert shared.get("/activation").status_code == 303
-    # Jeton d'un compte inexistant, ou signature d'un autre indicatif : refusés.
+    # Token for a nonexistent account, or another callsign's signature: refused.
     forged = TestClient(app, follow_redirects=False)
     forged.cookies.set(activation.OP_COOKIE, activation.make_op_token("F5GHOST"))
     assert forged.get("/activation").status_code == 303
@@ -1666,7 +1666,7 @@ def test_admin_resets_and_clears_operator_password() -> None:
     activation.set_operator_password_for("F5RST", "NouveauMdp2!")
     assert _login(_op_client(), "F5RST", "AncienMdp1!").status_code == 401
     assert _login(_op_client(), "F5RST", "NouveauMdp2!").status_code == 303
-    activation.clear_operator_password("F5RST")                  # oubli : nouveau choix libre
+    activation.clear_operator_password("F5RST")                  # forgotten: new free choice
     assert _login(_op_client(), "F5RST", "ToutNeuf3!").status_code == 303
     with pytest.raises(ValueError):
         activation.set_operator_password_for("F5RST", "")
@@ -1684,7 +1684,7 @@ def test_shared_password_mode_is_unchanged() -> None:
 
 
 def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
-    activation.set_flag("auto_slots", False)     # on teste le comptage seul
+    activation.set_flag("auto_slots", False)     # only the counting is tested
     sid = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
     other = activation.add_slot("F5RRO", "2026-09-07T10:00", "2026-09-07T12:00", "40M", "CW")
     activation.add_operator("F5RRO")
@@ -1693,12 +1693,12 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
                                qso_date="20260907", time_on=time_on)
     qso("DL1ABC")
     qso("DL2ABC", time_on="1159")
-    qso("DL3ABC", time_on="1200")          # minute de fin : compté (voir ci-dessous)
-    qso("DL4ABC", time_on="1201")          # après la fin
-    qso("DL5ABC", time_on="0959")          # avant le début
-    qso("DL6ABC", band="40M")              # autre bande
-    qso("DL7ABC", mode="CW")               # autre mode
-    qso("DL8ABC", op="F5RRO")              # autre opérateur
+    qso("DL3ABC", time_on="1200")          # end minute: counted (see below)
+    qso("DL4ABC", time_on="1201")          # after the end
+    qso("DL5ABC", time_on="0959")          # before the start
+    qso("DL6ABC", band="40M")              # different band
+    qso("DL7ABC", mode="CW")               # different mode
+    qso("DL8ABC", op="F5RRO")              # different operator
     qso("DL9ABC", op="F5RRO", band="40M", mode="CW")
     counts = activation.slot_qso_counts()
     assert counts[sid] == 3 and counts[other] == 1
@@ -1712,8 +1712,8 @@ def test_slot_qso_counts_match_operator_band_mode_and_window() -> None:
 
 
 def test_public_shows_every_slot_card_by_default(monkeypatch) -> None:
-    """Par défaut, aucune vignette n'est coupée : dix créneaux à venir = dix
-    vignettes (avant, la page s'arrêtait à huit)."""
+    """By default, no card is cut: ten upcoming slots = ten cards
+    (previously the page stopped at eight)."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
     _public()
@@ -1726,12 +1726,12 @@ def test_public_shows_every_slot_card_by_default(monkeypatch) -> None:
     assert activation.public_slots_max() == 0
     page = TestClient(app).get("/tm25test").text
     assert page.count("act-next-card") == 10
-    # Limité à 4 depuis les Réglages.
+    # Limited to 4 from the Settings.
     admin = _private_client()
     admin.post("/activation/settings/flags", data={"show_map_stats": "1", "public_slots_max": "4"})
     assert activation.public_slots_max() == 4
     assert TestClient(app).get("/tm25test").text.count("act-next-card") == 4
-    # Valeur absurde : bornée, jamais d'erreur.
+    # Absurd value: clamped, never an error.
     admin.post("/activation/settings/flags", data={"public_slots_max": "n'importe quoi"})
     assert activation.public_slots_max() == 0
     admin.post("/activation/settings/flags", data={"public_slots_max": "99999"})
@@ -1739,14 +1739,14 @@ def test_public_shows_every_slot_card_by_default(monkeypatch) -> None:
 
 
 def test_settings_button_realigns_slots_on_the_log(monkeypatch) -> None:
-    """Bouton « Mettre à jour les créneaux d'après le log » : marche même quand
-    le rattrapage automatique est décoché (l'admin le demande explicitement)."""
+    """« Mettre à jour les créneaux d'après le log » button (update slots from the log):
+    works even when automatic catch-up is unchecked (the admin asks for it explicitly)."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
     for call, time_on in (("DL1ABC", "1000"), ("DL2ABC", "1010"), ("DL3ABC", "1020")):
         activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
                                qso_date="20260907", time_on=time_on)
-    assert activation.list_slots() == []              # rien pendant que l'option est off
+    assert activation.list_slots() == []              # nothing while the option is off
     admin = _private_client()
     r = admin.post("/activation/settings/slots-from-log")
     assert r.status_code == 303 and "sl=1-0" in r.headers["location"]
@@ -1755,7 +1755,7 @@ def test_settings_button_realigns_slots_on_the_log(monkeypatch) -> None:
     assert activation.slot_qso_counts()[slots[0]["id"]] == 3
     page = admin.get("/activation/settings?sl=1-0").text
     assert "1 créé(s)" in page and "Mettre à jour les créneaux" in page
-    # Réservé à l'admin.
+    # Admin only.
     activation.set_operator_password("oppass")
     op = TestClient(app, follow_redirects=False)
     op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
@@ -1763,19 +1763,19 @@ def test_settings_button_realigns_slots_on_the_log(monkeypatch) -> None:
 
 
 def test_settings_slot_flash_ignores_a_tampered_parameter(monkeypatch) -> None:
-    """Le compte rendu vient de l'URL : une valeur bricolée ne doit rien afficher."""
+    """The report comes from the URL: a tampered value must display nothing."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     page = _private_client().get("/activation/settings?sl=<img src=x onerror=alert(1)>-oops").text
-    assert "Créneaux recalés" not in page          # compte rendu non affiché
-    assert "<img src=x" not in page                # et jamais réinjecté tel quel
+    assert "Créneaux recalés" not in page          # report not displayed
+    assert "<img src=x" not in page                # and never echoed back as is
 
 
 def test_qso_logged_on_the_last_minute_of_a_slot_counts() -> None:
-    """Cas vécu (TM25TEST, passage FO-29) : créneau 18:59→19:15, cinq QSO dont
-    un à 19:15 pile — la vignette n'en affichait que quatre.
+    """Real case (TM25TEST, FO-29 pass): slot 18:59→19:15, five QSOs including
+    one at exactly 19:15 — the card only showed four.
 
-    Les QSO sont horodatés à la minute : celui de 19:15 a eu lieu PENDANT la
-    minute de fin, et c'est même le dernier contact du passage."""
+    QSOs are timestamped to the minute: the 19:15 one happened DURING the
+    end minute, and it was even the last contact of the pass."""
     activation.set_flag("auto_slots", False)
     sid = activation.add_slot("F4IOZ", "2026-09-14T18:59", "2026-09-14T19:15", "2M", "SSB",
                               note="SAT FO-29")
@@ -1787,8 +1787,8 @@ def test_qso_logged_on_the_last_minute_of_a_slot_counts() -> None:
 
 
 def test_qso_at_the_hinge_of_two_slots_counts_once() -> None:
-    """Deux créneaux qui se touchent : le QSO de la charnière va au plus récent,
-    jamais aux deux (sinon le total dépasserait le nombre de QSO)."""
+    """Two adjacent slots: the QSO at the boundary goes to the more recent one,
+    never to both (otherwise the total would exceed the number of QSOs)."""
     activation.set_flag("auto_slots", False)
     first = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T11:00", "20M", "SSB")
     second = activation.add_slot("F4IOZ", "2026-09-07T11:00", "2026-09-07T12:00", "20M", "SSB")
@@ -1801,12 +1801,12 @@ def test_qso_at_the_hinge_of_two_slots_counts_once() -> None:
 
 
 def test_slot_without_qso_shows_nothing_rather_than_zero() -> None:
-    """Aucun QSO compté = log peut-être pas encore importé : on n'affiche rien."""
-    activation.add_slot("F4IOZ", "2026-09-05T10:00", "2026-09-05T12:00", "20M", "SSB")  # passé, vide
+    """No QSO counted = log maybe not imported yet: display nothing."""
+    activation.add_slot("F4IOZ", "2026-09-05T10:00", "2026-09-05T12:00", "20M", "SSB")  # past, empty
     now = datetime.now(timezone.utc)
     fmt = "%Y-%m-%dT%H:%M"
     activation.add_slot("F4IOZ", (now - timedelta(minutes=30)).strftime(fmt),
-                        (now + timedelta(hours=1)).strftime(fmt), "40M", "CW")          # en cours, vide
+                        (now + timedelta(hours=1)).strftime(fmt), "40M", "CW")          # current, empty
     _public()
     public = TestClient(app).get("/tm25test").text
     with pytest.MonkeyPatch.context() as mp:
@@ -1815,31 +1815,31 @@ def test_slot_without_qso_shows_nothing_rather_than_zero() -> None:
         board = admin.get("/activation").text
         planning = admin.get("/activation/planning").text
     for page in (public, board, planning):
-        # Le compteur d'un créneau n'apparaît que s'il y a des QSO ; le « 0 » du
-        # total de l'activation (« QSO réalisés »), lui, reste légitime.
+        # A slot's counter only appears if there are QSOs; the « 0 » of the
+        # activation total (« QSO réalisés »), however, is legitimate.
         assert '<b class="act-slot-qso">' not in page and "0 QSO" not in page
-    # Dans le planning, la colonne QSO reste simplement vide.
+    # In the schedule, the QSO column simply stays empty.
     assert '<td class="act-slot-qso"></td>' in planning
 
 
 def test_admin_logout_button_is_everywhere_for_the_main_admin(monkeypatch) -> None:
-    """Bouton « Admin ⎋ » : visible pour l'admin principal, sur toutes les pages
-    de l'espace activation (publiques comprises), et il ferme bien la session."""
+    """« Admin ⎋ » button: visible to the main admin, on every page of the
+    activation area (public ones included), and it does close the session."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     _public()
     admin = _private_client()
     pages = ("/activation", "/activation/planning", "/activation/settings", "/tm25test",
-             "/activations")   # /activation/login redirige quand on est déjà connecté
+             "/activations")   # /activation/login redirects when already logged in
     for path in pages:
         page = admin.get(path)
         assert page.status_code == 200, path
         assert 'action="/logout"' in page.text and "Admin ⎋" in page.text, path
         assert f'name="next" value="{path}"' in page.text, path
     anon = TestClient(app, follow_redirects=False)
-    assert "Admin ⎋" not in anon.get("/tm25test").text          # visiteur : rien
+    assert "Admin ⎋" not in anon.get("/tm25test").text          # visitor: nothing
     r = admin.post("/logout", data={"next": "/tm25test"})
     assert r.status_code == 303 and r.headers["location"] == "/tm25test"
-    # Le cookie admin est effacé (le client de test garde celui posé à la main).
+    # The admin cookie is cleared (the test client keeps the one set by hand).
     cookie = r.headers.get("set-cookie", "")
     assert auth_mod.COOKIE_NAME in cookie and "Max-Age=0" in cookie
     assert TestClient(app, follow_redirects=False).get("/activation/settings").status_code == 303
@@ -1853,16 +1853,16 @@ def test_password_rule_is_enforced_at_account_creation() -> None:
         assert "majuscule" in r.text and activation.get_operator("F5WEAK") is None, weak
     assert _login(_op_client(), "F5WEAK", PW).status_code == 303
     assert activation.get_operator("F5WEAK")["password_hash"]
-    # La règle en vigueur est affichée sur la page de connexion.
+    # The rule in force is shown on the login page.
     assert "Au moins 8 caractères, dont 1 majuscule, 1 chiffre, 1 caractère spécial." \
         in _op_client().get("/activation/login").text
-    # Un administrateur ne peut pas poser un mot de passe trop simple non plus.
+    # An administrator cannot set a too-simple password either.
     with pytest.raises(ValueError, match="majuscule"):
         activation.set_operator_password_for("F5WEAK", "faible")
 
 
 def test_activity_report_pdf(monkeypatch) -> None:
-    """Rapport PDF : réservé à l'admin, lisible, et présent dans les Réglages."""
+    """PDF report: admin only, readable, and available in the Settings."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
     for i, call in enumerate(("DL1ABC", "ON4ZZ", "G0XYZ", "EA5QQ")):
@@ -1875,12 +1875,12 @@ def test_activity_report_pdf(monkeypatch) -> None:
     body = r.content
     assert body.startswith(b"%PDF-1.") and body.rstrip().endswith(b"%%EOF")
     assert b"/Type /Catalog" in body and b"/Type /Page " in body
-    assert b"(TM25TEST)" in body                      # le titre de l'activation
-    assert b"(529)" not in body and b"(4)" in body     # le nombre de QSO du log de test
-    # Indicatif inconnu : on revient aux Réglages, pas d'erreur 500.
+    assert b"(TM25TEST)" in body                      # the activation's title
+    assert b"(529)" not in body and b"(4)" in body     # the number of QSOs in the test log
+    # Unknown callsign: back to the Settings, no 500 error.
     assert admin.get("/activation/report.pdf?station=XX9ZZZ").status_code == 303
     assert '/activation/report.pdf"' in admin.get("/activation/settings").text
-    # Espace opérateurs : refusé.
+    # Operator area: refused.
     activation.set_operator_password("oppass")
     op = TestClient(app, follow_redirects=False)
     op.post("/activation/login", data={"callsign": "F5TEST", "password": "oppass"})
@@ -1888,7 +1888,7 @@ def test_activity_report_pdf(monkeypatch) -> None:
 
 
 def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
-    """Sections facultatives : rythme horaire, entités avec drapeaux, chasseurs."""
+    """Optional sections: hourly rate, entities with flags, hunters."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
@@ -1898,25 +1898,25 @@ def test_report_options_shape_the_pdf(monkeypatch, tmp_path) -> None:
     admin = _private_client()
     assert activation.get_report_options() == activation.DEFAULT_REPORT
     base = admin.get("/activation/report.pdf").content
-    assert b"RYTHME, HEURE PAR HEURE" not in base      # coupé par défaut (titres en capitales)
-    assert b"/Subtype /Image" in base                  # les drapeaux des entités
+    assert b"RYTHME, HEURE PAR HEURE" not in base      # off by default (titles in capitals)
+    assert b"/Subtype /Image" in base                  # the entities' flags
 
     r = admin.post("/activation/settings/report",
                    data={"hours": "1", "dxcc_all": "", "hunters": "0"})
     assert r.status_code == 303 and "rp=ok" in r.headers["location"]
-    # « runs » n'était pas dans ce formulaire : la valeur par défaut est gardée,
-    # comme pour les autres nombres.
+    # « runs » was not in this form: the default value is kept,
+    # as for the other numbers.
     assert activation.get_report_options() == {"hours": True, "dxcc_all": False, "hunters": 0,
                                                "sats": False, "one_page": False, "runs": 3}
     tuned = admin.get("/activation/report.pdf").content
     assert b"RYTHME, HEURE PAR HEURE" in tuned
-    assert b"MEILLEURS CHASSEURS" not in tuned         # palmarès retiré
-    assert b"/Subtype /Image" not in tuned             # tableau court, sans drapeau
+    assert b"MEILLEURS CHASSEURS" not in tuned         # leaderboard removed
+    assert b"/Subtype /Image" not in tuned             # short table, no flag
 
     admin.post("/activation/settings/report", data={"dxcc_all": "1", "hunters": "3"})
     short = admin.get("/activation/report.pdf").content
     assert b"MEILLEURS CHASSEURS" in short
-    # Valeur absurde : bornée, jamais d'erreur.
+    # Absurd value: clamped, never an error.
     admin.post("/activation/settings/report", data={"hunters": "5000"})
     assert activation.get_report_options()["hunters"] == activation.REPORT_HUNTERS_MAX
 
@@ -1926,8 +1926,8 @@ def _pages(pdf_bytes: bytes) -> int:
 
 
 def test_qrz_photo_is_kept_only_from_qrz(monkeypatch) -> None:
-    """La vignette du correspondant vient de la fiche QRZ — et de nulle part
-    ailleurs : une adresse hors qrz.com ou en http n'est pas retenue."""
+    """The contact's thumbnail comes from the QRZ record — and from nowhere
+    else: an address outside qrz.com or over http is not kept."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     bonne = "https://cdn-bio.qrz.com/z/dl1abc/portrait.jpg"
     fake = _FakeQrz({
@@ -1945,30 +1945,30 @@ def test_qrz_photo_is_kept_only_from_qrz(monkeypatch) -> None:
 
 
 def test_old_callbook_entries_get_their_photo(monkeypatch) -> None:
-    """Fiche mise en cache AVANT la vignette : elle vaut « ok » mais n'a pas de
-    photo. Sans repère, elle ne serait jamais réinterrogée — vécu sur F4IOZ."""
+    """Record cached BEFORE thumbnails existed: it is « ok » but has no
+    photo. Without a marker, it would never be queried again — happened with F4IOZ."""
     photo = "https://cdn-xml.qrz.com/z/dl1abc/portrait.jpg"
-    _qso("DL1ABC")            # la tâche de fond ne repasse que sur les stations contactées
+    _qso("DL1ABC")            # the background task only goes over the contacted stations
     fake = _FakeQrz({"DL1ABC": XmlLookup(call="DL1ABC", grid="JO31AB", land="Germany",
                                          image=photo)})
     activation.qrz_lookup("DL1ABC", fake)
     assert activation.callbook_get("DL1ABC")["image"] == photo
-    # On simule l'ancienne fiche : photo jamais cherchée.
+    # Simulate the old record: photo never looked up.
     with activation.conn() as c:
         c.execute("UPDATE callbook SET image = '', image_at = 0 WHERE call = 'DL1ABC'")
     assert activation.callbook_get("DL1ABC")["image"] == ""
-    assert "DL1ABC" in activation.pending_callbook_calls(5)      # la tâche de fond la reprend
+    assert "DL1ABC" in activation.pending_callbook_calls(5)      # the background task picks it up
     fake.asked.clear()
     activation.qrz_lookup("DL1ABC", fake)
     assert fake.asked == ["DL1ABC"] and activation.callbook_get("DL1ABC")["image"] == photo
-    # Une fois la photo cherchée, on ne redérange plus QRZ.
+    # Once the photo has been looked up, QRZ is not bothered again.
     fake.asked.clear()
     activation.qrz_lookup("DL1ABC", fake)
     assert fake.asked == [] and "DL1ABC" not in activation.pending_callbook_calls(5)
 
 
 def test_log_page_station_card_sizes(monkeypatch) -> None:
-    """Photo et boussole : tailles réglables, 0 = on n'affiche rien."""
+    """Photo and compass: adjustable sizes, 0 = nothing displayed."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     admin = _private_client()
     assert activation.get_log_view() == activation.DEFAULT_LOG_VIEW
@@ -1980,30 +1980,30 @@ def test_log_page_station_card_sizes(monkeypatch) -> None:
     assert activation.get_log_view() == {"photo": 150, "compass": 0}
     page = admin.get("/activation/log").text
     assert 'data-photo="150"' in page and 'data-compass="0"' in page
-    # Les deux à zéro : l'encart disparaît complètement.
+    # Both at zero: the panel disappears completely.
     admin.post("/activation/settings/log-view", data={"photo": "0", "compass": "0"})
     assert 'id="act-dir"' not in admin.get("/activation/log").text
-    # Valeur absurde : bornée.
+    # Absurd value: clamped.
     admin.post("/activation/settings/log-view", data={"photo": "9999", "compass": "abc"})
     view = activation.get_log_view()
     assert view["photo"] == activation.LOG_VIEW_MAX and view["compass"] == 120
 
 
 def test_bearing_points_the_right_way() -> None:
-    """Azimut : l'est à 90°, l'ouest à 270°, et rien sans locator."""
+    """Azimuth: east at 90°, west at 270°, and nothing without a locator."""
     assert round(activation.bearing_deg("JN18", "JN28")) in (89, 90, 91)
     assert round(activation.bearing_deg("JN18", "JN08")) in (269, 270, 271)
     assert activation.bearing_deg("JN18", "") is None and activation.bearing_deg("", "JN18") is None
 
 
 def test_run_periods_spot_the_pile_up() -> None:
-    """Les « meilleurs moments » : une rafale serrée est retenue, pas un QSO
-    toutes les dix minutes."""
+    """The « meilleurs moments » (best moments): a tight burst is picked, not one QSO
+    every ten minutes."""
     activation.set_flag("auto_slots", False)
-    for i in range(20):                       # rafale : un QSO par minute
+    for i in range(20):                       # burst: one QSO per minute
         activation.add_contact(call=f"DL{i}ABC", band="20M", mode="SSB", operator_call="F4IOZ",
                                qso_date="20260910", time_on=f"10{i:02d}" if i < 60 else "1059")
-    for i in range(4):                        # trafic calme : un toutes les 20 min
+    for i in range(4):                        # quiet traffic: one every 20 min
         activation.add_contact(call=f"ON{i}ZZ", band="20M", mode="SSB", operator_call="F4IOZ",
                                qso_date="20260910", time_on=f"{14 + i}00")
     runs = activation.run_periods()
@@ -2011,13 +2011,13 @@ def test_run_periods_spot_the_pile_up() -> None:
     best = runs["best"]
     assert best["qsos"] == 20 and best["rate"] > 50
     assert best["start"].startswith("2026-09-10T10:00") and best["end"].endswith("10:19")
-    assert runs["total"] == 20 and 80 < runs["share"] <= 84   # 20 QSO sur 24
+    assert runs["total"] == 20 and 80 < runs["share"] <= 84   # 20 QSOs out of 24
     assert activation.run_periods(top=0)["periods"] == []
 
 
 def test_hunter_certificate(monkeypatch, tmp_path) -> None:
-    """Certificat d'un chasseur : réservé à l'admin tant qu'il n'est pas ouvert,
-    public ensuite, et refusé pour un indicatif absent du log."""
+    """Hunter certificate: admin only until it is opened, public afterwards,
+    and refused for a callsign not in the log."""
     from app import certificate
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
@@ -2031,35 +2031,35 @@ def test_hunter_certificate(monkeypatch, tmp_path) -> None:
     admin = _private_client()
 
     assert activation.get_certificate_options()["enabled"] is False
-    assert public.get("/tm25test/certificat?call=ON4ZZ").status_code == 404   # pas encore ouvert
+    assert public.get("/tm25test/certificat?call=ON4ZZ").status_code == 404   # not opened yet
     data = certificate.hunter_data("ON4ZZ", "TM25TEST")
     assert data["recipient"] == {"callsign": "ON4ZZ", "name": "", "locator": "JO20"}
-    assert [q["band"] for q in data["qso"]] == ["20 m", "40 m"]   # présentation du kit
+    assert [q["band"] for q in data["qso"]] == ["20 m", "40 m"]   # kit presentation
     assert data["certificate"]["number"] == "TM25TEST-ON4ZZ"
     assert certificate.hunter_data("XX9ZZZ", "TM25TEST") is None
 
-    # L'admin peut produire le certificat avant de l'ouvrir au public.
+    # The admin can produce the certificate before opening it to the public.
     r = admin.get("/tm25test/certificat?call=ON4ZZ")
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
     assert r.content.startswith(b"%PDF-") and r.content.rstrip().endswith(b"%%EOF")
     assert "certificat-tm25test-on4zz.pdf" in r.headers["content-disposition"]
-    assert b"ON4ZZ" in r.content or len(r.content) > 20_000      # texte comprimé par reportlab
+    assert b"ON4ZZ" in r.content or len(r.content) > 20_000      # text compressed by reportlab
 
-    # Ouvert au public : bouton sur la page et téléchargement libre.
+    # Open to the public: button on the page and free download.
     assert admin.post("/activation/settings/certificate",
                       data={"enabled": "1", "ranking": "1"}).status_code == 303
     assert activation.certificates_on() is True
     assert public.get("/tm25test/certificat?call=ON4ZZ").status_code == 200
     page = TestClient(app).get("/tm25test?call=ON4ZZ").text
     assert "/tm25test/certificat?call=ON4ZZ" in page
-    # Indicatif sans QSO : retour à la page avec un message, pas d'erreur.
+    # Callsign with no QSO: back to the page with a message, no error.
     r = public.get("/tm25test/certificat?call=XX9ZZZ")
     assert r.status_code == 303 and "cert=absent" in r.headers["location"]
     assert "Pas de certificat" in TestClient(app).get("/tm25test?call=XX9ZZZ&cert=absent").text
 
 
 def test_certificate_flag_and_border(monkeypatch, tmp_path) -> None:
-    """Drapeau du pays (auto ou choisi) et liseré : deux options, bornées."""
+    """Country flag (auto or chosen) and border: two options, clamped."""
     from app import certificate
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
@@ -2072,34 +2072,34 @@ def test_certificate_flag_and_border(monkeypatch, tmp_path) -> None:
     data = certificate.hunter_data("ON4ZZ")
     assert data["flag"].endswith("/fr.png")          # TM25TEST → France
     assert data["border"] == ["#0055A4", "#FFFFFF", "#EF3340"]
-    # Sous le gros indicatif : le libellé de l'activation, en capitales.
+    # Under the big callsign: the activation's label, in capitals.
     assert data["activation"]["subtitle"] == activation.current_station()["label"].upper()
 
     admin.post("/activation/settings/certificate", data={"enabled": "1", "flag": "BE"})
     assert certificate.hunter_data("ON4ZZ")["flag"].endswith("/be.png")
-    assert "border" not in certificate.hunter_data("ON4ZZ")   # case décochée
-    # Entité inconnue ou couleur bricolée : on retombe sur des valeurs saines.
+    assert "border" not in certificate.hunter_data("ON4ZZ")   # unchecked box
+    # Unknown entity or tampered color: fall back to sane values.
     admin.post("/activation/settings/certificate",
                data={"enabled": "1", "flag": "ZZ9", "border": "1", "border1": "bleu"})
     options = activation.get_certificate_options()
     assert options["flag"] == "" and options["border_colors"][0] == "#0055A4"
     assert "flag" not in certificate.hunter_data("ON4ZZ")
-    # Le PDF sort avec tout ça.
+    # The PDF comes out with all of that.
     admin.post("/activation/settings/certificate",
                data={"enabled": "1", "flag": "auto", "border": "1"})
     assert certificate.build_certificate("ON4ZZ").startswith(b"%PDF-")
 
 
 def test_certificate_points_match_the_ranking(monkeypatch, tmp_path) -> None:
-    """Les points du certificat sont CEUX de l'application : même règle, mêmes
-    doublons à zéro, même total que le classement public."""
+    """The certificate points are THOSE of the application: same rule, same
+    zero-point duplicates, same total as the public ranking."""
     from app import certificate
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     activation.set_flag("auto_slots", False)
     _public("JN18FS")
     for call, band, mode, grid in (("ON4ZZ", "40M", "SSB", "JO20"),
-                                   ("ON4ZZ", "40M", "SSB", "JO20"),   # doublon : 0 point
+                                   ("ON4ZZ", "40M", "SSB", "JO20"),   # duplicate: 0 points
                                    ("ON4ZZ", "40M", "CW", "JO20"),
                                    ("DL1ABC", "20M", "CW", "JO31")):
         activation.add_contact(call=call, band=band, mode=mode, operator_call="F4IOZ",
@@ -2111,20 +2111,20 @@ def test_certificate_points_match_the_ranking(monkeypatch, tmp_path) -> None:
     for call in ("ON4ZZ", "DL1ABC"):
         qso = certificate.hunter_data(call)["qso"]
         assert sum(q["points"] for q in qso) == ranking[call]["points"], call
-    # Le doublon 40 m SSB ne rapporte rien, comme au classement.
+    # The 40 m SSB duplicate earns nothing, as in the ranking.
     points = [q["points"] for q in certificate.hunter_data("ON4ZZ")["qso"]]
     assert points.count(0) == 1 and sum(points) == ranking["ON4ZZ"]["points"]
 
-    # Sans règle de points, le certificat compte les couples bande × mode —
-    # le critère du classement dans ce cas.
-    activation.set_scoring({"per_qso": "3"})          # enabled absent = désactivé
+    # Without a points rule, the certificate counts band × mode pairs —
+    # the ranking criterion in that case.
+    activation.set_scoring({"per_qso": "3"})          # enabled missing = disabled
     assert activation.get_scoring()["enabled"] is False
     qso = certificate.hunter_data("ON4ZZ")["qso"]
     assert sum(q["points"] for q in qso) == ranking["ON4ZZ"]["band_modes"] == 2
 
 
 def test_certificate_page_options(monkeypatch, tmp_path) -> None:
-    """Nombre de contacts en page 1 et annexe : réglables dans les Réglages."""
+    """Number of contacts on page 1 and in the appendix: adjustable in the Settings."""
     import re
 
     from app import certificate
@@ -2135,32 +2135,32 @@ def test_certificate_page_options(monkeypatch, tmp_path) -> None:
     for i in range(14):
         activation.add_contact(call="ON4ZZ", band="20M", mode="SSB", operator_call="F4IOZ",
                                qso_date="20260910", time_on=f"10{i:02d}")
-    assert activation.get_certificate_options()["max_qso"] == 10      # défaut demandé
+    assert activation.get_certificate_options()["max_qso"] == 10      # requested default
     data = certificate.hunter_data("ON4ZZ")
     assert data["options"] == {"max_qso": 10, "appendix": True}
-    assert data["activation"]["title"] == "TM25TEST"                  # l'indicatif en gros
+    assert data["activation"]["title"] == "TM25TEST"                  # the callsign in large type
     assert data["activation"]["morse"] == "TM25TEST"
 
     pages = lambda pdf: len(re.findall(rb"/Type\s*/Page[^s]", pdf))   # noqa: E731
     with_annexe = certificate.build_certificate("ON4ZZ")
-    assert pages(with_annexe) == 2                                    # 14 QSO > 10
+    assert pages(with_annexe) == 2                                    # 14 QSOs > 10
 
     admin = _private_client()
     admin.post("/activation/settings/certificate",
-               data={"enabled": "1", "max_qso": "14"})                # annexe décochée
+               data={"enabled": "1", "max_qso": "14"})                # appendix unchecked
     assert activation.get_certificate_options() == {
         "enabled": True, "names": False, "ranking": False, "mention": "",
         "max_qso": 14, "appendix": False, "flag": "", "border": False,
         "border_colors": activation.DEFAULT_CERTIFICATE["border_colors"],
         "emblem": False, "emblem_text": "", "ham_symbol": False, "qr_url": ""}
-    assert pages(certificate.build_certificate("ON4ZZ")) == 1         # tout tient, pas d'annexe
-    # Valeur absurde : bornée.
+    assert pages(certificate.build_certificate("ON4ZZ")) == 1         # everything fits, no appendix
+    # Absurd value: clamped.
     admin.post("/activation/settings/certificate", data={"enabled": "1", "max_qso": "99"})
     assert activation.get_certificate_options()["max_qso"] == 14
 
 
 def test_certificate_appendix_reads_legacy_key() -> None:
-    """Réglages enregistrés avant la 1.40 : la clé s'appelait « annexe »."""
+    """Settings saved before 1.40: the key was called « annexe »."""
     data = activation.load_settings()
     data["certificate"] = {"enabled": True, "annexe": False}
     activation._save_settings(data)
@@ -2171,8 +2171,8 @@ def test_certificate_appendix_reads_legacy_key() -> None:
 
 
 def test_admin_can_try_a_certificate_from_settings(monkeypatch, tmp_path) -> None:
-    """Champ d'essai des Réglages : un indicatif, un PDF — et un message clair
-    (sans quitter les Réglages) quand l'indicatif n'a pas de QSO."""
+    """Settings test field: a callsign, a PDF — and a clear message
+    (without leaving the Settings) when the callsign has no QSO."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
@@ -2180,14 +2180,14 @@ def test_admin_can_try_a_certificate_from_settings(monkeypatch, tmp_path) -> Non
     admin = _private_client()
     page = admin.get("/activation/settings").text
     assert 'action="/tm25test/certificat"' in page and 'value="settings"' in page
-    assert 'value="ON4ZZ"' in page                 # pré-rempli avec le premier chasseur
+    assert 'value="ON4ZZ"' in page                 # prefilled with the first hunter
     r = admin.get("/tm25test/certificat?call=ON4ZZ&back=settings")
     assert r.status_code == 200 and r.content.startswith(b"%PDF-")
     r = admin.get("/tm25test/certificat?call=XX9ZZZ&back=settings")
     assert r.status_code == 303 and "ce=absent" in r.headers["location"]
     assert "cert_call=XX9ZZZ" in r.headers["location"]
     assert "aucun QSO" in admin.get("/activation/settings?ce=absent&cert_call=XX9ZZZ").text
-    # « back=settings » ne sert qu'à l'admin : un visiteur revient au board.
+    # « back=settings » is only for the admin: a visitor returns to the board.
     activation.set_certificate_options({"enabled": "1"})
     _public()
     r = TestClient(app, follow_redirects=False).get(
@@ -2196,7 +2196,7 @@ def test_admin_can_try_a_certificate_from_settings(monkeypatch, tmp_path) -> Non
 
 
 def test_certificate_name_is_opt_in(monkeypatch, tmp_path) -> None:
-    """Le nom du chasseur n'apparaît que si l'admin l'a demandé (vie privée)."""
+    """The hunter's name only appears if the admin asked for it (privacy)."""
     from app import certificate
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
@@ -2209,15 +2209,15 @@ def test_certificate_name_is_opt_in(monkeypatch, tmp_path) -> None:
 
 
 def test_certificate_emblem_and_ham_symbol(monkeypatch, tmp_path) -> None:
-    """Emblème sous le poste (banderole au nom du club, sinon « HAM RADIO »)
-    et symbole radioamateur : chacun en option dans les Réglages."""
+    """Emblem under the rig (banner with the club name, otherwise « HAM RADIO »)
+    and amateur radio symbol: each optional in the Settings."""
     from app import certificate
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
     data = certificate.hunter_data("DL1ABC")
-    assert data["emblem"] == {"text": "HAM RADIO"}            # par défaut
+    assert data["emblem"] == {"text": "HAM RADIO"}            # by default
     assert "ham_symbol" not in data
 
     admin = _private_client()
@@ -2228,27 +2228,27 @@ def test_certificate_emblem_and_ham_symbol(monkeypatch, tmp_path) -> None:
                      "emblem_text": "  Radio-club   de Villeneuve " + "x" * 60})
     opts = activation.get_certificate_options()
     assert opts["emblem"] and opts["ham_symbol"]
-    assert opts["emblem_text"].startswith("Radio-club de Villeneuve")    # espaces resserrés
+    assert opts["emblem_text"].startswith("Radio-club de Villeneuve")    # tightened spacing
     assert len(opts["emblem_text"]) == activation.CERTIFICATE_EMBLEM_MAX
     data = certificate.hunter_data("DL1ABC")
     assert data["emblem"]["text"] == opts["emblem_text"] and data["ham_symbol"] is True
     assert certificate.build_certificate("DL1ABC").startswith(b"%PDF-")
 
-    admin.post("/activation/settings/certificate", data={"enabled": "1"})   # tout décoché
+    admin.post("/activation/settings/certificate", data={"enabled": "1"})   # everything unchecked
     data = certificate.hunter_data("DL1ABC")
     assert "emblem" not in data and "ham_symbol" not in data
     assert certificate.build_certificate("DL1ABC").startswith(b"%PDF-")
 
 
 def test_certificate_qr_code_address_from_settings(monkeypatch, tmp_path) -> None:
-    """Adresse du QR code réglée dans les Réglages : imprimée si valide, sinon rien."""
+    """QR code address set in the Settings: printed if valid, otherwise nothing."""
     from app import certificate
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
-    assert "qr_url" not in certificate.hunter_data("DL1ABC")          # par défaut : pas de QR
+    assert "qr_url" not in certificate.hunter_data("DL1ABC")          # by default: no QR
 
     admin = _private_client()
     assert 'name="qr_url"' in admin.get("/activation/settings").text
@@ -2267,7 +2267,7 @@ def test_certificate_qr_code_address_from_settings(monkeypatch, tmp_path) -> Non
 
 
 def test_report_best_moments_section(monkeypatch, tmp_path) -> None:
-    """Section « Meilleurs moments » du PDF : réglable, retirée à 0."""
+    """PDF « Meilleurs moments » (best moments) section: adjustable, removed at 0."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
@@ -2282,11 +2282,11 @@ def test_report_best_moments_section(monkeypatch, tmp_path) -> None:
 
 
 def test_report_fits_one_page_on_demand(monkeypatch, tmp_path) -> None:
-    """Option « une seule page » : le rapport se resserre, puis coupe les listes."""
+    """« Single page » option: the report tightens up, then truncates the lists."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
-    # Un log copieux : beaucoup d'entités et de chasseurs, deux pages au large.
+    # A hefty log: many entities and hunters, two pages when loosely laid out.
     prefixes = ("F", "ON", "PA", "DL", "G", "EA", "I", "CT", "OE", "HB9", "SP", "OK", "OM",
                 "HA", "S5", "9A", "YU", "SV", "LZ", "YO", "OH", "SM", "LA", "OZ", "ES",
                 "LY", "YL", "UR", "RA", "K", "VE", "PY", "JA", "VK", "ZS")
@@ -2304,18 +2304,18 @@ def test_report_fits_one_page_on_demand(monkeypatch, tmp_path) -> None:
     assert activation.get_report_options()["one_page"] is True
     one = admin.get("/activation/report.pdf").content
     assert _pages(one) == 1
-    assert b"ENTIT" in one and b"MEILLEURS CHASSEURS" in one   # les sections restent
-    assert len(one) < len(large)                    # coupé, pas déplacé sur une 2e page
+    assert b"ENTIT" in one and b"MEILLEURS CHASSEURS" in one   # the sections remain
+    assert len(one) < len(large)                    # truncated, not moved to a 2nd page
 
 
 def test_logo_keeps_its_transparency_in_the_pdf(monkeypatch, tmp_path) -> None:
-    """Un logo détouré doit le rester sur le bandeau : le PDF porte un masque
-    (avant, l'alpha était aplati sur du blanc — rectangle blanc sur fond bleu)."""
+    """A logo with a transparent background must stay so on the banner: the PDF carries a
+    mask (previously alpha was flattened onto white — white rectangle on blue)."""
     from app import pdf as pdf_mod
 
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
-    # Petit PNG rond détouré : 8 pixels, deux opaques, deux transparents.
+    # Small round transparent PNG: 8 pixels, two opaque, two transparent.
     import zlib
     width = height = 2
     raw = b"".join(b"\x00" + bytes((255, 0, 0, 255, 0, 255, 0, 0)) for _ in range(height))
@@ -2329,19 +2329,19 @@ def test_logo_keeps_its_transparency_in_the_pdf(monkeypatch, tmp_path) -> None:
            + chunk(b"IEND", b""))
     w, h, rgb, alpha = pdf_mod.read_png(png)
     assert (w, h) == (2, 2) and alpha == bytes((255, 0, 255, 0))
-    assert rgb[:3] == bytes((255, 0, 0))          # la couleur n'est pas délavée
+    assert rgb[:3] == bytes((255, 0, 0))          # the color is not washed out
 
     activation.set_logo(png)
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
     body = _private_client().get("/activation/report.pdf").content
-    assert b"/SMask" in body                      # transparence conservée
+    assert b"/SMask" in body                      # transparency preserved
 
 
 def test_report_header_lines_never_overlap(monkeypatch, tmp_path) -> None:
-    """Bandeau du PDF : indicatif, libellé et dates empilés, à toute densité.
+    """PDF banner: callsign, label and dates stacked, at any density.
 
-    Vécu en prod : le rapport resserré sur une page gardait des positions
-    calculées pour le grand bandeau — les trois lignes se chevauchaient."""
+    Seen in production: the report squeezed onto one page kept positions
+    computed for the large banner — the three lines overlapped."""
     import re
 
     from app import report as report_mod
@@ -2360,7 +2360,7 @@ def test_report_header_lines_never_overlap(monkeypatch, tmp_path) -> None:
         lignes = []
         for size, y, text in re.findall(r"/F\d ([\d.]+) Tf [\d.]+ ([\d.]+) Td \((.*?)\) Tj",
                                         stream):
-            haut = height - float(y) - float(size)      # haut du texte, repère écran
+            haut = height - float(y) - float(size)      # top of the text, screen coordinates
             if haut < band and "Rapport" not in text and "tabli le" not in text:
                 lignes.append((haut, float(size), text))
         lignes.sort()
@@ -2368,11 +2368,11 @@ def test_report_header_lines_never_overlap(monkeypatch, tmp_path) -> None:
         for (haut, size, texte), (suivant, _s, _t) in zip(lignes, lignes[1:]):
             assert haut + size <= suivant + 0.5, \
                 f"densité {level} : « {texte} » déborde sur la ligne suivante"
-        assert lignes[-1][0] + lignes[-1][1] <= band - 4      # rien ne dépasse du bandeau
+        assert lignes[-1][0] + lignes[-1][1] <= band - 4      # nothing sticks out of the banner
 
 
 def test_report_footer_is_signed(monkeypatch, tmp_path) -> None:
-    """Pied de page : la signature du logiciel, sur chaque page."""
+    """Footer: the software signature, on every page."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
@@ -2382,14 +2382,14 @@ def test_report_footer_is_signed(monkeypatch, tmp_path) -> None:
 
 
 def test_report_details_satellite_qsos(monkeypatch, tmp_path) -> None:
-    """Section « Satellites » : présente dès qu'il y a des QSO satellite,
-    désactivable, et absente quand la station n'a rien fait par satellite."""
+    """« Satellites » section: present as soon as there are satellite QSOs,
+    can be disabled, and absent when the station did nothing via satellite."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("auto_slots", False)
     admin = _private_client()
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
-    assert b"SATELLITES" not in admin.get("/activation/report.pdf").content   # rien en sat
+    assert b"SATELLITES" not in admin.get("/activation/report.pdf").content   # nothing via sat
     for call, sat in (("ON4ZZ", "FO-29"), ("G0XYZ", "FO-29"), ("EA5QQ", "SO-50")):
         activation.add_contact(call=call, band="2M", mode="SSB", operator_call="F4IOZ",
                                sat_name=sat)
@@ -2398,14 +2398,14 @@ def test_report_details_satellite_qsos(monkeypatch, tmp_path) -> None:
     assert sats["total"] == 3 and sats["count"] == 2 and sats["share"] == 75.0
     body = admin.get("/activation/report.pdf").content
     assert b"SATELLITES" in body and b"(FO-29)" in body and b"(SO-50)" in body
-    # Décochée dans les Réglages : la section disparaît.
+    # Unchecked in the Settings: the section disappears.
     admin.post("/activation/settings/report", data={"dxcc_all": "1", "hunters": "10"})
     assert activation.get_report_options()["sats"] is False
     assert b"SATELLITES" not in admin.get("/activation/report.pdf").content
 
 
 def test_club_logo_upload_and_use(monkeypatch, tmp_path) -> None:
-    """Logo : déposé dans les Réglages, servi sur /logo, repris dans le PDF."""
+    """Logo: uploaded in the Settings, served at /logo, reused in the PDF."""
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     client = TestClient(app)
@@ -2418,39 +2418,39 @@ def test_club_logo_upload_and_use(monkeypatch, tmp_path) -> None:
     served = client.get("/logo")
     assert served.status_code == 200 and served.headers["content-type"] == "image/png"
     assert activation.logo_info()["kind"] == "png"
-    # Le logo est celui du module d'activation : il ne s'invite pas sur les
-    # pages du site qui l'héberge (accueil, articles…).
+    # The logo belongs to the activation module: it does not show up on the
+    # pages of the hosting site (home, articles…).
     assert "/logo?v=" not in client.get("/").text
-    # Grand bandeau de l'indicatif : le logo y est dimensionné sur la hauteur.
+    # Large callsign banner: the logo is sized to its height.
     _public()
     assert "act-hero-logo" in client.get("/tm25test").text
-    # Option d'affichage : le PDF garde le logo, les pages ne le montrent plus.
+    # Display option: the PDF keeps the logo, the pages no longer show it.
     assert admin.post("/activation/settings/logo/show", data={}).status_code == 303
     assert activation.logo_on_pages() is False
     assert "act-hero-logo" not in client.get("/tm25test").text
-    assert b"/Subtype /Image" in admin.get("/activation/report.pdf").content  # le PDF le garde
+    assert b"/Subtype /Image" in admin.get("/activation/report.pdf").content  # the PDF keeps it
     admin.post("/activation/settings/logo/show", data={"show": "1"})
     assert "act-hero-logo" in client.get("/tm25test").text
     assert b"/Subtype /Image" in admin.get("/activation/report.pdf").content
-    # Fichier qui n'est pas une image : refusé avec un message.
+    # File that is not an image: refused with a message.
     bad = admin.post("/activation/settings/logo",
                      files={"logo": ("notes.txt", b"bonjour", "text/plain")})
     assert "lg=format" in bad.headers["location"] or "PNG" in bad.headers["location"]
-    assert activation.logo_info() is not None            # l'ancien logo est gardé
+    assert activation.logo_info() is not None            # the old logo is kept
     assert admin.post("/activation/settings/logo/delete").status_code == 303
     assert activation.logo_info() is None and client.get("/logo").status_code == 404
 
 
 def test_activity_report_survives_an_empty_log(monkeypatch) -> None:
-    """Rapport demandé avant le premier QSO : une page valide, pas une erreur."""
+    """Report requested before the first QSO: a valid page, not an error."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     body = _private_client().get("/activation/report.pdf").content
     assert body.startswith(b"%PDF-1.") and b"(0)" in body
 
 
 def test_planning_highlights_the_booking_form(monkeypatch) -> None:
-    """La carte « Réserver un créneau » est encadrée : c'est le geste principal
-    de la page, il ne doit pas se confondre avec « Ajouter un opérateur »."""
+    """The « Réserver un créneau » (book a slot) card is framed: it is the main action
+    of the page, it must not be confused with « Ajouter un opérateur »."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     page = _private_client().get("/activation/planning").text
     assert 'class="act-card act-card-focus"' in page
@@ -2458,8 +2458,8 @@ def test_planning_highlights_the_booking_form(monkeypatch) -> None:
 
 
 def test_password_requirements_are_adjustable(monkeypatch) -> None:
-    """Réglages → Comptes opérateurs : longueur, majuscules, chiffres et
-    caractères spéciaux exigés (0 = pas d'exigence)."""
+    """Settings → Operator accounts: length, uppercase, digits and
+    special characters required (0 = no requirement)."""
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.set_flag("per_operator_auth", True)
     assert activation.get_password_rule() == activation.DEFAULT_PASSWORD_RULE
@@ -2471,19 +2471,19 @@ def test_password_requirements_are_adjustable(monkeypatch) -> None:
     assert activation.get_password_rule() == {"min_length": 12, "min_upper": 2,
                                               "min_digits": 0, "min_special": 3}
     assert activation.password_rule() == "Au moins 12 caractères, dont 2 majuscules, 3 caractères spéciaux."
-    assert not activation.password_is_strong("Abcdef1!")          # trop court, une seule majuscule
-    assert not activation.password_is_strong("ABcdefgh!$")        # deux spéciaux sur trois
-    assert activation.password_is_strong("ABcdefghi!$%")          # 12 car., 2 maj., 3 spéciaux
-    # Le refus de connexion reprend la règle réglée.
+    assert not activation.password_is_strong("Abcdef1!")          # too short, a single uppercase
+    assert not activation.password_is_strong("ABcdefgh!$")        # two specials out of three
+    assert activation.password_is_strong("ABcdefghi!$%")          # 12 chars, 2 upper, 3 specials
+    # The login refusal restates the configured rule.
     assert "2 majuscules" in _login(_op_client(), "F5NEW", "Abcdef1!").text
     assert _login(_op_client(), "F5NEW", "ABcdefghi!$%").status_code == 303
-    # Aucune exigence de caractères : seule la longueur compte.
+    # No character requirement: only the length matters.
     admin.post("/activation/settings/auth",
                data={"per_operator": "1", "min_length": "6", "min_upper": "0",
                      "min_digits": "0", "min_special": "0"})
     assert activation.password_rule() == "Au moins 6 caractères."
     assert activation.password_is_strong("abcdef") and not activation.password_is_strong("abcde")
-    # Valeurs bricolées : on retombe sur le défaut plutôt que d'ouvrir la porte.
+    # Tampered values: fall back to the default rather than opening the door.
     admin.post("/activation/settings/auth",
                data={"per_operator": "1", "min_length": "1", "min_upper": "99",
                      "min_digits": "n'importe quoi", "min_special": "-3"})
@@ -2501,26 +2501,26 @@ def test_robot_signups_are_blocked() -> None:
     def post(**extra):
         return _op_client().post("/activation/login", data={**base, **extra})
 
-    # Sans question résolue, mauvaise réponse, jeton bricolé : rien n'est créé.
+    # No solved question, wrong answer, tampered token: nothing is created.
     for extra in ({}, _captcha_fields(answer_shift=1), {"captcha": "7", "captcha_token": "1.2"},
                   {"captcha": "7", "captcha_token": f"{int(time.time())}.deadbeef"}):
         r = post(**extra)
         assert r.status_code == 401 and "question" in r.text.lower()
         assert activation.get_operator("F5BOT") is None
-    # Formulaire renvoyé instantanément (robot) : refusé malgré la bonne réponse.
+    # Form sent back instantly (bot): refused despite the right answer.
     assert post(**_captcha_fields(age=0)).status_code == 401
-    # Jeton périmé : refusé.
+    # Expired token: refused.
     assert post(**_captcha_fields(age=activation.CAPTCHA_TTL + 60)).status_code == 401
-    # Champ-piège rempli : refusé, même avec la bonne réponse.
+    # Honeypot field filled in: refused, even with the right answer.
     assert post(**_captcha_fields(), website="https://spam.example").status_code == 401
     assert activation.get_operator("F5BOT") is None
-    # Réponse correcte, formulaire rempli normalement : compte créé.
+    # Correct answer, form filled in normally: account created.
     assert post(**_captcha_fields()).status_code == 303
     assert activation.get_operator("F5BOT")["password_hash"]
 
 
 def test_captcha_only_in_per_operator_mode() -> None:
-    """Mot de passe commun : pas de question (le compte n'est pas créé ici)."""
+    """Shared password: no question (the account is not created here)."""
     activation.set_operator_password("commun")
     page = _op_client().get("/activation/login").text
     assert "Question anti-robot" not in page and 'name="captcha_token"' not in page
@@ -2529,7 +2529,7 @@ def test_captcha_only_in_per_operator_mode() -> None:
     assert r.status_code == 303 and client.get("/activation").status_code == 200
 
 
-# ── « Station déjà contactée ? » pendant la saisie du log ──────────────────
+# ── « Station déjà contactée ? » (already worked?) while logging ───────────
 
 
 def test_worked_before_reports_history_of_a_station() -> None:
@@ -2544,7 +2544,7 @@ def test_worked_before_reports_history_of_a_station() -> None:
     w = activation.worked_before("dl1abc")
     assert w["worked"] == 3 and w["last"] == "08/09/26 09:20"
     assert sorted(w["band_modes"]) == ["20M SSB", "40M CW"] and w["elsewhere"] == []
-    # QSO sous un AUTRE indicatif du club : signalé à part (ce n'est pas un doublon).
+    # QSO under ANOTHER club callsign: flagged separately (it is not a duplicate).
     activation.create_station("TM61TEST")
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ",
                            qso_date="20260909", time_on="1000", station="TM61TEST")
@@ -2570,11 +2570,11 @@ def test_log_page_carries_the_worked_hint(monkeypatch) -> None:
         assert text in page, text
 
 
-# ── Créneaux déduits du log ────────────────────────────────────────────────
+# ── Slots inferred from the log ────────────────────────────────────────────
 
 
 def _qso_at(call: str, when: str, op: str = "F4IOZ", band: str = "20M", mode: str = "SSB") -> None:
-    """QSO à une heure UTC donnée (« AAAAMMJJ HHMM »)."""
+    """QSO at a given UTC time (« AAAAMMJJ HHMM »)."""
     date, time_on = when.split()
     activation.add_contact(call=call, band=band, mode=mode, operator_call=op,
                            qso_date=date, time_on=time_on)
@@ -2587,7 +2587,7 @@ def test_forgotten_slot_is_created_from_the_log() -> None:
     slots = activation.list_slots()
     assert len(slots) == 1
     slot = slots[0]
-    # Calé sur le quart d'heure, opérateur, bande et mode repris du log.
+    # Aligned on the quarter hour, operator, band and mode taken from the log.
     assert (slot["start_utc"], slot["end_utc"]) == ("2026-09-07T10:00", "2026-09-07T10:30")
     assert slot["operator_call"] == "F4IOZ" and slot["band"] == "20M" and slot["mode"] == "SSB"
     assert slot["source"] == "log"
@@ -2596,11 +2596,11 @@ def test_forgotten_slot_is_created_from_the_log() -> None:
 def test_slot_is_extended_when_the_operator_runs_over() -> None:
     sid = activation.add_slot("F4IOZ", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")
     _qso_at("DL1ABC", "20260907 1130")
-    _qso_at("DL2ABC", "20260907 1242")            # bien après la fin prévue
+    _qso_at("DL2ABC", "20260907 1242")            # well after the planned end
     slot = activation.get_slot(sid)
     assert slot["end_utc"] == "2026-09-07T12:45" and slot["start_utc"] == "2026-09-07T10:00"
     assert slot["source"] == "manual" and len(activation.list_slots()) == 1
-    # Un QSO avant l'heure prévue étire le début, sans jamais raccourcir.
+    # A QSO before the planned time extends the start, never shortens it.
     _qso_at("DL3ABC", "20260907 0940")
     slot = activation.get_slot(sid)
     assert slot["start_utc"] == "2026-09-07T09:30" and slot["end_utc"] == "2026-09-07T12:45"
@@ -2608,10 +2608,10 @@ def test_slot_is_extended_when_the_operator_runs_over() -> None:
 
 def test_separate_sessions_make_separate_slots() -> None:
     _qso_at("DL1ABC", "20260907 1000")
-    _qso_at("DL2ABC", "20260907 1020")            # même séance (< 30 min)
-    _qso_at("DL3ABC", "20260907 1400")            # séance du soir
-    _qso_at("DL4ABC", "20260907 1015", band="40M", mode="CW")   # autre bande/mode
-    _qso_at("DL5ABC", "20260907 1010", op="F5RRO")              # autre opérateur
+    _qso_at("DL2ABC", "20260907 1020")            # same session (< 30 min)
+    _qso_at("DL3ABC", "20260907 1400")            # evening session
+    _qso_at("DL4ABC", "20260907 1015", band="40M", mode="CW")   # different band/mode
+    _qso_at("DL5ABC", "20260907 1010", op="F5RRO")              # different operator
     slots = sorted(activation.list_slots(), key=lambda s: (s["operator_call"], s["band"], s["start_utc"]))
     assert len(slots) == 4
     assert [(s["operator_call"], s["band"], s["mode"], s["start_utc"]) for s in slots] == [
@@ -2629,7 +2629,7 @@ def test_auto_slots_can_be_switched_off(monkeypatch) -> None:
     assert activation.reconcile_slots_from_log() == {"created": 0, "extended": 0}
     activation.set_flag("auto_slots", True)
     assert activation.reconcile_slots_from_log() == {"created": 1, "extended": 0}
-    # Le réglage est bien piloté depuis les Réglages (admin).
+    # The setting is indeed driven from the Settings (admin).
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     admin = _private_client()
     admin.post("/activation/settings/flags", data={"show_contacts": "1"})
@@ -2650,10 +2650,10 @@ def test_log_page_shows_the_current_slots(monkeypatch) -> None:
     admin.post("/activation/whoami", data={"operator": "F5RRO", "next": "/activation/log"})
     page = admin.get("/activation/log").text
     assert "Créneaux du moment" in page and "F5RRO" in page and "F4IOZ" in page
-    assert "is-me" in page                      # l'opérateur connecté est mis en avant
+    assert "is-me" in page                      # the logged-in operator is highlighted
 
 
-# ── Bande/mode réservés par un autre opérateur ─────────────────────────────
+# ── Band/mode booked by another operator ───────────────────────────────────
 
 
 def _now_slot(op: str, band: str, mode: str, start_min: int = -30, end_min: int = 60) -> int:
@@ -2666,10 +2666,10 @@ def _now_slot(op: str, band: str, mode: str, start_min: int = -30, end_min: int 
 def test_blocking_slot_only_for_another_operator() -> None:
     _now_slot("F5RRO", "20M", "SSB")
     assert activation.blocking_slot("F4IOZ", "20M", "SSB")["operator_call"] == "F5RRO"
-    assert activation.blocking_slot("F5RRO", "20M", "SSB") is None      # son propre créneau
-    assert activation.blocking_slot("F4IOZ", "40M", "SSB") is None      # autre bande
-    assert activation.blocking_slot("F4IOZ", "20M", "CW") is None       # autre mode
-    # Hors de la tranche horaire, plus rien ne bloque.
+    assert activation.blocking_slot("F5RRO", "20M", "SSB") is None      # their own slot
+    assert activation.blocking_slot("F4IOZ", "40M", "SSB") is None      # different band
+    assert activation.blocking_slot("F4IOZ", "20M", "CW") is None       # different mode
+    # Outside the time range, nothing blocks anymore.
     later = (datetime.now(timezone.utc) + timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M")
     assert activation.blocking_slot("F4IOZ", "20M", "SSB", later) is None
 
@@ -2681,12 +2681,12 @@ def test_logging_is_refused_on_a_reserved_band_and_mode(monkeypatch) -> None:
     r = admin.post("/activation/contacts",
                    data={"call": "DL1ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
     assert r.status_code == 200 and "réservé par F5RRO" in r.text
-    assert activation.list_contacts() == []                  # rien n'est écrit
-    # Sur une autre bande, le QSO passe.
+    assert activation.list_contacts() == []                  # nothing is written
+    # On another band, the QSO goes through.
     r = admin.post("/activation/contacts",
                    data={"call": "DL1ABC", "band": "40M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
     assert "réservé par" not in r.text and len(activation.list_contacts()) == 1
-    # L'opérateur qui a réservé loggue normalement sur son créneau.
+    # The operator who booked logs normally on their slot.
     r = admin.post("/activation/contacts",
                    data={"call": "DL2ABC", "band": "20M", "mode": "SSB", "operator": "F5RRO", "now": "1"})
     assert "réservé par" not in r.text and len(activation.list_contacts()) == 2
@@ -2711,7 +2711,7 @@ def test_slot_conflict_route_needs_the_operator_area() -> None:
         "/activation/slot-conflict?band=20M&mode=SSB").status_code == 303
 
 
-# ── Spots DX et drapeaux des pays contactés ────────────────────────────────
+# ── DX spots and flags of worked countries ─────────────────────────────────
 
 
 def test_entity_for_call_reads_the_prefix() -> None:
@@ -2719,17 +2719,17 @@ def test_entity_for_call_reads_the_prefix() -> None:
 
     assert dxcc_flags.entity_for_call("F4IOZ") == ("FR", "France")
     assert dxcc_flags.entity_for_call("TM25TEST")[1] == "France"
-    assert dxcc_flags.entity_for_call("EA8XX")[1] == "Canary Islands"   # préfixe long d'abord
+    assert dxcc_flags.entity_for_call("EA8XX")[1] == "Canary Islands"   # long prefix first
     assert dxcc_flags.entity_for_call("GM4ABC") == ("GB-SCT", "Scotland")
-    assert dxcc_flags.entity_for_call("F4IOZ/P")[0] == "FR"             # suffixe portable ignoré
-    assert dxcc_flags.entity_for_call("F/DL1ABC")[1] == "France"        # préfixe portable = pays d'émission
-    assert dxcc_flags.entity_for_call("XYZZY") == ("", "")              # inconnu : pas de drapeau
+    assert dxcc_flags.entity_for_call("F4IOZ/P")[0] == "FR"             # portable suffix ignored
+    assert dxcc_flags.entity_for_call("F/DL1ABC")[1] == "France"        # portable prefix = country
+    assert dxcc_flags.entity_for_call("XYZZY") == ("", "")              # unknown: no flag
     assert dxcc_flags.flag("FR") == "🇫🇷" and dxcc_flags.flag("GB-SCT") == ""
 
 
 def test_overseas_and_island_entities_are_not_merged() -> None:
-    """La Corse, les Canaries, la Sicile… sont des entités DXCC à part entière,
-    au même titre que la Guadeloupe ou la Guyane : jamais fondues dans le pays."""
+    """Corsica, the Canaries, Sicily… are DXCC entities in their own right,
+    just like Guadeloupe or French Guiana: never merged into the country."""
     from app import dxcc_flags
 
     for call, code, name in (("TK5MH", "FR-COR", "Corsica"), ("FG8OJ", "GP", "Guadeloupe"),
@@ -2741,12 +2741,12 @@ def test_overseas_and_island_entities_are_not_merged() -> None:
         assert dxcc_flags.entity_for_call(call) == (code, name), call
     metropoles = {dxcc_flags.entity_for_call(c)[0] for c in ("F4IOZ", "EA1AA", "I1AAA", "CT1AA",
                                                              "W1AW", "UA3XX")}
-    assert metropoles == {"FR", "ES", "IT", "PT", "US", "RU"}   # aucune confusion avec les îles
+    assert metropoles == {"FR", "ES", "IT", "PT", "US", "RU"}   # no confusion with the islands
 
 
 def test_every_dxcc_entity_has_its_own_name() -> None:
-    """Deux entités ne doivent jamais partager un code (elles seraient comptées
-    comme un seul pays dans le tableau DXCC)."""
+    """Two entities must never share a code (they would be counted
+    as a single country in the DXCC table)."""
     from collections import defaultdict
 
     from app import dxcc_flags
@@ -2759,8 +2759,8 @@ def test_every_dxcc_entity_has_its_own_name() -> None:
 
 
 def test_every_dxcc_code_has_a_flag_image() -> None:
-    """Les vignettes sont servies par l'application (Windows n'affiche pas les
-    emojis drapeaux) : chaque préfixe doit avoir son image dans static/vendor."""
+    """Thumbnails are served by the application (Windows does not display
+    flag emojis): each prefix must have its image in static/vendor."""
     from pathlib import Path
 
     from app import dxcc_flags
@@ -2779,9 +2779,9 @@ def test_worked_entities_lists_countries_most_recent_first() -> None:
         activation.add_contact(call=call, band="20M", mode="SSB", operator_call="F4IOZ",
                                qso_date=date, time_on=t)
     ents = activation.worked_entities()
-    assert [e["code"] for e in ents] == ["CA", "DE"]     # XYZZY9 : entité inconnue, ignorée
+    assert [e["code"] for e in ents] == ["CA", "DE"]     # XYZZY9: unknown entity, ignored
     assert ents[0]["name"] == "Canada" and ents[0]["n"] == 1
-    assert ents[1]["n"] == 2 and ents[1]["calls"] == 2   # deux indicatifs allemands
+    assert ents[1]["n"] == 2 and ents[1]["calls"] == 2   # two German callsigns
     assert activation.worked_entities(limit=1) == [ents[0]]
 
 
@@ -2789,15 +2789,15 @@ def test_log_page_shows_the_worked_country_flags(monkeypatch) -> None:
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     admin = _private_client()
     page = admin.get("/activation/log").text
-    assert "Pays contactés" not in page                  # aucun QSO : pas d'encart
+    assert "Pays contactés" not in page                  # no QSO: no panel
     r = admin.post("/activation/contacts",
                    data={"call": "DL1ABC", "band": "20M", "mode": "SSB", "operator": "F4IOZ", "now": "1"})
     assert "Pays contactés" in r.text and "Germany" in r.text
-    assert "/static/vendor/flags/de.png" in r.text       # vignette locale, pas un emoji
+    assert "/static/vendor/flags/de.png" in r.text       # local thumbnail, not an emoji
 
 
 def test_spots_panel_survives_a_network_outage(monkeypatch) -> None:
-    """Sans Internet, le panneau est simplement vide : la page de log reste utilisable."""
+    """Without Internet, the panel is simply empty: the log page stays usable."""
     from app import dx_spots as spots
 
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
@@ -2826,10 +2826,10 @@ def test_spots_panel_lists_the_spots(monkeypatch) -> None:
     client = _private_client()
     page = client.get("/activation/spots").text
     assert "14190.0" in page and "K4NYX" in page and "20M" in page and "il y a 3 min" in page
-    assert "actUseSpot('14.190', '20M')" in page      # clic → fréquence reprise dans le formulaire
-    assert "act-card" not in page                     # panneau intégré à la carte de l'opérateur
-    assert "loud in FL" not in page                   # le commentaire n'est plus affiché
-    # Le panneau ne montre que la bande et le type de trafic en cours.
+    assert "actUseSpot('14.190', '20M')" in page      # click → frequency copied into the form
+    assert "act-card" not in page                     # panel built into the operator's card
+    assert "loud in FL" not in page                   # the comment is no longer displayed
+    # The panel only shows the current band and traffic type.
     assert "14190.0" in client.get("/activation/spots?band=20M").text
     assert client.get("/activation/spots?band=40M").text.strip() == ""
     assert "14190.0" in client.get("/activation/spots?band=20M&mode=SSB").text
@@ -2838,8 +2838,8 @@ def test_spots_panel_lists_the_spots(monkeypatch) -> None:
 
 
 def test_spot_of_unknown_mode_is_kept(monkeypatch) -> None:
-    """Mieux vaut montrer un spot au mode indéterminé que laisser croire que
-    personne ne nous entend."""
+    """Better to show a spot with an undetermined mode than to suggest that
+    nobody hears us."""
     from app import dx_spots as spots
 
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
@@ -2852,14 +2852,14 @@ def test_spot_of_unknown_mode_is_kept(monkeypatch) -> None:
 def test_spot_mode_from_the_comment_then_the_band_plan() -> None:
     from app import dx_spots
 
-    assert dx_spots.mode_family(7005) == "CW"           # bas de bande
-    assert dx_spots.mode_family(7044) == "DIGI"         # segment numérique
+    assert dx_spots.mode_family(7005) == "CW"           # bottom of the band
+    assert dx_spots.mode_family(7044) == "DIGI"         # digital segment
     assert dx_spots.mode_family(7188) == "PHONE"
-    assert dx_spots.mode_family(7188, "FT8 -06db") == "DIGI"    # le commentaire prime
+    assert dx_spots.mode_family(7188, "FT8 -06db") == "DIGI"    # the comment takes precedence
     assert dx_spots.mode_family(14250, "SES special call") == "PHONE"
     assert dx_spots.mode_family(50313) == "DIGI" and dx_spots.mode_family(144174) == "DIGI"
     assert dx_spots.mode_family(3600) == "PHONE" and dx_spots.mode_family(7040) == "DIGI"
-    assert dx_spots.mode_family(12345) == ""            # hors bande amateur
+    assert dx_spots.mode_family(12345) == ""            # outside amateur bands
     familles = {m: dx_spots.family_of_mode(m) for m in activation.MODES}
     assert familles == {"SSB": "PHONE", "FM": "PHONE", "AM": "PHONE", "CW": "CW",
                         "FT8": "DIGI", "FT4": "DIGI", "RTTY": "DIGI", "PSK31": "DIGI",
@@ -2895,13 +2895,13 @@ def test_spots_are_cached_between_calls(monkeypatch) -> None:
     monkeypatch.setattr(spots, "_from_dxwatch", fake)
     spots.recent_spots("TM25TEST")
     spots.recent_spots("TM25TEST")
-    assert calls == ["TM25TEST"]                 # deuxième appel servi par le cache
+    assert calls == ["TM25TEST"]                 # second call served from the cache
     spots.recent_spots("TM25TEST", force=True)
     assert calls == ["TM25TEST", "TM25TEST"]
     spots.clear_cache()
 
 
-# ── Jauges de cadence ──────────────────────────────────────────────────────
+# ── Rate gauges ────────────────────────────────────────────────────────────
 
 
 def _qso_minutes_ago(call: str, minutes: int, operator: str = "F4IOZ") -> None:
@@ -2911,19 +2911,19 @@ def _qso_minutes_ago(call: str, minutes: int, operator: str = "F4IOZ") -> None:
 
 
 def test_qso_rate_counts_both_windows() -> None:
-    activation.set_flag("auto_slots", False)     # pas de créneaux déduits ici
+    activation.set_flag("auto_slots", False)     # no inferred slots here
     for i, minutes in enumerate((2, 5, 9, 20, 40)):
         _qso_minutes_ago(f"DL{i}ABC", minutes)
     rate = activation.qso_rate()
     assert rate["hour"]["qsos"] == 5 and rate["hour"]["per_hour"] == 5.0
     assert rate["ten"]["qsos"] == 3 and rate["ten"]["per_hour"] == 18.0
-    assert rate["ten"]["gauge"] == 30                    # 18 QSO/h sur une pleine échelle de 60
+    assert rate["ten"]["gauge"] == 30                    # 18 QSO/h on a full scale of 60
     assert rate["hour"]["level"] == "station calme"    # 5 QSO/h
-    assert rate["ten"]["level"] == "bon rythme"        # 18 QSO/h projetés
+    assert rate["ten"]["level"] == "bon rythme"        # 18 QSO/h projected
 
 
 def test_qso_rate_counts_the_qso_just_logged() -> None:
-    """Le QSO enregistré à la minute même doit faire bouger la jauge aussitôt."""
+    """A QSO logged in the current minute must move the gauge right away."""
     activation.set_flag("auto_slots", False)
     assert activation.qso_rate()["ten"]["qsos"] == 0
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
@@ -2932,7 +2932,7 @@ def test_qso_rate_counts_the_qso_just_logged() -> None:
 
 def test_qso_rate_trend_compares_with_the_previous_period() -> None:
     activation.set_flag("auto_slots", False)
-    for i, minutes in enumerate((3, 6, 75, 80, 90)):     # 2 dans l'heure, 3 avant
+    for i, minutes in enumerate((3, 6, 75, 80, 90)):     # 2 within the hour, 3 before
         _qso_minutes_ago(f"DL{i}ABC", minutes)
     rate = activation.qso_rate()
     assert rate["hour"]["previous"] == 3 and rate["hour"]["delta"] == -1
@@ -2944,7 +2944,7 @@ def test_qso_rate_can_be_limited_to_one_operator() -> None:
     activation.set_flag("auto_slots", False)
     _qso_minutes_ago("DL1ABC", 5, operator="F4IOZ")
     _qso_minutes_ago("DL2ABC", 5, operator="F5RRO")
-    assert activation.qso_rate()["ten"]["qsos"] == 2            # toute la station
+    assert activation.qso_rate()["ten"]["qsos"] == 2            # the whole station
     mine = activation.qso_rate("F4IOZ")
     assert mine["ten"]["qsos"] == 1 and mine["operator"] == "F4IOZ"
 
@@ -2964,7 +2964,7 @@ def test_rate_panel_needs_the_operator_area() -> None:
     assert TestClient(app, follow_redirects=False).get("/activation/rate").status_code == 303
 
 
-# ── Spots : la station entendue, pas le spotteur ───────────────────────────
+# ── Spots: the station heard, not the spotter ──────────────────────────────
 
 
 class _FakeResponse:
@@ -2979,15 +2979,15 @@ class _FakeResponse:
 
 
 def test_dxwatch_asks_for_the_spotted_station(monkeypatch) -> None:
-    """Le filtre est cdx (le DX) : cde donnerait les spots ENVOYÉS par l'indicatif,
-    ce qu'une station spéciale ne fait jamais — le panneau restait vide."""
+    """The filter is cdx (the DX): cde would give the spots SENT by the callsign,
+    which a special station never does — the panel stayed empty."""
     from app import dx_spots
 
     seen = {}
 
     def fake_get(url, params=None, **_kw):
         seen.update(params or {})
-        # [spotteur, fréquence, DX, commentaire, horodatage, âge en secondes, …]
+        # [spotter, frequency, DX, comment, timestamp, age in seconds, …]
         return _FakeResponse({"s": {
             "1": ["ON4ZD", 7188, "TM25TEST", "SES last hours", "1705z 20 Sep", 300, 12, 0],
             "2": ["TM25TEST", 14074, "DL1ABC", "spot envoyé par nous", "1706z 20 Sep", 240, 22, 0],
@@ -2997,7 +2997,7 @@ def test_dxwatch_asks_for_the_spotted_station(monkeypatch) -> None:
     dx_spots.clear_cache()
     spots = dx_spots.recent_spots("TM25TEST", force=True)
     assert seen.get("cdx") == "TM25TEST" and "cde" not in seen
-    assert len(spots) == 1                      # le spot que NOUS avons envoyé ne compte pas
+    assert len(spots) == 1                      # the spot WE sent does not count
     spot = spots[0]
     assert spot["dx"] == "TM25TEST" and spot["spotter"] == "ON4ZD"
     assert spot["freq_khz"] == 7188 and spot["band"] == "40M"
@@ -3015,7 +3015,7 @@ def test_old_spots_are_dropped(monkeypatch) -> None:
 
     monkeypatch.setattr(dx_spots.httpx, "get", fake_get)
     dx_spots.clear_cache()
-    assert dx_spots.recent_spots("TM25TEST", force=True) == []   # « suis-je spotté ? » = maintenant
+    assert dx_spots.recent_spots("TM25TEST", force=True) == []   # « am I spotted? » = now
     dx_spots.clear_cache()
 
 
@@ -3041,11 +3041,11 @@ def test_hamqth_fallback_reads_its_own_format(monkeypatch) -> None:
     dx_spots.clear_cache()
 
 
-# ── Périmètre d'un opérateur non administrateur ────────────────────────────
+# ── Scope of a non-administrator operator ──────────────────────────────────
 
 
 def _member_client(call: str = "F5ABC") -> TestClient:
-    """Session d'un opérateur ordinaire (mot de passe individuel, pas admin)."""
+    """Session of a regular operator (individual password, not admin)."""
     activation.set_flag("per_operator_auth", True)
     activation.set_flag("auto_slots", False)
     client = _op_client()
@@ -3057,7 +3057,7 @@ def test_member_logs_under_their_own_callsign_only() -> None:
     client = _member_client()
     r = client.post("/activation/contacts",
                     data={"call": "DL1ABC", "band": "20M", "mode": "SSB",
-                          "operator": "F5RRO", "now": "1"})      # tentative au nom d'un autre
+                          "operator": "F5RRO", "now": "1"})      # attempt on someone else's behalf
     assert r.status_code == 200
     assert [q["operator_call"] for q in activation.list_contacts()] == ["F5ABC"]
 
@@ -3067,7 +3067,7 @@ def test_member_cannot_switch_to_another_operator() -> None:
     client.post("/activation/whoami", data={"operator": "F5RRO", "next": "/activation/log"})
     page = client.get("/activation/log").text
     assert "F5ABC" in page and "F5RRO" not in page
-    assert '<select name="operator"' not in page        # plus de choix : l'indicatif est imposé
+    assert '<select name="operator"' not in page        # no choice anymore: the callsign is imposed
 
 
 def test_member_cannot_touch_another_operators_qso() -> None:
@@ -3081,7 +3081,7 @@ def test_member_cannot_touch_another_operators_qso() -> None:
     r = client.post(f"/activation/contacts/{other}",
                     data={"call": "DL9ZZZ", "band": "20M", "mode": "SSB", "operator": "F5ABC"})
     assert r.status_code == 303 and activation.list_contacts()[0]["call"] == "DL1ABC"
-    # Son propre QSO, en revanche, lui appartient.
+    # Their own QSO, on the other hand, belongs to them.
     client.post("/activation/contacts",
                 data={"call": "ON4ZZ", "band": "20M", "mode": "SSB", "now": "1"})
     mine = [q for q in activation.list_contacts() if q["operator_call"] == "F5ABC"][0]["id"]
@@ -3101,7 +3101,7 @@ def test_member_exports_only_their_own_qso() -> None:
     assert "ON4ZZ" in csv_body and "DL1ABC" not in csv_body
     page = client.get("/activation/adif").text
     assert "ON4ZZ" in page and "DL1ABC" not in page
-    # Même en cochant l'id du QSO d'un autre dans l'export d'une sélection.
+    # Even when ticking the id of someone else's QSO in a selection export.
     other = [q for q in activation.list_contacts() if q["operator_call"] == "F5RRO"][0]["id"]
     r = client.post("/activation/export-selection.adi", data={"ids": [other]})
     assert r.status_code == 303 and "err=empty" in r.headers["location"]
@@ -3117,8 +3117,8 @@ def test_member_books_slots_under_their_own_callsign_only() -> None:
                 data={"operator": "F5RRO", "start": (now + timedelta(hours=5)).strftime(fmt),
                       "end": (now + timedelta(hours=6)).strftime(fmt), "band": "40M", "mode": "CW"})
     nouveau = [s for s in activation.list_slots() if s["band"] == "40M"]
-    assert nouveau and nouveau[0]["operator_call"] == "F5ABC"    # réservé pour lui, pas pour F5RRO
-    # Le créneau d'un autre reste intouchable.
+    assert nouveau and nouveau[0]["operator_call"] == "F5ABC"    # booked for them, not for F5RRO
+    # Someone else's slot remains untouchable.
     assert client.get(f"/activation/slots/{autre}/edit").status_code == 303
     client.post(f"/activation/slots/{autre}/delete")
     assert activation.get_slot(autre) is not None
@@ -3132,12 +3132,12 @@ def test_admin_operator_keeps_the_full_scope() -> None:
     assert _login(client, "F5BOS", PW).status_code == 303
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F5RRO")
     page = client.get("/activation/log").text
-    assert '<select name="operator"' in page                     # il choisit qui est au micro
-    assert "DL1ABC" in client.get("/activation/export.adi").text  # et exporte tout le log
+    assert '<select name="operator"' in page                     # they choose who is on the mic
+    assert "DL1ABC" in client.get("/activation/export.adi").text  # and export the whole log
 
 
 def _shared_client(call: str = "F5ABC") -> TestClient:
-    """Session ouverte avec le MOT DE PASSE COMMUN, sous un indicatif donné."""
+    """Session opened with the SHARED PASSWORD, under a given callsign."""
     activation.set_flag("per_operator_auth", False)
     activation.set_flag("auto_slots", False)
     activation.set_operator_password("oppass")
@@ -3158,8 +3158,8 @@ def test_shared_password_also_keeps_each_operator_on_their_callsign() -> None:
 
 
 def test_shared_password_admin_flag_frees_the_choice_but_not_the_settings() -> None:
-    """Coché « administrateur », on choisit de nouveau qui est au micro ; les
-    Réglages restent fermés tant qu'il n'y a pas de mot de passe personnel."""
+    """With « administrateur » checked, they choose again who is on the mic; the
+    Settings stay closed as long as there is no personal password."""
     activation.add_operator("F5BOS", "Chef")
     activation.set_operator_admin("F5BOS", True)
     client = _shared_client("F5BOS")
@@ -3169,10 +3169,10 @@ def test_shared_password_admin_flag_frees_the_choice_but_not_the_settings() -> N
                 data={"call": "DL1ABC", "band": "20M", "mode": "SSB",
                       "operator": "F5RRO", "now": "1"})
     assert [q["operator_call"] for q in activation.list_contacts()] == ["F5RRO"]
-    assert client.get("/activation/settings").status_code == 303   # mot de passe commun : non
+    assert client.get("/activation/settings").status_code == 303   # shared password: no
 
 
-# ── Heure locale : celle du visiteur ───────────────────────────────────────
+# ── Local time: the visitor's ──────────────────────────────────────────────
 
 
 def test_visitor_timezone_drives_the_local_display() -> None:
@@ -3186,10 +3186,10 @@ def test_visitor_timezone_drives_the_local_display() -> None:
         client.cookies.set("tm_tzname", tz)
         page = client.get("/tm25test").text
         heures[tz] = re.findall(r"\b\d{2}:\d{2}\b", page)[0]
-    assert heures["Europe/Paris"] == "14:00"        # 12:00 UTC en heure d'été
+    assert heures["Europe/Paris"] == "14:00"        # 12:00 UTC in summer time
     assert heures["America/New_York"] == "08:00"
     assert heures["Asia/Tokyo"] == "21:00"
-    # L'étiquette nomme le fuseau du visiteur.
+    # The label names the visitor's time zone.
     client = TestClient(app)
     client.cookies.set("tm_tzname", "America/New_York")
     assert "Locale (New York)" in client.get("/tm25test").text
@@ -3215,11 +3215,11 @@ def test_utc_mode_still_wins_over_the_visitor_timezone() -> None:
     client.cookies.set("tm_tz", "utc")
     page = client.get("/tm25test").text
     assert re.findall(r"\b\d{2}:\d{2}\b", page)[0] == "12:00"
-    assert "Locale (Tokyo)" in page          # la bascule propose son heure à lui
+    assert "Locale (Tokyo)" in page          # the toggle offers their own time
 
 
 def test_typed_times_are_read_in_the_visitor_timezone() -> None:
-    """Un créneau saisi à 20:00 à New York n'est pas 20:00 à Paris."""
+    """A slot entered at 20:00 in New York is not 20:00 in Paris."""
     assert activation.input_to_utc_iso("2026-09-21T20:00", "America/New_York") == "2026-09-22T00:00"
     assert activation.input_to_utc_iso("2026-09-21T20:00", "local") == "2026-09-21T18:00"
     assert activation.input_to_utc_iso("2026-09-21T20:00", "utc") == "2026-09-21T20:00"

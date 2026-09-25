@@ -1,8 +1,8 @@
-"""Traduction de l'installeur (install.sh) et du script Proxmox.
+"""Translation of the installer (install.sh) and of the Proxmox script.
 
-Les textes sont écrits en français dans les scripts ; deploy/lang/en.sh donne
-leur traduction. On vérifie que chaque texte est traduit, que les champs {1},
-{2}… correspondent, et que l'affichage en anglais ne laisse pas de français.
+Texts are written in French in the scripts; deploy/lang/en.sh provides
+their translation. We check that every text is translated, that the {1},
+{2}… fields match, and that the English output leaves no French behind.
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ INSTALL = ROOT / "install.sh"
 LXC = ROOT / "proxmox" / "tm-activation-lxc.sh"
 EN = ROOT / "deploy" / "lang" / "en.sh"
 
-# Noms propres, commandes et intitulés d'interfaces : pas de traduction.
-SKIP = {"texte français", "1) Français", "2) English", "systemctl status cloudflared",
+# Proper names, commands and interface labels: not translated.
+SKIP = {"French text", "1) Français", "2) English", "systemctl status cloudflared",
         "Freebox", "Livebox", "SFR Box", "Bbox", "nginx", "UTC", "OK", "TM Activation",
-        "Cloudflare Tunnel", "config.yml", "cloudflared", "Question", "choix 1", "choix 2"}
+        "Cloudflare Tunnel", "config.yml", "cloudflared", "Question", "choice 1", "choice 2"}
 _STR = r'"((?:[^"\\$`]|\\.)*)"'
 _PATS = [rf'\b(?:say|info|warn|die|title|t)\s+{_STR}', rf'\bline\s+{_STR}',
          rf'\b(?:ask|ask_secret|ask_password)\s+\w+\s+{_STR}', rf'\bconfirm\s+{_STR}',
@@ -31,13 +31,13 @@ _PATS = [rf'\b(?:say|info|warn|die|title|t)\s+{_STR}', rf'\bline\s+{_STR}',
 
 
 def message_ids(path: Path) -> list[str]:
-    """Textes passés aux fonctions d'affichage et de saisie d'un script."""
+    """Texts passed to a script's output and input functions."""
     src = re.sub(r'(?m)^\s*#.*$', '', path.read_text(encoding="utf-8"))
     found: list[str] = []
     for pat in _PATS:
         found += [m.group(1) for m in re.finditer(pat, src)]
     lines = src.splitlines()
-    for i, line in enumerate(lines):          # options d'un menu (suite de la ligne)
+    for i, line in enumerate(lines):          # menu options (rest of the line)
         if re.search(r'\bmenu\s+\w+\s', line):
             j = i
             found += [x for x in re.findall(r'"([^"]*)"', line) if "$" not in x and "`" not in x]
@@ -54,7 +54,7 @@ def message_ids(path: Path) -> list[str]:
 
 
 def catalog(source: str = f'source "{EN}"') -> dict[str, str]:
-    """Traductions d'un catalogue bash : deploy/lang/en.sh, ou load_en (script Proxmox)."""
+    """Translations from a bash catalog: deploy/lang/en.sh, or load_en (Proxmox script)."""
     out = subprocess.run(
         ["bash", "-c", f'declare -A MSG; {source}; for k in "${{!MSG[@]}}"; do '
                        'printf "%s\\t%s\\0" "$k" "${MSG[$k]}"; done'],
@@ -63,7 +63,7 @@ def catalog(source: str = f'source "{EN}"') -> dict[str, str]:
 
 
 def lxc_catalog() -> dict[str, str]:
-    # Le script Proxmox porte ses traductions (il est lancé seul, via curl).
+    # The Proxmox script carries its own translations (it is run alone, via curl).
     return catalog(f'source "{LXC}" >/dev/null 2>&1 || true; load_en')
 
 
@@ -80,14 +80,14 @@ def test_placeholders_match() -> None:
 
 
 def run_sh(script: Path, snippet: str, lang: str = "en", **env: str) -> str:
-    """Exécute un bout de code après avoir sourcé le script dans la langue voulue."""
+    """Runs a code snippet after sourcing the script in the requested language."""
     code = f'UI_LANG={lang}\nsource "{script}"\nUI_LANG={lang}\nload_lang\n{snippet}'
     r = subprocess.run(["bash", "-c", code], capture_output=True, text=True, timeout=30,
                        cwd=ROOT, env={**os.environ, **env})
     return r.stdout + r.stderr
 
 
-# Mots français : leur présence dans une sortie anglaise trahit un texte oublié.
+# French words: their presence in English output reveals a missed text.
 FRENCH = re.compile(r"(?i)(?<![\w-])(le|la|les|des|du|une|avec|pour|dans|sur|aucun|aucune|"
                     r"réglages|opérateurs?|réseau|adresse|indicatif|mot de passe|à|être|où)(?![\w-])")
 
@@ -104,8 +104,8 @@ FRENCH = re.compile(r"(?i)(?<![\w-])(le|la|les|des|du|une|avec|pour|dans|sur|auc
 def test_installer_speaks_english(snippet: str) -> None:
     out = run_sh(INSTALL, snippet)
     assert out.strip(), snippet
-    # Les intitulés des interfaces de box françaises restent en français
-    # (« Baux statiques », « Réseau v4 »…) : ces lignes sont hors contrôle.
+    # Labels of French router interfaces stay in French
+    # (« Baux statiques », « Réseau v4 »…): these lines are not checked.
     checked = "\n".join(l for l in out.splitlines()
                         if not re.search(r"«|Freebox|Paramètres|Réseau v4|rubrique DHCP", l))
     words = sorted({m.group(0) for m in FRENCH.finditer(checked)})
@@ -118,7 +118,7 @@ def test_installer_still_speaks_french() -> None:
 
 
 def test_language_is_remembered(tmp_path) -> None:
-    """--lang en est mémorisé dans install.env et repris à la mise à jour."""
+    """--lang en is stored in install.env and reused on upgrade."""
     (tmp_path / "install.env").write_text("MODE=lan\nUI_LANG=en\n", encoding="utf-8")
     (tmp_path / ".tm-activation").write_text("9.9.9\n", encoding="utf-8")
     out = run_sh(INSTALL, f'CLI_DIR={tmp_path} resolve_context; echo "LANG=$UI_LANG"', lang="")

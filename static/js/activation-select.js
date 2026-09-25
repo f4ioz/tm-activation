@@ -1,10 +1,9 @@
-/* Sélection de lignes à la souris dans les tableaux ADIF (export d'une
- * sélection, aperçu d'import) : clic = cocher/décocher, Maj+clic = plage,
- * cliquer-glisser = « peindre » plusieurs lignes. Les filtres de groupe
- * (data-filter) masquent ET décochent les lignes hors groupe : seules les
- * lignes visibles et cochées sont envoyées. */
+/* Mouse row selection in the ADIF tables (export of a selection, import
+ * preview): click = check/uncheck, Shift+click = range, click-and-drag =
+ * "paint" several rows. Group filters (data-filter) hide AND uncheck rows
+ * outside the group: only visible, checked rows are submitted. */
 (function () {
-  // Textes traduits : window.ACT_I18N (rempli par _base.html hors français).
+  // Translated strings: window.ACT_I18N (filled by _base.html for non-French).
   function t(s, p) {
     var m = (window.ACT_I18N || {})[s] || s;
     return p ? m.replace(/\{(\w+)\}/g, function (_, k) { return p[k]; }) : m;
@@ -63,14 +62,14 @@
     var last = -1, painting = false, paintOn = false;
     rows.forEach(function (tr, i) {
       var cb = box(tr);
-      // La bascule se fait au mousedown (ce qui permet le glisser) : on annule
-      // le clic souris natif de la case pour ne pas rebasculer. Au clavier
-      // (espace, e.detail === 0) la case garde son comportement normal.
+      // Toggling happens on mousedown (which enables dragging): the checkbox's
+      // native mouse click is cancelled so it does not toggle back. With the
+      // keyboard (space, e.detail === 0) the checkbox behaves normally.
       cb.addEventListener('click', function (e) { if (e.detail !== 0) e.preventDefault(); });
       cb.addEventListener('change', refresh);
       tr.addEventListener('mousedown', function (e) {
         if (e.button !== 0 || e.target.closest('a, button, select')) return;
-        e.preventDefault();                 // pas de sélection de texte
+        e.preventDefault();                 // no text selection
         paintOn = !cb.checked;
         if (e.shiftKey && last >= 0) {
           var a = Math.min(last, i), b = Math.max(last, i);

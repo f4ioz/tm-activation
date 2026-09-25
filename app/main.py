@@ -1,7 +1,7 @@
-"""Point d'entrée FastAPI : application autonome d'activation d'indicatifs spéciaux.
+"""FastAPI entry point: standalone special-callsign activation application.
 
-Un seul worker uvicorn : blocages anti-bruteforce en mémoire et tâche de fond
-QRZ (un thread) supposent un processus unique.
+A single uvicorn worker: in-memory anti-bruteforce blocking and the QRZ
+background task (a thread) assume a single process.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ STATIC_DIR = ROOT / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Au démarrage : snapshot de la base (best-effort) et enrichissement QRZ
-    en tâche de fond ; arrêté à l'extinction."""
+    """On startup: database snapshot (best-effort) and QRZ enrichment
+    in the background; stopped on shutdown."""
     try:
         activation.backup_now()
-    except Exception:  # noqa: BLE001 — ne jamais bloquer le démarrage
+    except Exception:  # noqa: BLE001 — never block startup
         pass
     try:
         activation.start_enricher()
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     activation.stop_enricher()
 
 
-# Pas de /docs, /redoc, /openapi.json : inutile de publier le plan des routes.
+# No /docs, /redoc, /openapi.json: no point publishing the route map.
 app = FastAPI(title="TM Activation", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -48,7 +48,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.middleware("http")
 async def shield_middleware(request: Request, call_next):
-    """Blocage temporaire des scanners + en-têtes de sécurité (security.py)."""
+    """Temporary scanner blocking + security headers (security.py)."""
     blocked = security.check_request(request)
     if blocked is not None:
         return blocked
@@ -57,8 +57,8 @@ async def shield_middleware(request: Request, call_next):
     return response
 
 
-# Ajouté en dernier = exécuté en premier : l'IP réelle (X-Forwarded-For) et le
-# schéma https (X-Forwarded-Proto) ne sont repris QUE des proxys de confiance.
+# Added last = runs first: the real IP (X-Forwarded-For) and the https
+# scheme (X-Forwarded-Proto) are taken ONLY from trusted proxies.
 app.add_middleware(
     ProxyHeadersMiddleware,
     trusted_hosts=server_config().get("trusted_proxies") or ["127.0.0.1", "::1"],
@@ -68,5 +68,5 @@ app.include_router(site_router.router)
 app.include_router(auth_router.router)
 app.include_router(admin_router.router)
 app.include_router(activation_router.router)
-# En dernier : pages publiques /<indicatif> (route générique à un segment).
+# Last: public /<callsign> pages (generic single-segment route).
 app.include_router(activation_router.public_router)

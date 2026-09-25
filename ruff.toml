@@ -1,3 +1,3 @@
-# Règles ruff par défaut pour tout le projet, app/tmcert compris (le module de
-# certificat n'est plus un kit externe gardé tel quel depuis son passage en
-# anglais : il est maintenu ici).
+# Default ruff rules for the whole project, app/tmcert included (the certificate
+# module is no longer an external kit kept as is since its switch to English: it
+# is maintained here).

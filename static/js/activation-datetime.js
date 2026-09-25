@@ -1,18 +1,18 @@
-/* Saisie des dates et heures : calendrier de qualité si Internet est là,
- * calendrier simple sinon, sélecteur du téléphone sur écran tactile.
+/* Date and time input: a quality calendar when Internet is available,
+ * a simple calendar otherwise, the phone's own picker on touch screens.
  *
- * 1. Air Datepicker, chargé depuis Internet (calendrier aéré, heures et
- *    minutes au curseur). S'il ne répond pas en 2 s — réseau du club sans
- *    Internet — on n'attend pas.
- * 2. Repli : flatpickr, fourni avec l'application (donc toujours disponible
- *    dans la version autonome).
- * 3. Dernier repli : le champ natif du navigateur, inchangé.
+ * 1. Air Datepicker, loaded from the Internet (airy calendar, hour and
+ *    minute sliders). If it does not answer within 2 s — club network
+ *    without Internet — we do not wait.
+ * 2. Fallback: flatpickr, bundled with the app (so always available in
+ *    the standalone version).
+ * 3. Last resort: the browser's native field, unchanged.
  *
- * La valeur envoyée reste dans tous les cas « AAAA-MM-JJTHH:MM » (ou
- * « AAAA-MM-JJ ») : le serveur ne voit aucune différence.
+ * The submitted value is always "YYYY-MM-DDTHH:MM" (or "YYYY-MM-DD"):
+ * the server sees no difference.
  *
- * Raccourcis (Maintenant, Ce soir…, +2 h) : boutons rendus par les templates,
- * branchés ici, valables quel que soit le calendrier actif.
+ * Shortcuts (Maintenant, Ce soir…, +2 h): buttons rendered by the templates,
+ * wired here, working whichever calendar is active.
  */
 (function () {
   var CDN_JS = 'https://unpkg.com/air-datepicker@3.5.3/air-datepicker.js';
@@ -48,7 +48,7 @@
   };
   var locale = LOCALES[lang] || LOCALES.fr;
 
-  // ── Valeurs : toujours le format d'un champ natif ────────────────────────
+  // ── Values: always in a native field's format ─────────────────────────────
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   function parse(value) {
@@ -63,15 +63,15 @@
     return withTime ? d + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) : d;
   }
 
-  // Les modifications faites par le script ne doivent pas se relancer entre
-  // elles : poser une date minimale désélectionne parfois la date choisie.
+  // Changes made by the script must not trigger each other: setting a
+  // minimum date sometimes deselects the chosen date.
   var busy = false;
   function quietly(fn) {
     busy = true;
     try { fn(); } finally { busy = false; }
   }
 
-  // ── Trois façons d'éditer un champ, même interface ───────────────────────
+  // ── Three ways to edit a field, same interface ───────────────────────────
   function nativeField(el, withTime) {
     return {
       el: el, withTime: withTime,
@@ -95,10 +95,10 @@
       minutesStep: 15,
       autoClose: !withTime,
       buttons: withTime ? ['today', 'clear'] : ['today', 'clear'],
-      dateFormat: 'E dd MMM yyyy',      // l'heure est ajoutée par le timepicker
+      dateFormat: 'E dd MMM yyyy',      // the time is appended by the timepicker
       altField: el,
-      // Une fonction, car les formats d'Air Datepicker n'ont pas de littéral
-      // échappé : c'est nous qui écrivons « AAAA-MM-JJTHH:MM ».
+      // A function, because Air Datepicker formats have no escaped literal:
+      // we write "YYYY-MM-DDTHH:MM" ourselves.
       altFieldDateFormat: function (date) { return format(date, withTime); },
       selectedDates: parse(el.value) ? [parse(el.value)] : [],
       onSelect: function (data) { if (!busy && data.date instanceof Date) onChange(data.date); }
@@ -106,7 +106,7 @@
     var api = {
       el: el, withTime: withTime,
       get: function () { return picker.selectedDates[0] || parse(el.value); },
-      // updateTime : sans lui, le calendrier garderait l'heure précédente.
+      // updateTime: without it, the calendar would keep the previous time.
       set: function (date) {
         quietly(function () { picker.selectDate(date, { updateTime: true }); });
         el.value = format(date, withTime);
@@ -114,7 +114,7 @@
       min: function (date) {
         var keep = api.get();
         quietly(function () { picker.update({ minDate: date }); });
-        if (keep) api.set(keep);          // la mise à jour peut désélectionner
+        if (keep) api.set(keep);          // the update may deselect
       }
     };
     return api;
@@ -148,7 +148,7 @@
     return api;
   }
 
-  // ── Liens entre champs : la fin suit le début, durée conservée ───────────
+  // ── Field links: the end follows the start, duration preserved ──────────
   var byId = {};
   var previous = {};
 
@@ -181,7 +181,7 @@
     wireShortcuts();
   }
 
-  // ── Raccourcis (boutons rendus par les templates) ────────────────────────
+  // ── Shortcuts (buttons rendered by the templates) ────────────────────────
   function nowIn(zone) {
     var d = new Date();
     if (zone !== 'utc') return d;
@@ -198,14 +198,14 @@
           var set = btn.getAttribute('data-set');
           var add = btn.getAttribute('data-add');
           var date;
-          if (add) {                                   // + N minutes après le début
+          if (add) {                                   // + N minutes after the start
             var startId = target.el.getAttribute('data-after');
             var start = startId && byId[startId] ? byId[startId].get() : null;
             if (!start) return;
             date = new Date(start.getTime() + parseInt(add, 10) * 60000);
           } else if (set === 'now') {
             date = nowIn(zone);
-          } else {                                     // « today 20:00 » / « tomorrow 09:00 »
+          } else {                                     // "today 20:00" / "tomorrow 09:00"
             var parts = (set || '').split(' ');
             var hm = (parts[1] || '00:00').split(':');
             date = nowIn(zone);
@@ -219,9 +219,9 @@
     });
   }
 
-  // ── Choix du calendrier ──────────────────────────────────────────────────
-  // Écran tactile : le sélecteur du téléphone reste le plus pratique ; on
-  // branche tout de même les raccourcis.
+  // ── Calendar choice ──────────────────────────────────────────────────────
+  // Touch screen: the phone's picker remains the most convenient; the
+  // shortcuts are still wired.
   if (!(window.matchMedia && window.matchMedia('(pointer: fine)').matches)) {
     attach(nativeField);
     return;

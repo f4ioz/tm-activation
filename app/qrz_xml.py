@@ -1,16 +1,15 @@
-"""Client QRZ XML API (abonnés payants).
+"""QRZ XML API client (paid subscribers).
 
-L'API XML expose un endpoint d'authentification qui retourne un
-`Session.Key` valable ~24 h, puis on l'utilise sur les requêtes lookup.
-Le client gère le renouvellement automatique du token quand il expire
-(ou en cas d'erreur 401/Invalid session).
+The XML API exposes an authentication endpoint that returns a `Session.Key`
+valid for ~24 h, which is then used on lookup requests. The client renews
+the token automatically when it expires (or on a 401/Invalid session error).
 
 Configuration (config.yml):
     qrz:
       username: F1ABC
       password: ...
 
-Pas de cookie à manipuler à la main.
+No cookie to handle by hand.
 """
 
 from __future__ import annotations
@@ -30,9 +29,9 @@ logger = logging.getLogger(__name__)
 XML_BASE = "https://xmldata.qrz.com/xml/current/"
 USER_AGENT = "tm-activation/1.0"
 NS = "{http://xmldata.qrz.com}"
-SESSION_TTL = 23 * 3600          # on renouvelle proactivement avant 24 h
+SESSION_TTL = 23 * 3600          # renewed proactively before 24 h
 REQ_TIMEOUT = 10.0
-DEFAULT_LOOKUP_TTL = 6 * 3600    # cache lookup par callsign (positif + négatif)
+DEFAULT_LOOKUP_TTL = 6 * 3600    # per-callsign lookup cache (positive + negative)
 
 
 @dataclass
@@ -48,15 +47,15 @@ class XmlLookup:
     profile_url: str = ""
     fname: str = ""
     lname: str = ""
-    dxcc: str = ""       # n° d'entité DXCC
-    land: str = ""       # nom de l'entité DXCC (≠ country = pays postal)
+    dxcc: str = ""       # DXCC entity number
+    land: str = ""       # DXCC entity name (≠ country = postal country)
     cqzone: str = ""
 
 
 @dataclass
 class _CacheEntry:
     fetched_at: float
-    result: XmlLookup | None  # None = négatif (callsign introuvable)
+    result: XmlLookup | None  # None = negative (callsign not found)
 
 
 def _strip_ns(tag: str) -> str:
@@ -68,7 +67,7 @@ def _xml_to_dict(elem: ET.Element) -> dict[str, str]:
 
 
 class QrzXmlClient:
-    """Client thread-safe avec lazy-login + renouvellement auto."""
+    """Thread-safe client with lazy login + automatic renewal."""
 
     def __init__(self, username: str, password: str,
                  agent: str = USER_AGENT,
@@ -78,7 +77,7 @@ class QrzXmlClient:
         self.agent = agent
         self._key: str | None = None
         self._key_expires: float = 0.0
-        self.sub_exp: str = ""       # fin d'abonnement XML annoncée par QRZ au login
+        self.sub_exp: str = ""       # XML subscription end date reported by QRZ at login
         self._lock = threading.Lock()
         self._cache: dict[str, _CacheEntry] = {}
         self._lookup_ttl = lookup_ttl_seconds
@@ -111,10 +110,10 @@ class QrzXmlClient:
         return key
 
     def check_login(self) -> tuple[str, str]:
-        """Connexion immédiate, pour valider un compte saisi.
+        """Log in right away, to validate an entered account.
 
-        ``("ok", fin d'abonnement)`` ; ``("refused", message de QRZ)`` si le
-        compte est refusé ; ``("error", raison)`` si QRZ est injoignable.
+        ``("ok", subscription end)``; ``("refused", QRZ message)`` if the
+        account is refused; ``("error", reason)`` if QRZ is unreachable.
         """
         with self._lock, httpx.Client(timeout=REQ_TIMEOUT) as client:
             self._key = None
@@ -137,10 +136,10 @@ class QrzXmlClient:
         return self.lookup_with_status(callsign)[0]
 
     def lookup_with_status(self, callsign: str) -> tuple[XmlLookup | None, str]:
-        """Comme lookup() mais distingue « introuvable » d'une erreur.
+        """Like lookup() but tells "not found" apart from an error.
 
-        Statut ``ok`` / ``notfound`` / ``error`` : une tâche de fond ne doit
-        pas mémoriser une panne réseau comme un indicatif inconnu.
+        Status ``ok`` / ``notfound`` / ``error``: a background task must not
+        record a network failure as an unknown callsign.
         """
         cs = callsign.strip().upper()
         if not cs:
@@ -157,7 +156,7 @@ class QrzXmlClient:
                     r.raise_for_status()
                     root = ET.fromstring(r.text)
 
-                    # Erreur de session ? on retente après login forcé
+                    # Session error? Retry after a forced login
                     sess = root.find(f"{NS}Session")
                     if sess is not None:
                         d = _xml_to_dict(sess)
@@ -180,9 +179,9 @@ class QrzXmlClient:
                             if err:
                                 logger.info("QRZ XML lookup %s: %s", cs, err)
                         if err and "not found" not in err.lower():
-                            # Erreur de compte / quota, pas un indicatif inconnu
+                            # Account / quota error, not an unknown callsign
                             return None, "error"
-                        # Cache négatif : on ne re-tape pas QRZ pendant TTL
+                        # Negative cache: don't hit QRZ again for TTL
                         self._cache[cs] = _CacheEntry(time.time(), None)
                         return None, "notfound"
 
@@ -217,11 +216,11 @@ class QrzXmlClient:
                     return result, "ok"
                 except (httpx.HTTPError, ET.ParseError, RuntimeError) as exc:
                     logger.warning("QRZ XML lookup %s failed: %s", cs, exc)
-                    # Pas de cache négatif sur erreur réseau : retry au prochain coup
+                    # No negative cache on network error: retry next time
                     return None, "error"
 
     def clear_cache(self) -> None:
-        """Vide le cache de lookups (utile en debug ou après modif quota)."""
+        """Clear the lookup cache (useful for debugging or after a quota change)."""
         with self._lock:
             self._cache.clear()
 
@@ -231,9 +230,9 @@ _shared_lock = threading.Lock()
 
 
 def get_shared_client() -> QrzXmlClient | None:
-    """Client XML unique pour tout le site (une session QRZ, un cache).
+    """Single XML client for the whole site (one QRZ session, one cache).
 
-    None si ``qrz.username`` / ``qrz.password`` ne sont pas configurés.
+    None if ``qrz.username`` / ``qrz.password`` are not configured.
     """
     global _shared
     cfg = qrz_config()

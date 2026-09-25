@@ -1,9 +1,9 @@
-/* Carte publique des contacts (board /<indicatif>), Leaflet.
- * Un point par locator × bande × mode : la COULEUR dit le mode, la FORME dit
- * la bande (réglables dans Réglages → Carte des contacts). Les points d'un
- * même carré sont écartés en couronne pour rester tous cliquables ; les
- * indicatifs s'affichent en étiquette à partir de LABEL_ZOOM.
- * Données : <script type="application/json" id="act-map-data">. */
+/* Public contacts map (board /<callsign>), Leaflet.
+ * One point per locator × band × mode: the COLOUR shows the mode, the SHAPE
+ * shows the band (configurable in Réglages → Carte des contacts). Points in
+ * the same square are spread in a ring so they all stay clickable;
+ * callsigns are shown as labels from LABEL_ZOOM upwards.
+ * Data: <script type="application/json" id="act-map-data">. */
 (function () {
   var el = document.getElementById('act-map');
   var dataEl = document.getElementById('act-map-data');
@@ -13,7 +13,7 @@
 
   var LABEL_ZOOM = 6;
   var MAX_LABEL_CALLS = 3;
-  var SPREAD_PX = 9;            // écart des points d'un même carré
+  var SPREAD_PX = 9;            // spacing of points in the same square
   var style = data.style || {};
   var styled = !!style.enabled;
 
@@ -23,7 +23,7 @@
     });
   }
 
-  // Sans style personnalisé, tous les points gardent le cyan du site.
+  // Without custom styling, all points keep the site's cyan.
   var PLAIN = (getComputedStyle(document.documentElement).getPropertyValue('--cyan') || '').trim()
     || '#3d7ea6';
 
@@ -37,7 +37,7 @@
     return (style.band_shapes || {})[band] || style.band_default;
   }
 
-  /* Contour du symbole dans une case de 100×100 (SVG mis à l'échelle ensuite). */
+  /* Symbol outline in a 100×100 box (the SVG is scaled afterwards). */
   function shapeSvg(shape, color, size) {
     var fill = 'fill="' + color + '" fill-opacity="0.75" stroke="#1b2430" stroke-width="8"';
     var body;
@@ -62,7 +62,7 @@
 
   var map = L.map(el, { worldCopyJump: true, minZoom: 2, maxZoom: 19 }).setView([48.8, 2.5], 4);
 
-  // Fond OpenStreetMap standard.
+  // Standard OpenStreetMap base layer.
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -70,13 +70,13 @@
 
   var points = data.points || [];
 
-  // Décalage des points d'un même carré : le premier reste au centre, les
-  // suivants tournent autour à SPREAD_PX (en pixels, donc constant au zoom).
+  // Offset of points in the same square: the first stays at the centre, the
+  // next ones circle around at SPREAD_PX (in pixels, so constant when zooming).
   var perGrid = {};
   points.forEach(function (p) { (perGrid[p.grid] = perGrid[p.grid] || []).push(p); });
 
   var bounds = [];
-  var markers = [];             // { marker, band, mode } pour les filtres
+  var markers = [];             // { marker, band, mode } for the filters
   Object.keys(perGrid).forEach(function (grid) {
     var group = perGrid[grid];
     group.forEach(function (p, i) {
@@ -107,7 +107,7 @@
     });
   });
 
-  // Station d'activation (locator de config) : repère toujours étiqueté.
+  // Activation station (locator from config): always-labelled marker.
   var home = data.home || {};
   if (home.pos) {
     L.circleMarker(home.pos, { className: 'act-map-home', radius: 7, weight: 2, fillOpacity: 0.8 })
@@ -123,9 +123,9 @@
   map.on('zoomend', syncLabels);
   syncLabels();
 
-  /* Légende : seulement les bandes et les modes réellement travaillés. Avec
-   * l'option « filtres », chaque entrée devient une case à cocher — un point
-   * reste visible tant que SA bande ET SON mode sont cochés. */
+  /* Legend: only the bands and modes actually worked. With the "filters"
+   * option, each entry becomes a checkbox — a point stays visible as long
+   * as ITS band AND ITS mode are checked. */
   var NEUTRAL = '#5b6b7c';
   var legend = document.getElementById('act-map-legend');
   var modes = data.modes || [];
@@ -165,7 +165,7 @@
         on[box.dataset.kind][box.dataset.value] = box.checked;
       });
       markers.forEach(function (m) {
-        // Bande ou mode absent de la légende (champ vide) : toujours visible.
+        // Band or mode missing from the legend (empty field): always visible.
         var show = (!m.mode || on.mode[m.mode] !== false)
           && (!m.band || on.band[m.band] !== false);
         if (show && !map.hasLayer(m.marker)) map.addLayer(m.marker);

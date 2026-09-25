@@ -1,11 +1,11 @@
-"""Contrôles réseau d'install.sh (bibliothèque standard uniquement).
+"""Network checks for install.sh (standard library only).
 
-    python3 netcheck.py local            IP locale, carte réseau, adresse MAC
-    python3 netcheck.py public           adresse IPv4 publique de la connexion
-    python3 netcheck.py dns DOMAINE      enregistrements A et AAAA (DNS publics)
-    python3 netcheck.py cert DOMAINE [HÔTE]   certificat HTTPS (défaut : cette machine)
+    python3 netcheck.py local            local IP, network interface, MAC address
+    python3 netcheck.py public           public IPv4 address of the connection
+    python3 netcheck.py dns DOMAIN       A and AAAA records (public DNS)
+    python3 netcheck.py cert DOMAIN [HOST]    HTTPS certificate (default: this machine)
 
-Sortie : lignes CLE=valeur, lues par install.sh sans être exécutées.
+Output: KEY=value lines, read by install.sh without being executed.
 """
 
 from __future__ import annotations
@@ -22,19 +22,19 @@ import urllib.request
 from datetime import datetime, timezone
 
 PUBLIC_IP_URLS = ("https://api.ipify.org", "https://ipv4.icanhazip.com", "https://v4.ident.me")
-# Résolveurs publics interrogés directement : pas le cache de la box, qui garde
-# plusieurs minutes un nom « introuvable » juste avant sa création.
+# Public resolvers queried directly: not the router's cache, which keeps
+# a "not found" name for several minutes right before it is created.
 DNS_SERVERS = ("1.1.1.1", "8.8.8.8")
 CGNAT = ipaddress.ip_network("100.64.0.0/10")
 TYPE_A, TYPE_AAAA = 1, 28
 
 
 def local_info() -> dict[str, str]:
-    """Adresse locale utilisée pour sortir sur Internet, sa carte réseau et sa MAC."""
+    """Local address used to reach the Internet, its network interface and MAC."""
     ip = ""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("192.0.2.1", 9))  # aucun paquet envoyé : choix de l'interface de sortie
+            s.connect(("192.0.2.1", 9))  # no packet sent: just picks the outgoing interface
             ip = s.getsockname()[0]
     except OSError:
         pass
@@ -57,7 +57,7 @@ def local_info() -> dict[str, str]:
 
 
 def classify(ip: str) -> str:
-    """« public », « cgnat » (100.64.0.0/10, partagée par l'opérateur), « private » ou ""."""
+    """"public", "cgnat" (100.64.0.0/10, shared by the ISP), "private" or ""."""
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
@@ -70,7 +70,7 @@ def classify(ip: str) -> str:
 
 
 def public_ip(urls: tuple[str, ...] = PUBLIC_IP_URLS, timeout: float = 5.0) -> str:
-    """Adresse IPv4 publique vue d'Internet ("" si aucun service ne répond)."""
+    """Public IPv4 address as seen from the Internet ("" if no service answers)."""
     for url in urls:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "tm-activation-install"})
@@ -83,7 +83,7 @@ def public_ip(urls: tuple[str, ...] = PUBLIC_IP_URLS, timeout: float = 5.0) -> s
     return ""
 
 
-# ── Requête DNS minimale (UDP) ─────────────────────────────────────────────
+# ── Minimal DNS query (UDP) ────────────────────────────────────────────────
 
 
 def _qname(domain: str) -> bytes:
@@ -96,13 +96,13 @@ def _skip_name(buf: bytes, pos: int) -> int:
         n = buf[pos]
         if n == 0:
             return pos + 1
-        if n & 0xC0 == 0xC0:  # pointeur de compression
+        if n & 0xC0 == 0xC0:  # compression pointer
             return pos + 2
         pos += 1 + n
 
 
 def parse_response(buf: bytes, qtype: int) -> list[str]:
-    """Adresses du type demandé dans la section réponse (chaînes CNAME comprises)."""
+    """Addresses of the requested type in the answer section (CNAME chains included)."""
     qdcount, ancount = struct.unpack(">HH", buf[4:8])
     pos = 12
     for _ in range(qdcount):
@@ -131,7 +131,7 @@ def query(domain: str, qtype: int, server: str, timeout: float = 3.0) -> list[st
     if len(buf) < 12 or buf[:2] != msg[:2]:
         raise OSError("réponse DNS inattendue")
     rcode = buf[3] & 0x0F
-    if rcode == 3:  # NXDOMAIN : le nom n'existe pas
+    if rcode == 3:  # NXDOMAIN: the name does not exist
         return []
     if rcode != 0:
         raise OSError(f"erreur DNS {rcode}")
@@ -155,7 +155,7 @@ def dns(domain: str) -> dict[str, str]:
             }
         except (OSError, IndexError, struct.error, UnicodeError):
             continue
-    return {  # DNS publics injoignables (réseau filtré) : résolveur du système
+    return {  # public DNS unreachable (filtered network): system resolver
         "DNS_A": ",".join(_system_lookup(domain, socket.AF_INET)),
         "DNS_AAAA": ",".join(_system_lookup(domain, socket.AF_INET6)),
         "DNS_VIA": "système",
@@ -163,7 +163,7 @@ def dns(domain: str) -> dict[str, str]:
 
 
 def cert(domain: str, host: str = "127.0.0.1", port: int = 443, timeout: float = 5.0) -> dict[str, str]:
-    """Certificat HTTPS que nginx sert pour ``domain`` sur cette machine."""
+    """HTTPS certificate nginx serves for ``domain`` on this machine."""
     ctx = ssl.create_default_context()
     try:
         with socket.create_connection((host, port), timeout=timeout) as sock:
@@ -190,7 +190,7 @@ def main(argv: list[str]) -> int:
         out = {"PUBLIC_IP": ip, "PUBLIC_KIND": classify(ip)}
     elif cmd == "dns" and len(args) == 1:
         out = dns(args[0])
-    elif cmd == "cert" and 1 <= len(args) <= 2:  # cert DOMAINE [HÔTE] (tunnel : l'hôte est le domaine)
+    elif cmd == "cert" and 1 <= len(args) <= 2:  # cert DOMAIN [HOST] (tunnel: the host is the domain)
         out = cert(*args)
     else:
         print(__doc__, file=sys.stderr)

@@ -94,8 +94,8 @@
     <p id="act-worked-hint" class="act-worked-hint" aria-live="polite"></p>
     <p id="act-qrz-hint" class="act-qrz-hint" aria-live="polite"></p>
     {% if log_view.photo or log_view.compass %}
-    {# Fiche du correspondant : photo QRZ, boussole (où tourner l'antenne) et
-       distance. Tailles réglées dans Réglages → Page de log. #}
+    {# Contact card: QRZ photo, compass (where to turn the antenna) and
+       distance. Sizes set in Réglages → Page de log. #}
     <div class="act-dir" id="act-dir" hidden
          data-home="{{ my_grid }}" data-photo="{{ log_view.photo }}" data-compass="{{ log_view.compass }}">
       <img class="act-dir-photo" id="act-dir-photo" alt="{{ _("Photo de la fiche QRZ") }}" hidden
@@ -139,7 +139,7 @@
 (function () {
   var form = document.querySelector('.act-log-form');
   if (!form) return;
-  // Textes du script (traduits côté serveur).
+  // Script texts (translated server-side).
   var T = {
     fresh: {{ _("✓ Station jamais contactée")|tojson }},
     worked: {{ _("● Déjà contactée : {n} QSO ({pairs}) — dernier le {last}")|tojson }},
@@ -150,14 +150,14 @@
   function fill(tpl, values) {
     return tpl.replace(/\{(\w+)\}/g, function (_m, k) { return values[k]; });
   }
-  // Préférences mémorisées dans le navigateur (coches « Maintenant » / QRZ).
+  // Preferences stored in the browser (« Maintenant » / QRZ checkboxes).
   function pref(key, def) {
     try { var v = localStorage.getItem(key); return v === null ? def : v === '1'; } catch (e) { return def; }
   }
   function setPref(key, on) { try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {} }
 
-  // Coche SAT → affiche + active le champ satellite (masqué/inactif par défaut,
-  // car la plupart des QSO ne sont pas faits en satellite).
+  // SAT checkbox → shows + enables the satellite field (hidden/disabled by default,
+  // since most QSOs are not made via satellite).
   var toggle = document.getElementById('act-sat-toggle');
   var field = document.getElementById('act-sat-field');
   var input = field ? field.querySelector('input') : null;
@@ -170,7 +170,7 @@
   toggle.addEventListener('change', syncSat);
   syncSat();
 
-  // Date/heure « maintenant » dans le fuseau d'affichage courant (data-tz).
+  // Current date/time in the current display time zone (data-tz).
   var whenEl = form.querySelector('input[name=when]');
   function resetWhen() {
     var d = new Date(), mode = whenEl.getAttribute('data-tz') || 'local';
@@ -181,8 +181,8 @@
     whenEl.value = Y + '-' + p(Mo) + '-' + p(Da) + 'T' + p(H) + ':' + p(Mi);
   }
 
-  // « Maintenant » coché : champ grisé (non soumis), le serveur prend l'heure
-  // de validation. Décoché : saisie libre, pour un QSO noté après coup.
+  // « Maintenant » checked: field greyed out (not submitted), the server uses the
+  // submission time. Unchecked: free entry, for a QSO logged after the fact.
   var nowToggle = document.getElementById('act-now-toggle');
   function syncNow() {
     whenEl.disabled = nowToggle.checked;
@@ -191,13 +191,13 @@
   nowToggle.addEventListener('change', function () { setPref('tm.now', nowToggle.checked); syncNow(); });
   setInterval(function () { if (nowToggle.checked) resetWhen(); }, 15000);
 
-  // Lookup QRZ (compte du site) en quittant la case indicatif, si la coche est
-  // active : Prénom NOM · locator · pays ; préremplit le locator s'il est vide.
+  // QRZ lookup (site account) when leaving the callsign field, if the checkbox is
+  // on: First LAST · locator · country; prefills the locator if empty.
   var qrzToggle = document.getElementById('act-qrz-toggle');
   var callInput = form.querySelector('input[name=call]');
   var gridInput = form.querySelector('input[name=gridsquare]');
   var hint = document.getElementById('act-qrz-hint');
-  var lastCall = '', autoGrid = '';   // autoGrid : locator posé par QRZ (remplaçable)
+  var lastCall = '', autoGrid = '';   // autoGrid: locator set by QRZ (overridable)
   function show(text, miss) { hint.textContent = text; hint.classList.toggle('is-miss', !!miss); }
   function lookup() {
     var call = (callInput.value || '').trim().toUpperCase();
@@ -207,7 +207,7 @@
     fetch('/activation/qrz?call=' + encodeURIComponent(call), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if ((callInput.value || '').trim().toUpperCase() !== call) return;  // indicatif changé entre-temps
+        if ((callInput.value || '').trim().toUpperCase() !== call) return;  // callsign changed in the meantime
         if (autoGrid && gridInput.value === autoGrid) gridInput.value = '';
         autoGrid = '';
         if (!d || !d.found) {
@@ -223,7 +223,7 @@
       })
       .catch(function () { show(''); });
   }
-  // ── Station déjà contactée ? (log local, indépendant de QRZ) ──────────
+  // ── Station already worked? (local log, independent of QRZ) ────────────
   var workedHint = document.getElementById('act-worked-hint');
   var bandSel = form.querySelector('select[name=band]');
   var modeSel = form.querySelector('select[name=mode]');
@@ -262,7 +262,7 @@
     fetch('/activation/worked?call=' + encodeURIComponent(call), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if ((callInput.value || '').trim().toUpperCase() !== call) return;   // indicatif changé
+        if ((callInput.value || '').trim().toUpperCase() !== call) return;   // callsign changed
         workedData = d;
         showWorked();
       })
@@ -275,7 +275,7 @@
   bandSel.addEventListener('change', showWorked);
   modeSel.addEventListener('change', showWorked);
 
-  // ── Bande/mode réservés par un autre opérateur : on prévient avant de loguer ──
+  // ── Band/mode booked by another operator: warn before logging ──
   var blockHint = document.getElementById('act-block-hint');
   var submitBtn = form.querySelector('button[type=submit]');
 
@@ -292,8 +292,8 @@
       })
       .catch(function () { blockHint.textContent = ''; });
   }
-  // Les spots ne montrent que notre bande et notre type de trafic : ils
-  // suivent les deux sélecteurs.
+  // Spots only show our band and our kind of traffic: they
+  // follow both selectors.
   function refreshSpots() {
     if (window.htmx) htmx.trigger(document.body, 'act-band');
   }
@@ -301,10 +301,10 @@
   modeSel.addEventListener('change', refreshSpots);
   bandSel.addEventListener('change', checkSlot);
   modeSel.addEventListener('change', checkSlot);
-  setInterval(checkSlot, 60000);      // un créneau peut commencer pendant la saisie
+  setInterval(checkSlot, 60000);      // a slot may start while typing
   checkSlot();
 
-  // Locator tapé à la main : la boussole suit sans attendre QRZ.
+  // Locator typed by hand: the compass follows without waiting for QRZ.
   if (gridInput) {
     gridInput.addEventListener('input', function () {
       if (window.actStationGrid) window.actStationGrid(gridInput.value);
@@ -319,9 +319,9 @@
     if (qrzToggle.checked) lookup(); else show('');
   });
 
-  // Bande / mode gardés d'un QSO au suivant (le formulaire est remis à zéro
-  // après chaque QSO) et après un rechargement, le temps de la session de
-  // l'onglet (sessionStorage : un autre opérateur, un autre jour, repart à zéro).
+  // Band / mode kept from one QSO to the next (the form is reset
+  // after each QSO) and across reloads, for the lifetime of the tab
+  // session (sessionStorage: another operator, another day, starts fresh).
   var keepSel = [form.querySelector('select[name=band]'), form.querySelector('select[name=mode]')];
   var kept = {};
   function saveKeep() {
@@ -348,7 +348,7 @@
   }
   applyPrefs();
 
-  // Clic sur un spot : fréquence (MHz) et bande reprises dans le formulaire.
+  // Click on a spot: frequency (MHz) and band copied into the form.
   var freqInput = form.querySelector('input[name=freq]');
   window.actUseSpot = function (mhz, band) {
     if (freqInput) freqInput.value = mhz;
@@ -361,9 +361,9 @@
     callInput.focus();
   };
 
-  // Après un QSO loggé (formulaire remis à zéro par htmx).
+  // After a QSO is logged (form reset by htmx).
   window.actAfterLog = function () {
-    if (window.htmx) htmx.trigger(document.body, 'act-qso');   // jauges de cadence
+    if (window.htmx) htmx.trigger(document.body, 'act-qso');   // rate gauges
     toggle.checked = false; syncSat();
     restoreKeep();
     applyPrefs();

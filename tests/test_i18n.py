@@ -1,6 +1,6 @@
-"""Traduction du module d'activation : catalogue complet, détection de langue.
+"""Activation module translation: complete catalog, language detection.
 
-Le rendu des pages en anglais est testé dans test_activation.py (base isolée).
+English page rendering is tested in test_activation.py (isolated database).
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ def _norm(text: str) -> str:
 
 
 def message_ids() -> dict[str, str]:
-    """Textes marqués _("…") / N_("…") : templates d'activation, modules Python
-    qui utilisent app.i18n, textes JavaScript."""
+    """Texts marked _("…") / N_("…"): activation templates, Python modules
+    that use app.i18n, JavaScript texts."""
     files = [*ROOT.glob("templates/activation/**/*.html"), *ROOT.glob("templates/login.html")]
     files += [f for f in ROOT.glob("app/**/*.py") if "from app.i18n import" in f.read_text(encoding="utf-8")]
     ids: dict[str, str] = {}
@@ -47,7 +47,7 @@ def test_catalog_translates_every_message(lang: str) -> None:
 
 
 def test_js_messages_are_declared() -> None:
-    """Chaque t('…') des scripts doit figurer dans JS_MESSAGES (envoyé à la page)."""
+    """Every t('…') in the scripts must be listed in JS_MESSAGES (sent to the page)."""
     used = set()
     for f in ROOT.glob("static/js/activation-*.js"):
         for m in _JS_MSG.finditer(f.read_text(encoding="utf-8")):
@@ -56,14 +56,14 @@ def test_js_messages_are_declared() -> None:
 
 
 @pytest.mark.parametrize("header, lang", [
-    (None, "fr"),                                  # robots, scripts : français
+    (None, "fr"),                                  # robots, scripts: French
     ("", "fr"),
     ("fr-FR,fr;q=0.9,en;q=0.8", "fr"),
     ("en-US,en;q=0.9", "en"),
-    ("de-DE,de;q=0.9", "en"),                      # langue non gérée → anglais
-    ("de-DE,de;q=0.9,fr;q=0.8", "fr"),             # le français est dans la liste
-    ("it;q=1.0,en;q=0.5,fr;q=0.8", "fr"),          # ordre des q, pas de l'en-tête
-    ("fr;q=0", "en"),                              # q=0 : refusé
+    ("de-DE,de;q=0.9", "en"),                      # unsupported language → English
+    ("de-DE,de;q=0.9,fr;q=0.8", "fr"),             # French is in the list
+    ("it;q=1.0,en;q=0.5,fr;q=0.8", "fr"),          # q order, not header order
+    ("fr;q=0", "en"),                              # q=0: refused
     ("es;q=abc", "en"),
 ])
 def test_accept_language(header: str | None, lang: str) -> None:
@@ -84,5 +84,5 @@ def test_gettext_and_dates() -> None:
         i18n.use("fr")
     assert i18n.gettext("Réglages") == "Réglages" and i18n.date_long("2026-09-07") == "07/09/2026"
     assert i18n.dow("2026-09-07") == "lun" and i18n.js_catalog() == {}
-    i18n.use("xx")                                 # langue inconnue → français
+    i18n.use("xx")                                 # unknown language → French
     assert i18n.current() == "fr"

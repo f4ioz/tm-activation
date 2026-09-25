@@ -1,9 +1,9 @@
-"""Installation Proxmox (proxmox/tm-activation-lxc.sh) et mise à jour depuis
+"""Proxmox installation (proxmox/tm-activation-lxc.sh) and upgrade from
 GitHub (deploy/update-from-github.sh).
 
-Pas de Proxmox ici : pct, pveam, pvesm et lxc-attach sont simulés et journalisent
-leurs appels ; GitHub est remplacé par un serveur HTTP local qui publie une
-fausse version dont install.sh note ses arguments.
+No Proxmox here: pct, pveam, pvesm and lxc-attach are simulated and log
+their calls; GitHub is replaced by a local HTTP server publishing a
+fake release whose install.sh records its arguments.
 """
 
 from __future__ import annotations
@@ -24,17 +24,17 @@ LXC = ROOT / "proxmox" / "tm-activation-lxc.sh"
 UPDATE = ROOT / "deploy" / "update-from-github.sh"
 
 
-# ── Faux GitHub ─────────────────────────────────────────────────────────────
+# ── Fake GitHub ─────────────────────────────────────────────────────────────
 
 
 class _Quiet(SimpleHTTPRequestHandler):
-    def log_message(self, *args) -> None:  # pas de bruit dans la sortie pytest
+    def log_message(self, *args) -> None:  # no noise in the pytest output
         pass
 
 
 @pytest.fixture
 def fake_github(tmp_path):
-    """Dépôt servi en HTTP : VERSION + releases/tm-activation-9.9.9.tar.gz (+ .sha256)."""
+    """Repository served over HTTP: VERSION + releases/tm-activation-9.9.9.tar.gz (+ .sha256)."""
     repo, build = tmp_path / "repo", tmp_path / "build" / "tm-activation-9.9.9"
     (repo / "releases").mkdir(parents=True)
     build.mkdir(parents=True)
@@ -66,7 +66,7 @@ def test_update_downloads_verifies_and_runs_install(tmp_path, fake_github) -> No
     r = update(tmp_path, url, "--lan", "--non-interactive", "--force")
     assert r.returncode == 0, r.stderr
     assert "Empreinte SHA-256 vérifiée" in r.stdout
-    # --force est consommé par le script ; --dir ajouté car TM_DIR n'est pas le défaut.
+    # --force is consumed by the script; --dir added because TM_DIR is not the default.
     assert calls(tmp_path).strip() == f"install.sh --dir {tmp_path / 'inst'} --lan --non-interactive"
 
 
@@ -105,7 +105,7 @@ def test_update_rejects_invalid_version(tmp_path, fake_github) -> None:
     assert r.returncode != 0 and "version invalide" in r.stderr
 
 
-# ── Faux Proxmox ────────────────────────────────────────────────────────────
+# ── Fake Proxmox ────────────────────────────────────────────────────────────
 
 FAKE_PCT = r"""#!/usr/bin/env bash
 echo "pct $*" >> "$CALLS"
@@ -161,19 +161,19 @@ def proxmox(tmp_path, request):
     for name, body in fakes.items():
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
-    # TM_LANG : la question de langue est passée (testée séparément).
+    # TM_LANG: the language question is skipped (tested separately).
     return {"PATH": f"{bin_dir}:{os.environ['PATH']}", "CALLS": str(tmp_path / "calls"), "TERM": "dumb",
             "TM_LANG": "fr"}
 
 
 def lxc(env: dict[str, str], answers: list[str], **extra: str) -> subprocess.CompletedProcess:
-    # Sourcé (main() ne part pas tout seul) : check_root neutralisé, on n'est pas root.
+    # Sourced (main() does not start by itself): check_root disabled, we are not root.
     script = f'source "{LXC}"\ncheck_root() {{ :; }}\nmain'
     return subprocess.run(["bash", "-c", script], input="\n".join(answers) + "\n", capture_output=True,
                           text=True, timeout=60, env={**os.environ, **env, **extra})
 
 
-# CT 100 et VM 101 déjà prises → redemandé, puis défauts (ID 102 proposé).
+# CT 100 and VM 101 already taken → asked again, then defaults (ID 102 offered).
 CT_DEFAULTS = ["100", "101", "", "", "", "", "", "", "", ""]
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@pc"
 
@@ -183,7 +183,7 @@ def test_lxc_quick_test_install(tmp_path, proxmox) -> None:
     assert r.returncode == 0, r.stdout + r.stderr
     log = calls(tmp_path)
     assert "ID invalide ou déjà utilisé" in r.stdout
-    assert "pveam download local debian-13-standard_13.1-2_amd64.tar.zst" in log   # la plus récente
+    assert "pveam download local debian-13-standard_13.1-2_amd64.tar.zst" in log   # the most recent one
     create = next(line for line in log.splitlines() if line.startswith("pct create"))
     assert create.startswith("pct create 102 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst")
     for opt in ("--hostname tm-activation", "--rootfs local-zfs:4", "--memory 512", "--features nesting=1",
@@ -196,16 +196,16 @@ def test_lxc_quick_test_install(tmp_path, proxmox) -> None:
     assert "TM_CALLSIGN=TM1ABC" in run and "TM_PUBLIC=1" in run and run.endswith("--lan --non-interactive")
     assert "lxc-attach" not in log
     assert "http://192.168.1.50/" in r.stdout and "pct destroy 102" in r.stdout
-    # pct exec n'a pas /usr/local/sbin dans son PATH : commandes affichées avec le chemin complet.
+    # pct exec has no /usr/local/sbin in its PATH: commands shown with the full path.
     assert "pct exec 102 -- /usr/local/sbin/tm-activation-update" in r.stdout
     assert "-- tm-activation-update" not in r.stdout
 
 
 @pytest.mark.parametrize("proxmox", ["avec-pvesh", "sans-pvesh"], indirect=True)
 def test_lxc_default_id_skips_existing_vm_and_ct(tmp_path, proxmox) -> None:
-    """Une VM occupe aussi un ID : 100 (CT) et 101 (VM) pris → 102 proposé."""
+    """A VM also takes an ID: 100 (CT) and 101 (VM) taken → 102 offered."""
     r = lxc(proxmox, ["", "", "", "", "", "", "", "", "", "", "pw", "pw", "1", "n"])
-    assert "CT 102 «" in r.stdout, r.stdout             # récapitulatif (le prompt de read -p est muet hors terminal)
+    assert "CT 102 «" in r.stdout, r.stdout             # summary (the read -p prompt is silent outside a terminal)
     assert r.stdout.count("ID invalide ou déjà utilisé") == 0
 
 
@@ -244,12 +244,12 @@ def test_scripts_are_valid_bash() -> None:
 
 
 def test_lxc_asks_the_language_and_speaks_english(tmp_path, proxmox) -> None:
-    """Sans TM_LANG : première question « Langue / Language », puis tout en anglais."""
+    """Without TM_LANG: first question « Langue / Language », then everything in English."""
     env = {k: v for k, v in proxmox.items() if k != "TM_LANG"}
     r = lxc(env, ["2", *CT_DEFAULTS, "", "", "pw", "pw", "2", "", ""])
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "1) Français" in r.stdout and "2) English" in r.stdout   # le prompt read -p est muet hors terminal
-    # Les questions (read -p) sont muettes hors terminal : on contrôle les lignes affichées.
+    assert "1) Français" in r.stdout and "2) English" in r.stdout   # the read -p prompt is silent outside a terminal
+    # Questions (read -p) are silent outside a terminal: we check the printed lines.
     for expected in ("Summary", "Container 102 created.", "Packages installed.",
                      "TM Activation installed in container 102", "Delete the test container"):
         assert expected in r.stdout, expected

@@ -1,9 +1,9 @@
-"""Module d'activation d'un indicatif temporaire de club (ex. TM25TEST).
+"""Activation module for a temporary club callsign (e.g. TM25TEST).
 
-Coordination des créneaux (qui / quand / bande / mode) et journalisation des
-QSO. L'espace est réservé aux opérateurs du club (mot de passe opérateur dédié,
-session ``tm_auth``) ; l'admin site (mode privé) y accède aussi. L'opérateur
-au micro est mémorisé dans un cookie ``tm_op``.
+Coordination of slots (who / when / band / mode) and QSO logging. The area is
+reserved for club operators (dedicated operator password, ``tm_auth``
+session); the site admin (private mode) can access it too. The operator at the
+microphone is remembered in a ``tm_op`` cookie.
 """
 
 from __future__ import annotations
@@ -34,23 +34,23 @@ from app.config import club_config
 from app.i18n import _
 from app.templating import templates
 
-# Langue de chaque requête (cookie « lang », sinon navigateur) : voir app/i18n.py.
+# Language of each request ("lang" cookie, otherwise the browser): see app/i18n.py.
 router = APIRouter(prefix="/activation", tags=["activation"], dependencies=[Depends(i18n.request_lang)])
 
-# Board public (hors préfixe /activation) — URL partageable sans login.
+# Public board (outside the /activation prefix) — shareable URL, no login.
 public_router = APIRouter(tags=["activation"], dependencies=[Depends(i18n.request_lang)])
 
 COOKIE_OP = "tm_op"
 COOKIE_TZ = "tm_tz"
-COOKIE_TZNAME = "tm_tzname"     # fuseau annoncé par le navigateur du visiteur
+COOKIE_TZNAME = "tm_tzname"     # time zone reported by the visitor's browser
 
 
 def _tz_mode(request: Request) -> str:
-    """Fuseau d'affichage de la requête : « utc », ou un fuseau IANA.
+    """Display time zone of the request: "utc", or an IANA time zone.
 
-    En mode local, c'est celui du visiteur (son navigateur l'a déposé dans un
-    cookie) : les heures s'affichent chez lui à son heure, sans réglage. À
-    défaut — pas de JavaScript, premier affichage — c'est celui de la station.
+    In local mode, it is the visitor's (their browser stored it in a cookie):
+    times are shown in their own local time, with no setting. Failing that — no
+    JavaScript, first display — it is the station's.
     """
     mode = request.cookies.get(COOKIE_TZ) or "local"
     if mode == "utc":
@@ -59,25 +59,25 @@ def _tz_mode(request: Request) -> str:
 
 
 def _visitor_tz(request: Request) -> str:
-    """Fuseau annoncé par le navigateur ("" s'il manque ou n'existe pas).
+    """Time zone reported by the browser ("" if missing or unknown).
 
-    Le « / » est décodé au cas où un navigateur l'aurait échappé (%2F)."""
+    The "/" is decoded in case a browser escaped it (%2F)."""
     raw = unquote((request.cookies.get(COOKIE_TZNAME) or "").strip())
     return raw if activation.valid_tz(raw) else ""
 
 
 def _local_tz_label(request: Request) -> str:
-    """Nom du fuseau du visiteur, même quand il lit la page en UTC."""
+    """Name of the visitor's time zone, even when they read the page in UTC."""
     return activation.tz_label(_visitor_tz(request) or "local")
 
 
 def _authed(request: Request) -> bool:
-    """Accès autorisé à l'espace TM25TEST : opérateur du club OU admin site."""
+    """Access granted to the TM25TEST area: club operator OR site admin."""
     return activation.operator_authed(request.cookies.get(activation.OP_COOKIE)) or is_private(request)
 
 
 def _session_op(request: Request) -> str:
-    """Indicatif saisi à la connexion ("" : session ouverte avant la 1.21, ou admin site)."""
+    """Callsign entered at login ("": session opened before 1.21, or site admin)."""
     token = request.cookies.get(activation.OP_COOKIE)
     if not activation.operator_authed(token):
         return ""
@@ -85,11 +85,11 @@ def _session_op(request: Request) -> str:
 
 
 def _is_admin(request: Request) -> bool:
-    """Admin site (mot de passe de config.yml) OU opérateur admin ou superadmin.
+    """Site admin (config.yml password) OR admin or superadmin operator.
 
-    L'indicatif ne suffit pas : il faut un mot de passe personnel. Avec le mot
-    de passe commun, tout le monde le connaît — se dire administrateur en tapant
-    le bon indicatif ne doit pas ouvrir les Réglages.
+    The callsign is not enough: a personal password is required. With the shared
+    password everyone knows it — claiming to be an administrator by typing the
+    right callsign must not open the "Réglages" (Settings) page.
     """
     if is_private(request):
         return True
@@ -98,9 +98,9 @@ def _is_admin(request: Request) -> bool:
 
 
 def _is_superadmin(request: Request) -> bool:
-    """Admin site OU opérateur superadmin : les seuls à ouvrir les Réglages.
+    """Site admin OR superadmin operator: the only ones who can open the Settings.
 
-    Même exigence que pour l'admin : un mot de passe personnel."""
+    Same requirement as for admin: a personal password."""
     if is_private(request):
         return True
     op = _session_op(request)
@@ -108,7 +108,7 @@ def _is_superadmin(request: Request) -> bool:
 
 
 def _guard(request: Request) -> Response | None:
-    """None si l'accès est autorisé ; sinon une redirection vers le login opérateur."""
+    """None if access is granted; otherwise a redirect to the operator login."""
     if _authed(request):
         return None
     login = f"/activation/login?next={request.url.path}"
@@ -120,17 +120,17 @@ def _guard(request: Request) -> Response | None:
 
 
 def _require_admin(request: Request) -> Response | None:
-    """None pour un admin (site, opérateur admin ou superadmin) ; sinon /login."""
+    """None for an admin (site, admin or superadmin operator); otherwise /login."""
     if _is_admin(request):
         return None
     return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
 
 
 def _require_superadmin(request: Request) -> Response | None:
-    """None pour un superadmin ; sinon redirige vers /login.
+    """None for a superadmin; otherwise redirects to /login.
 
-    Les Réglages sont réservés à l'administrateur et aux opérateurs
-    superadmin — pas aux simples admins ni aux opérateurs.
+    The Settings are reserved for the administrator and superadmin
+    operators — not for plain admins or operators.
     """
     if _is_superadmin(request):
         return None
@@ -138,18 +138,18 @@ def _require_superadmin(request: Request) -> Response | None:
 
 
 def _safe_next(value: str | None) -> str:
-    """Redirection restreinte aux chemins internes de l'espace activation."""
+    """Redirect restricted to internal paths of the activation area."""
     return security.safe_next(value, "/activation", prefix="/activation")
 
 
 def _locked_op(request: Request) -> str:
-    """Indicatif imposé à la session ("" = libre de choisir).
+    """Callsign enforced for the session ("" = free to choose).
 
-    Un opérateur non coché « administrateur » reste sur son périmètre : il
-    logue, planifie, importe et exporte sous le seul indicatif donné à la
-    connexion. Vrai aussi avec le mot de passe commun — c'est alors un garde-fou
-    contre les erreurs, pas une barrière : qui connaît le mot de passe peut se
-    reconnecter sous un autre indicatif. Seul l'admin du site n'est pas concerné.
+    An operator without the "administrateur" box ticked stays within their scope:
+    they log, plan, import and export only under the callsign given at login.
+    Also true with the shared password — it is then a safeguard against
+    mistakes, not a barrier: anyone who knows the password can log in again
+    under another callsign. Only the site admin is exempt.
     """
     op = _session_op(request)
     if not op or is_private(request) or activation.operator_is_admin(op):
@@ -173,7 +173,7 @@ def _ctx(request: Request, **extra: object) -> dict:
         "my_grid": activation.my_gridsquare(),
         "is_admin": _is_admin(request),
         "is_superadmin": _is_superadmin(request),
-        "site_admin": is_private(request),     # journal des visites : admin du site seul
+        "site_admin": is_private(request),     # visit log: site admin only
         "session_op": _session_op(request),
         "locked_op": _locked_op(request),
         "station": activation.current_station(),
@@ -190,7 +190,7 @@ def _ctx(request: Request, **extra: object) -> dict:
     return ctx
 
 
-# ── Auth opérateurs du club ──────────────────────────────────────────────────
+# ── Auth club operators ───────────────────────────────────────────────────
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -224,7 +224,7 @@ async def operator_login_submit(
     next: str = Form("/activation"),
     captcha: str = Form(""),
     captcha_token: str = Form(""),
-    website: str = Form(""),          # champ-piège, invisible : rempli = robot
+    website: str = Form(""),          # invisible honeypot field: filled in = bot
 ) -> Response:
     target = _safe_next(next)
     per_op = activation.per_operator_auth()
@@ -237,7 +237,7 @@ async def operator_login_submit(
     elif per_op and not activation.check_captcha(captcha_token, captcha, website):
         error = _("Réponse à la question incorrecte : recommencez.")
     elif per_op:
-        # Compte créé à la première connexion ; validation éventuelle par un admin.
+        # Account created at first login; optional approval by an admin.
         error = {
             "invalid": _("Indicatif invalide"),
             "bad": _("Mot de passe incorrect"),
@@ -255,8 +255,8 @@ async def operator_login_submit(
     if not blocked:
         visits.record_auth(request, "operator", op, error is None)
     if error is None:
-        # Mot de passe commun : l'indicatif rejoint la liste (en mode comptes,
-        # operator_login l'a déjà fait, avec son mot de passe).
+        # Shared password: the callsign joins the list (in accounts mode,
+        # operator_login has already done it, with its password).
         if not per_op:
             try:
                 activation.add_operator(op)
@@ -275,7 +275,7 @@ async def operator_login_submit(
         return resp
 
     if not blocked:
-        await asyncio.sleep(security.FAILED_LOGIN_DELAY)  # ralentit les essais de mots de passe
+        await asyncio.sleep(security.FAILED_LOGIN_DELAY)  # slows down password guessing
     return templates.TemplateResponse(
         request,
         "activation/login.html",
@@ -305,10 +305,10 @@ async def operator_logout() -> Response:
 
 @router.get("/lang/{code}")
 async def set_language(request: Request, code: str, next: str = "/activations") -> Response:
-    """Choix de la langue (bouton FR | EN du bandeau), mémorisé un an.
+    """Language choice (FR | EN button in the header bar), remembered for a year.
 
-    Non protégé, comme /tz : simple préférence d'affichage, valable aussi pour
-    les pages publiques (cookie path=/)."""
+    Not protected, like /tz: a mere display preference, also valid for the
+    public pages (cookie path=/)."""
     resp = RedirectResponse(security.safe_next(next, "/activations"), status_code=303)
     if code in i18n.LANGS:
         resp.set_cookie(i18n.COOKIE, code, max_age=i18n.COOKIE_MAX_AGE, samesite="lax", path="/",
@@ -318,13 +318,13 @@ async def set_language(request: Request, code: str, next: str = "/activations") 
 
 @router.get("/tz")
 async def set_timezone(request: Request, mode: str = "local", next: str = "/activation") -> Response:
-    """Préférence d'affichage Local (fuseau du visiteur) / UTC. Stockage en UTC.
+    """Display preference Local (visitor's time zone) / UTC. Storage is in UTC.
 
-    Non protégé : c'est une simple préférence d'affichage (vaut aussi pour le
-    board public). Cookie path=/ pour couvrir /activation et les pages /<indicatif>.
+    Not protected: it is a mere display preference (also applies to the public
+    board). Cookie path=/ to cover /activation and the /<callsign> pages.
     """
     m = mode if mode in activation.TZ_MODES else "local"
-    # Chemin interne uniquement (« //hote », « /\hote »… = redirection externe).
+    # Internal path only ("//host", "/\host"… = external redirect).
     target = security.safe_next(next, "/activation")
     resp = RedirectResponse(target, status_code=303)
     resp.set_cookie(COOKIE_TZ, m, max_age=180 * 86400, samesite="lax", path="/",
@@ -358,7 +358,7 @@ async def dashboard(request: Request) -> Response:
     )
 
 
-# ── Opérateur courant ──────────────────────────────────────────────────────
+# ── Current operator ───────────────────────────────────────────────────────
 
 
 @router.post("/whoami")
@@ -369,7 +369,7 @@ async def set_operator(request: Request, operator: str = Form(""), next: str = F
     resp = RedirectResponse(target, status_code=303)
     cs = (operator or "").strip().upper()
     if _locked_op(request):
-        return resp                      # opérateur verrouillé sur son indicatif
+        return resp                      # operator locked to their callsign
     if activation.valid_callsign(cs):
         resp.set_cookie(COOKIE_OP, cs, max_age=30 * 86400, samesite="lax", path="/activation",
                         secure=security.is_https(request))
@@ -387,7 +387,7 @@ async def add_operator(request: Request, callsign: str = Form(""), name: str = F
     return RedirectResponse("/activation/planning", status_code=303)
 
 
-# ── Réglages ───────────────────────────────────────────────────────────────
+# ── Settings ───────────────────────────────────────────────────────────────
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -398,7 +398,7 @@ async def settings_page(request: Request) -> Response:
 
 
 def _settings_page(request: Request, status_code: int = 200, **extra: object) -> Response:
-    """Page Réglages (admin) ; ``extra`` : erreur / valeurs du formulaire d'indicatif."""
+    """Settings page (admin); ``extra``: error / values of the callsign form."""
     last = activation.last_backup_info()
     last_str = (
         datetime.fromtimestamp(last["mtime"], activation.PARIS).strftime("%d/%m/%Y %H:%M")
@@ -503,8 +503,8 @@ async def change_auth_mode(
     min_length: str = Form(""), min_upper: str = Form(""), min_digits: str = Form(""),
     min_special: str = Form(""),
 ) -> Response:
-    """Mot de passe commun ou un mot de passe par opérateur (+ validation), et
-    exigences des mots de passe individuels."""
+    """Shared password or one password per operator (+ approval), and
+    requirements for individual passwords."""
     if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_flag("per_operator_auth", bool(per_operator))
@@ -518,7 +518,7 @@ async def change_auth_mode(
 async def manage_operator(
     request: Request, call: str, action: str = Form(""), password: str = Form(""),
 ) -> Response:
-    """Gestion d'un compte opérateur (admin) : validation, droits, mot de passe."""
+    """Operator account management (admin): approval, rights, password."""
     if (g := _require_superadmin(request)) is not None:
         return g
     cs = (call or "").strip().upper()
@@ -528,7 +528,7 @@ async def manage_operator(
         if action == "approve":
             activation.approve_operator(cs)
         elif action in ("admin", "unadmin"):
-            # Un administrateur ne peut pas se retirer ses propres droits par mégarde.
+            # An administrator cannot accidentally remove their own rights.
             if action == "unadmin" and cs == me:
                 flash = "self"
             else:
@@ -561,7 +561,7 @@ async def change_qrz_account(
     password: str = Form(""),
     action: str = Form("save"),
 ) -> Response:
-    """Compte QRZ.com du callbook (admin) : testé auprès de QRZ avant d'être gardé."""
+    """QRZ.com callbook account (admin): tested against QRZ before being saved."""
     if (g := _require_superadmin(request)) is not None:
         return g
     if action == "clear":
@@ -576,9 +576,9 @@ async def change_qrz_account(
         return RedirectResponse("/activation/settings?qz=refused#qrz", status_code=303)
     activation.set_qrz_account(username, password)
     if status == "error":
-        flash = "offline"                    # QRZ injoignable : gardé, vérifié plus tard
+        flash = "offline"                    # QRZ unreachable: kept, checked later
     elif "non-subscriber" in detail.lower():
-        flash = "nosub"                      # compte valide mais sans abonnement XML
+        flash = "nosub"                      # valid account but no XML subscription
     else:
         flash = "ok"
     return RedirectResponse(f"/activation/settings?qz={flash}#qrz", status_code=303)
@@ -586,7 +586,7 @@ async def change_qrz_account(
 
 @router.post("/settings/scoring")
 async def change_scoring(request: Request) -> Response:
-    """Règle de points du classement (admin) : champs dynamiques par mode."""
+    """Ranking points rule (admin): dynamic fields per mode."""
     if (g := _require_superadmin(request)) is not None:
         return g
     form = await request.form()
@@ -600,7 +600,7 @@ async def change_report_options(
     hunters: str = Form(""), sats: str = Form(""), one_page: str = Form(""),
     runs: str = Form(""),
 ) -> Response:
-    """Contenu du rapport PDF (sections facultatives)."""
+    """Content of the PDF report (optional sections)."""
     if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_report_options({"hours": hours, "dxcc_all": dxcc_all, "hunters": hunters,
@@ -617,7 +617,7 @@ async def change_certificate_options(
     emblem: str = Form(""), emblem_text: str = Form(""), ham_symbol: str = Form(""),
     qr_url: str = Form(""),
 ) -> Response:
-    """Certificats des chasseurs : ouverture au public et contenu."""
+    """Hunter certificates: public availability and content."""
     if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_certificate_options({"enabled": enabled, "names": names,
@@ -635,7 +635,7 @@ async def change_certificate_options(
 @router.post("/settings/log-view")
 async def change_log_view(request: Request, photo: str = Form(""),
                           compass: str = Form("")) -> Response:
-    """Tailles de la photo QRZ et de la boussole sur la page de log."""
+    """Sizes of the QRZ photo and of the compass on the log page."""
     if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_log_view({"photo": photo, "compass": compass})
@@ -644,7 +644,7 @@ async def change_log_view(request: Request, photo: str = Form(""),
 
 @router.post("/settings/logo")
 async def upload_logo(request: Request, logo: UploadFile | None = File(None)) -> Response:
-    """Logo du club : bandeau du site, en-tête des pages et rapport PDF."""
+    """Club logo: site header bar, page headers and PDF report."""
     if (g := _require_superadmin(request)) is not None:
         return g
     data = await logo.read() if logo is not None else b""
@@ -658,7 +658,7 @@ async def upload_logo(request: Request, logo: UploadFile | None = File(None)) ->
 
 @router.post("/settings/logo/show")
 async def toggle_logo_on_pages(request: Request, show: str = Form("")) -> Response:
-    """Afficher ou non le logo dans le bandeau des pages (le PDF le garde)."""
+    """Show or hide the logo in the page header bar (the PDF keeps it)."""
     if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_flag("logo_on_pages", bool(show))
@@ -675,7 +675,7 @@ async def delete_logo(request: Request) -> Response:
 
 @router.get("/report.pdf")
 async def activity_report(request: Request, station: str = "") -> Response:
-    """Bilan illustré de l'activation, en PDF (administrateur)."""
+    """Illustrated activation report, as PDF (administrator)."""
     if (g := _require_admin(request)) is not None:
         return g
     call = (station or activation.callsign()).strip().upper()
@@ -693,7 +693,7 @@ async def activity_report(request: Request, station: str = "") -> Response:
 
 @router.post("/settings/slots-from-log")
 async def rebuild_slots_from_log(request: Request) -> Response:
-    """Recale tout de suite les créneaux sur le log (admin), sans attendre un QSO."""
+    """Realign the slots with the log right away (admin), without waiting for a QSO."""
     if (g := _require_superadmin(request)) is not None:
         return g
     done = activation.reconcile_slots_from_log(force=True)
@@ -704,7 +704,7 @@ async def rebuild_slots_from_log(request: Request) -> Response:
 
 @router.post("/settings/map")
 async def change_map_style(request: Request) -> Response:
-    """Couleurs (modes) et formes (bandes) de la carte publique (admin)."""
+    """Colors (modes) and shapes (bands) of the public map (admin)."""
     if (g := _require_superadmin(request)) is not None:
         return g
     form = await request.form()
@@ -712,13 +712,13 @@ async def change_map_style(request: Request) -> Response:
     return RedirectResponse("/activation/settings?mp=ok#carte", status_code=303)
 
 
-# ── Indicatifs spéciaux (admin) ────────────────────────────────────────────
+# ── Special callsigns (admin) ──────────────────────────────────────────────
 
 _STATION_FORM_FIELDS = ("label", "gridsquare", "start_date", "end_date", "badge", "subtitle", "flags", "public")
 
 
 def _station_fields(form: object) -> dict:
-    """Champs d'une fiche depuis le formulaire (case « public » absente = décochée)."""
+    """Record fields from the form (missing "public" checkbox = unticked)."""
     return {k: str(form.get(k, "")) for k in _STATION_FORM_FIELDS}  # type: ignore[attr-defined]
 
 
@@ -771,7 +771,7 @@ async def station_edit_submit(request: Request, slug: str) -> Response:
 
 @router.post("/stations/{slug}/current")
 async def station_set_current(request: Request, slug: str) -> Response:
-    """Un seul indicatif en cours : l'espace opérateurs bascule sur celui-ci."""
+    """A single current callsign: the operator area switches to this one."""
     if (g := _require_superadmin(request)) is not None:
         return g
     activation.set_current_station(_station_or_404(slug)["callsign"])
@@ -780,7 +780,7 @@ async def station_set_current(request: Request, slug: str) -> Response:
 
 @router.post("/stations/{slug}/delete")
 async def station_delete(request: Request, slug: str) -> Response:
-    """Suppression d'une fiche sans QSO (refus expliqué sinon)."""
+    """Delete a record with no QSO (otherwise an explained refusal)."""
     if (g := _require_superadmin(request)) is not None:
         return g
     try:
@@ -815,7 +815,7 @@ async def download_backup(request: Request) -> Response:
     )
 
 
-# ── Planning des créneaux ──────────────────────────────────────────────────
+# ── Slot planning ──────────────────────────────────────────────────────────
 
 
 @router.get("/planning", response_class=HTMLResponse)
@@ -844,15 +844,15 @@ def _band_key(band: str) -> tuple[int, str]:
 
 
 def _own_contacts(request: Request) -> list[dict]:
-    """QSO visibles par la session : tout le log, ou les seuls QSO de
-    l'opérateur quand son indicatif est verrouillé."""
+    """QSOs visible to the session: the whole log, or only the operator's own
+    QSOs when their callsign is locked."""
     contacts = activation.list_contacts()
     locked = _locked_op(request)
     return [q for q in contacts if q["operator_call"] == locked] if locked else contacts
 
 
 def _adif_page(request: Request, preview: dict | None = None) -> Response:
-    """Page ADIF : import (avec aperçu éventuel) + export d'une sélection."""
+    """ADIF page: import (with optional preview) + export of a selection."""
     contacts = _own_contacts(request)
     q = request.query_params
     flash = None
@@ -894,8 +894,8 @@ async def import_preview(
     op_source: str = Form("form"),
     file: UploadFile = File(...),
 ) -> Response:
-    """Étape 1 : analyse du fichier et aperçu des QSO avec leur statut
-    (doublons…). Rien n'est écrit dans le log à ce stade."""
+    """Step 1: parse the file and preview the QSOs with their status
+    (duplicates…). Nothing is written to the log at this stage."""
     if (g := _guard(request)) is not None:
         return g
     text = (await file.read()).decode("utf-8", errors="replace")
@@ -925,15 +925,15 @@ async def import_confirm(
     op_source: str = Form("form"),
     sel: list[int] = Form(default=[]),
 ) -> Response:
-    """Étape 2 : importe les QSO cochés dans l'aperçu (jeton à usage unique)."""
+    """Step 2: import the QSOs ticked in the preview (single-use token)."""
     if (g := _guard(request)) is not None:
         return g
     text = activation.load_import(token)
     if text is None:
         return RedirectResponse("/activation/adif?err=expired", status_code=303)
-    activation.drop_import(token)  # usage unique : pas de double import
+    activation.drop_import(token)  # single use: no double import
     try:
-        activation.backup_now()    # filet de sécurité avant un import en masse
+        activation.backup_now()    # safety net before a bulk import
     except Exception:  # noqa: BLE001
         pass
     locked = _locked_op(request)
@@ -947,7 +947,7 @@ async def import_confirm(
 
 @router.post("/export-selection.adi")
 async def export_selection(request: Request, ids: list[int] = Form(default=[])) -> Response:
-    """ADIF des seuls QSO cochés sur la page ADIF."""
+    """ADIF of only the QSOs ticked on the ADIF page."""
     if (g := _guard(request)) is not None:
         return g
     contacts = activation.contacts_by_ids(ids)
@@ -977,7 +977,7 @@ async def create_slot(
     if (g := _guard(request)) is not None:
         return g
     tzm = _tz_mode(request)
-    operator = _locked_op(request) or operator      # pas de créneau au nom d'un autre
+    operator = _locked_op(request) or operator      # no slot in someone else's name
     start_utc = activation.input_to_utc_iso(start, tzm)
     end_utc = activation.input_to_utc_iso(end, tzm)
     warn = ""
@@ -993,7 +993,7 @@ async def create_slot(
 
 
 def _may_touch_slot(request: Request, slot_id: int) -> bool:
-    """Créneau modifiable/supprimable par la session ? (chacun les siens)"""
+    """Can the session edit/delete this slot? (everyone their own)"""
     locked = _locked_op(request)
     if not locked:
         return True
@@ -1080,10 +1080,10 @@ async def log_page(request: Request) -> Response:
 
 @router.get("/qrz")
 async def qrz_lookup_route(request: Request, call: str = "") -> Response:
-    """Lookup QRZ pour la saisie du log : prénom, nom, locator, pays DXCC.
+    """QRZ lookup for log entry: first name, last name, locator, DXCC country.
 
-    Réservé à l'espace opérateurs (compte QRZ abonné du site, quota à ne pas
-    ouvrir au public). Le résultat est mémorisé dans le callbook.
+    Reserved for the operator area (the site's subscribed QRZ account, a quota
+    not to be opened to the public). The result is stored in the callbook.
     """
     if (g := _guard(request)) is not None:
         return g
@@ -1111,7 +1111,7 @@ async def qrz_lookup_route(request: Request, call: str = "") -> Response:
 
 @router.get("/worked")
 async def worked_route(request: Request, call: str = "") -> Response:
-    """Station déjà contactée ? Interrogé pendant la saisie de l'indicatif."""
+    """Station already worked? Queried while the callsign is being typed."""
     if (g := _guard(request)) is not None:
         return g
     return JSONResponse(activation.worked_before(call), headers={"Cache-Control": "no-store"})
@@ -1119,7 +1119,7 @@ async def worked_route(request: Request, call: str = "") -> Response:
 
 @router.get("/slot-conflict")
 async def slot_conflict_route(request: Request, band: str = "", mode: str = "") -> Response:
-    """Bande/mode réservés par un autre opérateur en ce moment ? (avertissement live)"""
+    """Band/mode currently reserved by another operator? (live warning)"""
     if (g := _guard(request)) is not None:
         return g
     slot = activation.blocking_slot(_current_op(request), band, mode) if activation.slot_lock() else None
@@ -1136,7 +1136,7 @@ async def slot_conflict_route(request: Request, band: str = "", mode: str = "") 
 
 @router.get("/rate", response_class=HTMLResponse)
 async def rate_panel(request: Request) -> Response:
-    """Jauges de cadence de l'opérateur au micro (ou de la station)."""
+    """Rate gauges of the operator at the microphone (or of the station)."""
     if (g := _guard(request)) is not None:
         return g
     return templates.TemplateResponse(
@@ -1149,11 +1149,11 @@ async def rate_panel(request: Request) -> Response:
 
 @router.get("/spots", response_class=HTMLResponse)
 async def spots_panel(request: Request, band: str = "", mode: str = "") -> Response:
-    """Panneau « suis-je spotté ? » du log (rafraîchi par htmx, jamais bloquant).
+    """The log's "Am I spotted?" panel (refreshed by htmx, never blocking).
 
-    Seuls les spots de la bande ET du type de trafic en cours (télégraphie,
-    phonie, numérique) sont montrés — c'est là que se joue le pile-up. Sans
-    Internet, la liste revient vide et le panneau disparaît.
+    Only spots on the current band AND traffic type (CW, phone, digital) are
+    shown — that is where the pile-up happens. Without Internet, the list comes
+    back empty and the panel disappears.
     """
     if (g := _guard(request)) is not None:
         return g
@@ -1164,8 +1164,8 @@ async def spots_panel(request: Request, band: str = "", mode: str = "") -> Respo
         found = [spot for spot in found if spot["band"] == wanted]
     family = dx_spots.family_of_mode(mode)
     if family:
-        # Un spot dont le mode reste indéterminé est gardé : mieux vaut le
-        # montrer que de laisser croire que personne ne nous entend.
+        # A spot whose mode stays undetermined is kept: better to show it than
+        # to suggest that nobody hears us.
         found = [spot for spot in found if spot["mode"] in ("", family)]
     found = found[:3]
     return templates.TemplateResponse(
@@ -1201,16 +1201,16 @@ async def create_contact(
         freq_mhz = float(freq.replace(",", ".")) if freq.strip() else None
     except ValueError:
         freq_mhz = None
-    # « Maintenant » coché (ou champ vide) → heure de validation, en UTC ;
-    # sinon date/heure saisies dans le fuseau d'affichage courant.
+    # "Maintenant" (Now) ticked (or empty field) → submission time, in UTC;
+    # otherwise the date/time entered in the current display time zone.
     qso_date = time_on = None
     if when.strip() and not now:
         iso = activation.input_to_utc_iso(when, _tz_mode(request))
         parts = activation.utc_iso_to_parts(iso) if iso else None
         if parts:
             qso_date, time_on = parts
-    # Bande et mode réservés par un autre opérateur à cet instant : on n'écrit
-    # rien (deux stations sous le même indicatif se brouilleraient).
+    # Band and mode reserved by another operator right now: nothing is written
+    # (two stations under the same callsign would interfere with each other).
     blocking = None
     if activation.slot_lock():
         when_utc = (activation.parts_to_utc_iso(qso_date, time_on)
@@ -1247,7 +1247,7 @@ async def create_contact(
 
 
 def _may_touch(request: Request, contact_id: int) -> bool:
-    """QSO modifiable/supprimable par la session ? (chacun ses propres QSO)"""
+    """Can the session edit/delete this QSO? (everyone their own QSOs)"""
     locked = _locked_op(request)
     if not locked:
         return True
@@ -1324,7 +1324,7 @@ async def update_contact(
         return g
     if not _may_touch(request, contact_id):
         return RedirectResponse("/activation/log", status_code=303)
-    operator = _locked_op(request) or operator      # pas de QSO au nom d'un autre
+    operator = _locked_op(request) or operator      # no QSO in someone else's name
     try:
         freq_mhz = float(freq.replace(",", ".")) if freq.strip() else None
     except ValueError:
@@ -1371,12 +1371,12 @@ async def export_csv(request: Request) -> Response:
     )
 
 
-# ── Board public (lecture seule) ───────────────────────────────────────────
+# ── Public board (read-only) ───────────────────────────────────────────────
 
 
 def _public_stats(station: str, search_call: str = "") -> dict:
-    """Carte / DXCC / classement d'un indicatif, si le réglage l'autorise.
-    ``search_rank`` : place de l'indicatif recherché dans le classement."""
+    """Map / DXCC / ranking of a callsign, if the setting allows it.
+    ``search_rank``: position of the searched callsign in the ranking."""
     if not activation.show_map_stats():
         return {"show_map_stats": False}
     grid = activation.my_gridsquare(station)
@@ -1397,7 +1397,7 @@ def _public_stats(station: str, search_call: str = "") -> dict:
 
 @public_router.get("/logo")
 async def club_logo(request: Request) -> Response:
-    """Logo du club, déposé dans les Réglages (404 tant qu'il n'y en a pas)."""
+    """Club logo, uploaded in the Settings (404 as long as there is none)."""
     info = activation.logo_info()
     if info is None:
         return Response(status_code=404)
@@ -1409,7 +1409,7 @@ async def club_logo(request: Request) -> Response:
 
 @public_router.get("/activations", response_class=HTMLResponse)
 async def stations_page(request: Request) -> Response:
-    """Liste publique des indicatifs spéciaux du club (pages publiées)."""
+    """Public list of the club's special callsigns (published pages)."""
     return templates.TemplateResponse(
         request,
         "activation/stations.html",
@@ -1429,8 +1429,8 @@ _RE_SLUG = re.compile(r"^[a-z0-9]{3,16}$")
 
 
 class _CallSlugConvertor(Convertor):
-    """Segment d'indicatif : lettres/chiffres avec au moins un chiffre. La route
-    générique ne capte ainsi ni /.git, /.ssh… ni /content (plus de 307)."""
+    """Callsign segment: letters/digits with at least one digit. That way the
+    generic route catches neither /.git, /.ssh… nor /content (no more 307)."""
 
     regex = "[A-Za-z0-9]*[0-9][A-Za-z0-9]*"
 
@@ -1447,11 +1447,11 @@ register_url_convertor("callslug", _CallSlugConvertor())
 @public_router.get("/{slug:callslug}/certificat")
 async def hunter_certificate(request: Request, slug: str, call: str = "",
                              back: str = "") -> Response:
-    """Certificat PDF d'un chasseur (page publique de l'indicatif).
+    """PDF certificate of a hunter (public page of the callsign).
 
-    Ouvert aux chasseurs quand l'admin a activé les certificats ; un
-    administrateur peut toujours le produire, ne serait-ce que pour le relire
-    avant de l'ouvrir au public.
+    Open to hunters once the admin has enabled certificates; an administrator
+    can always generate it, if only to proofread it before opening it to the
+    public.
     """
     st = activation.station_by_slug(slug)
     if st is None:
@@ -1460,8 +1460,8 @@ async def hunter_certificate(request: Request, slug: str, call: str = "",
     if not admin and (not st["public"] or not activation.certificates_on()):
         return Response(status_code=404)
     cs = (call or "").strip().upper()
-    # Essai depuis les Réglages : on y revient (avec le message), plutôt que
-    # d'expédier l'administrateur sur la page publique.
+    # Test run from the Settings: go back there (with the message) rather than
+    # sending the administrator to the public page.
     settings_back = back == "settings" and admin
 
     def failed(reason: str) -> Response:
@@ -1487,10 +1487,10 @@ async def hunter_certificate(request: Request, slug: str, call: str = "",
 
 @public_router.get("/{slug:callslug}", response_class=HTMLResponse)
 async def public_board(request: Request, slug: str, call: str = "") -> Response:
-    """Page publique d'un indicatif spécial : /tm25test, /tm61xyz…
+    """Public page of a special callsign: /tm25test, /tm61xyz…
 
-    Route générique à un segment, incluse en dernier (main.py) : tout ce qui
-    n'est pas un indicatif publié répond 404, comme avant.
+    Generic one-segment route, included last (main.py): anything that is not a
+    published callsign returns 404, as before.
     """
     low = slug.lower()
     st = activation.station_by_slug(low) if _RE_SLUG.match(low) else None

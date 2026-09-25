@@ -1,8 +1,8 @@
-"""Chargement de la configuration (config.yml).
+"""Configuration loading (config.yml).
 
-Chemin : variable d'environnement ``TM_CONFIG`` (posée par l'unité systemd),
-sinon ``config.yml`` à la racine, à défaut ``config.yml.example`` pour un
-premier essai sans rien configurer.
+Path: ``TM_CONFIG`` environment variable (set by the systemd unit),
+else ``config.yml`` at the root, failing that ``config.yml.example`` for a
+first try without configuring anything.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def server_config() -> dict[str, Any]:
 
 
 def club_config() -> dict[str, Any]:
-    """Radio-club qui active les indicatifs (nom, indicatif, ville, site web)."""
+    """Radio club activating the callsigns (name, callsign, city, website)."""
     return _section("club")
 
 

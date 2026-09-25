@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------------------------
-# TM Activation — installation en conteneur LXC sur Proxmox VE
+# TM Activation — installation in an LXC container on Proxmox VE
 #
-# Crée une CT Debian (non privilégiée), puis télécharge TM Activation depuis
-# GitHub (https://github.com/f4ioz/tm-activation), vérifie son empreinte et
-# l'installe dans la CT : installation guidée (réseau local, Internet par la
-# box ou Cloudflare Tunnel) ou test rapide en réseau local.
+# Creates an (unprivileged) Debian CT, then downloads TM Activation from
+# GitHub (https://github.com/f4ioz/tm-activation), verifies its checksum and
+# installs it in the CT: guided installation (local network, Internet via the
+# router or Cloudflare Tunnel) or a quick test on the local network.
 #
-# Usage : sur le nœud Proxmox, en root :
+# Usage: on the Proxmox node, as root:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/f4ioz/tm-activation/main/proxmox/tm-activation-lxc.sh)"
 #
 # Variables : TM_REPO (f4ioz/tm-activation), TM_BRANCH (main), TM_VERSION
-# (version précise), TM_RAW_URL (miroir des fichiers bruts du dépôt).
+# (specific version), TM_RAW_URL (mirror of the repository's raw files).
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
@@ -19,17 +19,17 @@ set -euo pipefail
 REPO="${TM_REPO:-f4ioz/tm-activation}"
 BRANCH="${TM_BRANCH:-main}"
 RAW="${TM_RAW_URL:-https://raw.githubusercontent.com/$REPO/$BRANCH}"
-# Chemin complet partout : pct exec n'a pas /usr/local/sbin dans son PATH.
+# Full path everywhere: pct exec does not have /usr/local/sbin in its PATH.
 UPDATER="/usr/local/sbin/tm-activation-update"
 
-# ─── Langue (français d'origine, anglais) ─────────────────────────────────────
-# Les textes sont écrits en français ; MSG donne leur traduction anglaise.
-# Choix : --lang / TM_LANG, sinon première question. Valeurs variables : {1}, {2}…
+# ─── Language (French source, English) ────────────────────────────────────────
+# Texts are written in French; MSG provides their English translation.
+# Choice: --lang / TM_LANG, else the first question. Variable values: {1}, {2}…
 UI_LANG="${TM_LANG:-}"
 declare -A MSG=()
 
-t() {  # t "texte français" [valeur de {1}, de {2}…]
-  # Les espaces d'alignement en tête ne font pas partie de la clé.
+t() {  # t "French text" [value of {1}, of {2}…]
+  # Leading alignment spaces are not part of the key.
   local raw="$1" lead m i=1 a
   shift
   lead="${raw%%[! ]*}"
@@ -40,8 +40,8 @@ t() {  # t "texte français" [valeur de {1}, de {2}…]
 }
 
 load_en() {
-  # Traductions anglaises (clé = texte français). Intégrées : ce script est
-  # lancé seul, sans le reste du package.
+  # English translations (key = French text). Built in: this script is
+  # run on its own, without the rest of the package.
   MSG["  CT          : {1} ({2})  IP {3}"]="  CT          : {1} ({2})  IP {3}"
   MSG["(Entrée = valeur proposée)"]="(Enter = suggested value)"
   MSG["1) Guidée : les questions de TM Activation (réseau local, Internet par la"]="1) Guided: the TM Activation questions (local network, Internet through the"
@@ -132,7 +132,7 @@ ask_lang() {
   case "${choice,,}" in 2|en|english|e) UI_LANG="en"; load_en ;; *) UI_LANG="fr" ;; esac
 }
 
-# ─── Couleurs ─────────────────────────────────────────────────────────────────
+# ─── Colors ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
@@ -157,7 +157,7 @@ EOF
   echo
 }
 
-# ─── Pré-checks ───────────────────────────────────────────────────────────────
+# ─── Pre-checks ───────────────────────────────────────────────────────────────
 check_root() {
   [[ $EUID -eq 0 ]] || { msg_err "À lancer en root sur le nœud Proxmox."; exit 1; }
 }
@@ -168,18 +168,18 @@ check_proxmox() {
   done
 }
 
-# ─── Défauts ──────────────────────────────────────────────────────────────────
+# ─── Defaults ─────────────────────────────────────────────────────────────────
 D_HOSTNAME="tm-activation"
-D_DISK="4"           # Go : Debian + Python + base SQLite (quelques Mo)
+D_DISK="4"           # GB: Debian + Python + SQLite database (a few MB)
 D_CORES="1"
-D_RAM="512"          # Mo : un seul worker uvicorn
-D_SWAP="512"         # Mo
+D_RAM="512"          # MB: a single uvicorn worker
+D_SWAP="512"         # MB
 D_BRIDGE="vmbr0"
 D_IP="dhcp"
 D_TEST_CALL="TM0TEST"
 
-# Les ID sont communs aux VM et aux CT, sur tout le cluster : pvesh le sait,
-# pct status ne voit que les CT du nœud.
+# IDs are shared by VMs and CTs across the whole cluster: pvesh knows this,
+# pct status only sees the CTs of this node.
 id_free() {
   if command -v pvesh >/dev/null; then
     pvesh get /cluster/nextid --vmid "$1" >/dev/null 2>&1
@@ -197,19 +197,19 @@ find_next_ctid() {
   echo "$id"
 }
 
-first_storage() {  # first_storage CONTENU DÉFAUT → stockage acceptant ce contenu
+first_storage() {  # first_storage CONTENT DEFAULT → storage accepting this content
   local found
   found=$(pvesm status -content "$1" 2>/dev/null | awk 'NR > 1 && $3 == "active" {print $1}')
   if grep -qx "$2" <<<"$found"; then echo "$2"; else echo "${found%%$'\n'*}"; fi
 }
 
-ask() {  # ask VAR "Question" [défaut]
+ask() {  # ask VAR "Question" [default]
   local answer
   read -rp "$(t "$2")${3:+ [$3]} : " answer || true
   printf -v "$1" '%s' "${answer:-${3:-}}"
 }
 
-ask_password() {  # ask_password VAR "Question" : deux saisies identiques, non vides
+ask_password() {  # ask_password VAR "Question" : two identical entries, not empty
   local pw pw2
   while :; do
     read -rsp "$(t "$2") : " pw || true; echo
@@ -320,7 +320,7 @@ ensure_template() {
   msg_ok "Template : {1}" "$tmpl"
 }
 
-# ─── Création CT ──────────────────────────────────────────────────────────────
+# ─── CT creation ──────────────────────────────────────────────────────────────
 create_lxc() {
   local net="name=eth0,bridge=${BRIDGE}" keyfile="" extra=()
   if [[ $IP == dhcp ]]; then net="${net},ip=dhcp"; else net="${net},ip=${IP}${GATEWAY:+,gw=${GATEWAY}}"; fi
@@ -331,8 +331,8 @@ create_lxc() {
   fi
 
   msg_info "Création de la CT {1}…" "$CTID"
-  # nesting=1 : le service TM Activation est durci (ProtectSystem, PrivateTmp…),
-  # ce qui demande des espaces de noms dans une CT non privilégiée.
+  # nesting=1: the TM Activation service is hardened (ProtectSystem, PrivateTmp…),
+  # which requires namespaces in an unprivileged CT.
   pct create "$CTID" "$TEMPLATE" \
     --hostname "$CT_HOST" \
     --cores "$CORES" \
@@ -357,7 +357,7 @@ create_lxc() {
   msg_ok "CT démarrée."
 }
 
-# ─── Préparation de la CT ─────────────────────────────────────────────────────
+# ─── CT preparation ───────────────────────────────────────────────────────────
 ct() { pct exec "$CTID" -- env LANG=C.UTF-8 LC_ALL=C.UTF-8 DEBIAN_FRONTEND=noninteractive "$@"; }
 
 wait_network() {
@@ -379,8 +379,8 @@ prepare_ct() {
   msg_ok "Système à jour."
   msg_info "Paquets : {1}…" "$pkgs"
   ct bash -c "apt-get install -y -qq --no-install-recommends $pkgs" >/dev/null
-  # Adresse <nom>.local : dans une CT non privilégiée, la limite rlimit-nproc
-  # d'avahi est partagée avec les autres CT (même plage d'UID) → désactivée.
+  # <name>.local address: in an unprivileged CT, avahi's rlimit-nproc limit
+  # is shared with the other CTs (same UID range) → disabled.
   ct bash -c 'sed -i "s/^rlimit-nproc=/#rlimit-nproc=/" /etc/avahi/avahi-daemon.conf
               systemctl restart avahi-daemon' >/dev/null 2>&1 \
     || msg_warn "avahi (http://{1}.local) n'a pas démarré : utiliser l'adresse IP." "$CT_HOST"
@@ -393,7 +393,7 @@ prepare_ct() {
   msg_ok "Installeur prêt : {1}" "$UPDATER"
 }
 
-# ─── Installation de TM Activation ────────────────────────────────────────────
+# ─── TM Activation installation ───────────────────────────────────────────────
 install_app() {
   local env=(LANG=C.UTF-8 LC_ALL=C.UTF-8 "TERM=${TERM:-xterm}" "TM_REPO=$REPO" "TM_BRANCH=$BRANCH")
   if [[ -n ${TM_RAW_URL:-} ]]; then env+=("TM_RAW_URL=$TM_RAW_URL"); fi
@@ -405,12 +405,12 @@ install_app() {
       "$UPDATER" --lan --non-interactive
   else
     msg_info "Installation guidée de TM Activation (questions dans la CT)…"
-    # lxc-attach donne un vrai terminal à l'installeur (questions, mots de passe).
+    # lxc-attach gives the installer a real terminal (questions, passwords).
     lxc-attach -n "$CTID" -- env "${env[@]}" "$UPDATER"
   fi
 }
 
-# ─── Récap final ──────────────────────────────────────────────────────────────
+# ─── Final summary ────────────────────────────────────────────────────────────
 ct_ip() {
   ct bash -c "ip -4 -o addr show eth0 | awk '{print \$4}' | cut -d/ -f1 | head -n1" 2>/dev/null || true
 }

@@ -1,19 +1,19 @@
-"""Activation d'un indicatif temporaire de club (ex. TM25TEST).
+"""Activation of a temporary club callsign (e.g. TM25TEST).
 
-Couche données SQLite brute (même style que ``app/db.py``) mais dans une base
-**séparée** (``var/activation.sqlite``) : la base ``f4ioz.sqlite`` est vidée à
-chaque refresh Wavelog, on ne veut surtout pas y mêler le log d'activation.
+Raw SQLite data layer (same style as ``app/db.py``) but in a **separate**
+database (``var/activation.sqlite``): the ``f4ioz.sqlite`` database is wiped on
+every Wavelog refresh, and the activation log must never be mixed into it.
 
-Tables (créneaux et QSO portent l'indicatif spécial : colonne ``station``) :
-- ``stations``  : indicatifs spéciaux du club, un seul « en cours » à la fois ;
-- ``operators`` : liste des opérateurs autorisés à émettre sous l'indicatif ;
-- ``slots``     : créneaux réservés (qui / quand / bande / mode) ;
-- ``contacts``  : QSO loggés (indicatifs contactés) ;
-- ``callbook``  : cache des fiches QRZ des indicatifs contactés (nom, locator,
-  DXCC), rempli à la saisie et par une tâche de fond douce.
+Tables (slots and QSOs carry the special callsign in the ``station`` column):
+- ``stations``  : the club's special callsigns, only one "current" at a time;
+- ``operators`` : operators allowed to transmit under the callsign;
+- ``slots``     : booked slots (who / when / band / mode);
+- ``contacts``  : logged QSOs (worked callsigns);
+- ``callbook``  : cache of QRZ records for worked callsigns (name, locator,
+  DXCC), filled at logging time and by a gentle background task.
 
-Heures stockées en UTC. Les créneaux en ISO ``YYYY-MM-DDTHH:MM`` ; les contacts
-au format ADIF (``qso_date`` ``YYYYMMDD`` + ``time_on`` ``HHMM``).
+Times are stored in UTC. Slots as ISO ``YYYY-MM-DDTHH:MM``; contacts in ADIF
+format (``qso_date`` ``YYYYMMDD`` + ``time_on`` ``HHMM``).
 """
 
 from __future__ import annotations
@@ -44,14 +44,14 @@ from app.qrz_xml import QrzXmlClient, get_shared_client
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "var" / "activation.sqlite"
 BACKUP_DIR = ROOT / "var" / "backups"
-BACKUP_KEEP = 40                 # nb de snapshots conservés (rotation)
-_BACKUP_MIN_INTERVAL = 600       # throttle : au plus 1 sauvegarde / 10 min sur écriture
+BACKUP_KEEP = 40                 # number of snapshots kept (rotation)
+_BACKUP_MIN_INTERVAL = 600       # throttle: at most 1 backup / 10 min on writes
 _last_backup_ts = 0.0
 
 PARIS = ZoneInfo("Europe/Paris")
 UTC = timezone.utc
 
-# Bandes / modes proposés dans les formulaires (HF + VHF/UHF usuelles).
+# Bands / modes offered in the forms (common HF + VHF/UHF).
 BANDS = [
     "160M", "80M", "60M", "40M", "30M", "20M", "17M", "15M", "12M", "10M",
     "6M", "4M", "2M", "70CM", "23CM",
@@ -60,35 +60,35 @@ MODES = ["SSB", "CW", "FT8", "FT4", "RTTY", "PSK31", "FM", "AM", "SSTV", "DIGI"]
 
 _RE_CALLSIGN = re.compile(r"^[A-Z0-9]{3,10}(/[A-Z0-9]{1,4})?$")
 _RE_LOCATOR = re.compile(r"^[A-R]{2}\d{2}([A-X]{2})?$")
-_RE_LOCATOR8 = re.compile(r"^[A-R]{2}\d{2}[A-X]{2}\d{2}$")  # station (ex. JN18FS89)
+_RE_LOCATOR8 = re.compile(r"^[A-R]{2}\d{2}[A-X]{2}\d{2}$")  # station (e.g. JN18FS89)
 
 
-# ── Indicatifs spéciaux (stations) ─────────────────────────────────────────
-# Le club active des indicatifs spéciaux de temps à autre (TM25TEST, puis
-# d'autres). Un seul est « en cours » à la fois (réglage admin) : c'est lui que
-# l'espace opérateurs logue et planifie ; les autres restent consultables sur
-# leur page publique /<slug>. Liste des opérateurs, mot de passe et callbook QRZ
-# sont communs à tous les indicatifs.
+# ── Special callsigns (stations) ───────────────────────────────────────────
+# The club activates special callsigns from time to time (TM25TEST, then
+# others). Only one is "current" at a time (admin setting): it is the one the
+# operators' area logs and schedules; the others remain viewable on their
+# public page /<slug>. The operator list, password and QRZ callbook are
+# shared by all callsigns.
 
-# Drapeaux dessinés en CSS (activation.css) → préfixe radio affiché à côté.
+# Flags drawn in CSS (activation.css) → radio prefix shown next to them.
 FLAG_PREFIXES = {"fr": "F", "be": "ON", "de": "DL", "it": "I", "nl": "PA", "lu": "LX", "es": "EA"}
 _RE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _RE_SAT_NOTE = re.compile(r"\bsat(?:ellites?|s)?\b", re.I)
 
 
 def note_is_sat(note: str | None) -> bool:
-    """Note de créneau qui parle de satellite (« SAT FO-29 », « QRV Sat SO-50 »…)
-    → icône 🛰️ dans les vignettes. Mot entier : « Samedi », « Saturne » exclus."""
+    """Slot note that mentions a satellite ("SAT FO-29", "QRV Sat SO-50"…)
+    → 🛰️ icon in the tiles. Whole word only: "Samedi", "Saturne" excluded."""
     return bool(_RE_SAT_NOTE.search(note or ""))
 
 
 def slugify_call(call: str) -> str:
-    """Indicatif → segment d'URL publique : TM25TEST → tm25test."""
+    """Callsign → public URL segment: TM25TEST → tm25test."""
     return re.sub(r"[^a-z0-9]", "", (call or "").lower())
 
 
 def list_stations() -> list[dict[str, Any]]:
-    """Tous les indicatifs spéciaux (plus récents d'abord), avec leur nombre de QSO."""
+    """All special callsigns (most recent first), with their QSO count."""
     init_db()
     with conn() as c:
         return [dict(r) for r in c.execute(
@@ -115,21 +115,21 @@ def station_by_slug(slug: str) -> dict[str, Any] | None:
 
 
 def current_station() -> dict[str, Any]:
-    """Indicatif spécial en cours (réglage admin), à défaut le premier créé."""
+    """Current special callsign (admin setting), else the first one created."""
     st = get_station(load_settings().get("current_station") or "")
     if st is None:
-        with conn() as c:  # init_db() déjà fait par get_station
+        with conn() as c:  # init_db() already done by get_station
             st = dict(c.execute("SELECT * FROM stations ORDER BY id LIMIT 1").fetchone())
     return st
 
 
 def _st(station: str | None = None) -> str:
-    """Indicatif visé : celui passé en paramètre, sinon celui en cours."""
+    """Target callsign: the one passed as a parameter, else the current one."""
     return (station or current_station()["callsign"]).strip().upper()
 
 
 def callsign() -> str:
-    """Indicatif spécial en cours."""
+    """Current special callsign."""
     return current_station()["callsign"]
 
 
@@ -139,18 +139,18 @@ def label() -> str:
 
 
 def my_gridsquare(station: str | None = None) -> str:
-    """Locator d'un indicatif spécial (défaut : en cours) — ADIF et distances."""
+    """Locator of a special callsign (default: current one) — ADIF and distances."""
     st = get_station(station) if station else current_station()
     return ((st or {}).get("gridsquare") or "").upper()
 
 
 def is_public() -> bool:
-    """La page publique de l'indicatif en cours est-elle en ligne ?"""
+    """Is the current callsign's public page online?"""
     return bool(current_station()["public"])
 
 
 def station_status(st: dict[str, Any]) -> str:
-    """« current » (en cours), « upcoming » (début daté dans le futur) ou « archive »."""
+    """One of "current", "upcoming" (start dated in the future) or "archive"."""
     if st["callsign"] == callsign():
         return "current"
     if st.get("start_date") and st["start_date"] > datetime.now(PARIS).strftime("%Y-%m-%d"):
@@ -159,7 +159,7 @@ def station_status(st: dict[str, Any]) -> str:
 
 
 def set_current_station(call: str) -> None:
-    """Bascule l'espace opérateurs (log, planning, ADIF, points) sur ``call``."""
+    """Switch the operators' area (log, schedule, ADIF, points) to ``call``."""
     st = get_station(call)
     if st is None:
         raise ValueError(_("indicatif inconnu"))
@@ -169,7 +169,7 @@ def set_current_station(call: str) -> None:
 
 
 def _clean_station(fields: dict[str, Any]) -> dict[str, Any]:
-    """Champs modifiables d'une fiche, validés (ValueError sinon)."""
+    """Editable fields of a record, validated (ValueError otherwise)."""
     grid = str(fields.get("gridsquare") or "").strip().upper()
     if grid and not (_RE_LOCATOR.match(grid) or _RE_LOCATOR8.match(grid)):
         raise ValueError(_("locator invalide (4, 6 ou 8 caractères)"))
@@ -194,10 +194,10 @@ def _clean_station(fields: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_station(call: str, **fields: Any) -> dict[str, Any]:
-    """Nouvel indicatif spécial (il ne devient pas « en cours » tout seul)."""
+    """New special callsign (it does not become "current" on its own)."""
     cs = (call or "").strip().upper()
     slug = slugify_call(cs)
-    # Un chiffre dans le slug : un indicatif ne peut pas masquer une page du site (/grid…).
+    # A digit in the slug: a callsign can never shadow a site page (/grid…).
     if not valid_callsign(cs) or not re.search(r"\d", slug):
         raise ValueError(_("indicatif invalide"))
     data = _clean_station(fields)
@@ -216,7 +216,7 @@ def create_station(call: str, **fields: Any) -> dict[str, Any]:
 
 
 def update_station(call: str, **fields: Any) -> dict[str, Any]:
-    """Modifie une fiche. L'indicatif lui-même ne change pas : il signe les QSO."""
+    """Update a record. The callsign itself never changes: it signs the QSOs."""
     st = get_station(call)
     if st is None:
         raise ValueError(_("indicatif inconnu"))
@@ -233,10 +233,10 @@ def update_station(call: str, **fields: Any) -> dict[str, Any]:
 
 
 def delete_station(call: str) -> None:
-    """Supprime une fiche SANS QSO (ses créneaux planifiés partent avec elle).
+    """Delete a record that has NO QSO (its scheduled slots go with it).
 
-    Refusé pour l'indicatif en cours et dès qu'un QSO porte cet indicatif : un
-    log ne se perd jamais. Sauvegarde complète juste avant la suppression.
+    Refused for the current callsign and as soon as any QSO carries this
+    callsign: a log is never lost. Full backup right before the deletion.
     """
     st = get_station(call)
     if st is None:
@@ -246,7 +246,7 @@ def delete_station(call: str) -> None:
         raise ValueError(_("{call} est l'indicatif en cours : mets-en un autre en cours d'abord", call=cs))
     backup_now()
     with conn() as c:
-        # Vérifié dans la même transaction que la suppression.
+        # Checked in the same transaction as the deletion.
         if c.execute("SELECT 1 FROM contacts WHERE station=? LIMIT 1", (cs,)).fetchone():
             raise ValueError(_("{call} a des QSO : sa fiche est conservée", call=cs))
         c.execute("DELETE FROM slots WHERE station=?", (cs,))
@@ -257,7 +257,7 @@ def delete_station(call: str) -> None:
         _save_settings(data)
 
 
-# ── Réglages persistants (flags togglés via l'UI admin) ────────────────────
+# ── Persistent settings (flags toggled from the admin UI) ──────────────────
 
 SETTINGS_FILE = ROOT / "var" / "activation_settings.json"
 
@@ -287,19 +287,19 @@ def set_flag(key: str, value: bool) -> None:
 
 
 def show_contacts() -> bool:
-    """Afficher la liste des contacts sur le board public ? (défaut : non)."""
+    """Show the contact list on the public board? (default: no)."""
     return get_flag("show_contacts", False)
 
 
 def show_map_stats() -> bool:
-    """Carte, tableau DXCC et classement sur le board public ? (défaut : oui)."""
+    """Map, DXCC table and ranking on the public board? (default: yes)."""
     return get_flag("show_map_stats", True)
 
 
-# ── Auth opérateurs du club ──────────────────────────────────────────────────
-# Session dédiée à l'espace TM25TEST, DISTINCTE du mode privé admin du site.
-# Le jeton signe "activation:{ts}" (séparation de domaine) : un cookie
-# opérateur ne peut donc pas être réutilisé comme cookie admin f4ioz_priv.
+# ── club operator auth ────────────────────────────────────────────────────
+# Session dedicated to the TM25TEST area, SEPARATE from the site's private admin mode.
+# The token signs "activation:{ts}" (domain separation): an operator cookie
+# therefore cannot be reused as an f4ioz_priv admin cookie.
 
 OP_COOKIE = "tm_auth"
 OP_TOKEN_TTL = 12 * 3600  # 12 h
@@ -307,11 +307,11 @@ OP_PASSWORD_FILE = ROOT / "var" / "activation_password"
 
 
 def operator_password() -> str:
-    """Mot de passe des opérateurs du club.
+    """club operators' password.
 
-    Priorité au fichier ``var/activation_password`` (réglable via l'UI) ; à
-    défaut ``activation.password`` de config.yml. Vide → auth opérateur non
-    configurée (seul l'admin site peut entrer, pour l'amorçage).
+    The ``var/activation_password`` file takes precedence (settable from the UI);
+    otherwise ``activation.password`` from config.yml. Empty → operator auth not
+    configured (only the site admin can get in, for bootstrapping).
     """
     try:
         if OP_PASSWORD_FILE.is_file():
@@ -330,7 +330,7 @@ def set_operator_password(new_password: str) -> None:
     OP_PASSWORD_FILE.parent.mkdir(parents=True, exist_ok=True)
     OP_PASSWORD_FILE.write_text(pw, encoding="utf-8")
     OP_PASSWORD_FILE.chmod(0o600)
-    # Force une sauvegarde immédiate (le mot de passe est critique).
+    # Force an immediate backup (the password is critical).
     try:
         backup_now()
     except Exception:  # noqa: BLE001
@@ -343,15 +343,15 @@ def _op_sig(ts: str, call: str = "") -> str:
 
 
 def make_op_token(call: str = "", now: int | None = None) -> str:
-    """Jeton de session opérateur. Avec ``call``, il ne vaut QUE pour cet
-    indicatif : le compte d'un autre opérateur ne peut pas être emprunté."""
+    """Operator session token. With ``call``, it is valid ONLY for that
+    callsign: another operator's account cannot be borrowed."""
     ts = str(int(time.time()) if now is None else int(now))
     cs = (call or "").strip().upper()
     return f"{ts}.{cs}.{_op_sig(ts, cs)}" if cs else f"{ts}.{_op_sig(ts)}"
 
 
 def op_session(token: str | None) -> dict[str, str] | None:
-    """Contenu d'un jeton valide : {"call": indicatif} ("" pour le mot de passe commun)."""
+    """Payload of a valid token: {"call": callsign} ("" for the shared password)."""
     if not token or "." not in token:
         return None
     parts = token.split(".")
@@ -377,14 +377,14 @@ def verify_op_token(token: str | None) -> bool:
 
 
 def session_operator(token: str | None) -> str:
-    """Indicatif du compte connecté ("" avec le mot de passe commun)."""
+    """Callsign of the logged-in account ("" with the shared password)."""
     sess = op_session(token)
     return sess["call"] if sess else ""
 
 
 def operator_authed(token: str | None) -> bool:
-    """Session opérateur valide : compte actif (mot de passe par opérateur) ou
-    mot de passe commun configuré."""
+    """Valid operator session: active account (per-operator password) or
+    configured shared password."""
     sess = op_session(token)
     if sess is None:
         return False
@@ -395,18 +395,18 @@ def operator_authed(token: str | None) -> bool:
     return bool(operator_password())
 
 
-# ── Comptes opérateurs (option : un mot de passe par opérateur) ────────────
-# Par défaut, tous les opérateurs partagent un mot de passe (operator_password).
-# Réglage « per_operator_auth » : chacun se connecte avec SON mot de passe, créé
-# à sa première connexion. Réglage « operator_approval » : un compte nouveau
-# attend l'accord d'un administrateur. Un opérateur déjà dans la liste (ajouté par
-# un admin) n'a rien à faire valider : il choisit son mot de passe et entre.
+# ── Operator accounts (option: one password per operator) ──────────────────
+# By default, all operators share one password (operator_password).
+# "per_operator_auth" setting: everyone logs in with THEIR OWN password, created
+# on their first login. "operator_approval" setting: a new account waits for
+# an administrator's approval. An operator already in the list (added by an
+# admin) has nothing to get approved: they choose their password and get in.
 
 PBKDF2_ROUNDS = 200_000
 
 
 def hash_password(password: str) -> str:
-    """Empreinte salée d'un mot de passe (jamais stocké en clair)."""
+    """Salted hash of a password (never stored in clear text)."""
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)
     return f"pbkdf2_sha256${PBKDF2_ROUNDS}${salt.hex()}${digest.hex()}"
@@ -424,21 +424,21 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def per_operator_auth() -> bool:
-    """Un mot de passe par opérateur (sinon : mot de passe commun)."""
+    """One password per operator (otherwise: shared password)."""
     return get_flag("per_operator_auth", False)
 
 
 def operator_approval() -> bool:
-    """Les comptes créés à la volée attendent la validation d'un administrateur."""
+    """Accounts created on the fly wait for an administrator's approval."""
     return get_flag("operator_approval", False)
 
 
-# Exigences du mot de passe d'un compte opérateur (création et remise à zéro),
-# réglables dans les Réglages : longueur minimale et nombre de majuscules, de
-# chiffres et de caractères spéciaux exigés (0 = pas d'exigence).
-PASSWORD_MIN_LEN = 8              # défaut historique
-PASSWORD_LEN_MAX = 64             # borne haute du réglage de longueur
-PASSWORD_COUNT_MAX = 8            # borne haute des compteurs (majuscules…)
+# Requirements for an operator account password (creation and reset),
+# adjustable in the Settings: minimum length and number of uppercase letters,
+# digits and special characters required (0 = no requirement).
+PASSWORD_MIN_LEN = 8              # historical default
+PASSWORD_LEN_MAX = 64             # upper bound of the length setting
+PASSWORD_COUNT_MAX = 8            # upper bound of the counters (uppercase…)
 DEFAULT_PASSWORD_RULE: dict[str, int] = {
     "min_length": PASSWORD_MIN_LEN, "min_upper": 1, "min_digits": 1, "min_special": 1,
 }
@@ -448,7 +448,7 @@ _RE_SPECIAL = re.compile(r"[^0-9A-Za-zÀ-ÿ]")
 
 
 def get_password_rule() -> dict[str, int]:
-    """Exigences en vigueur pour les mots de passe opérateurs."""
+    """Current requirements for operator passwords."""
     saved = load_settings().get("password_rule") or {}
     d = DEFAULT_PASSWORD_RULE
     return {
@@ -460,7 +460,7 @@ def get_password_rule() -> dict[str, int]:
 
 
 def set_password_rule(form: dict[str, Any]) -> dict[str, int]:
-    """Enregistre les exigences (valeurs hors bornes ramenées au défaut)."""
+    """Save the requirements (out-of-range values fall back to the default)."""
     d = DEFAULT_PASSWORD_RULE
     rule = {
         "min_length": _clamp_int(form.get("min_length"), 4, PASSWORD_LEN_MAX, d["min_length"]),
@@ -475,7 +475,7 @@ def set_password_rule(form: dict[str, Any]) -> dict[str, int]:
 
 
 def password_rule() -> str:
-    """Règle affichée sur la page de connexion, d'après le réglage en vigueur."""
+    """Rule shown on the login page, based on the current setting."""
     rule = get_password_rule()
     bits = []
     if rule["min_upper"]:
@@ -502,14 +502,14 @@ def password_is_strong(password: str) -> bool:
                 and len(_RE_SPECIAL.findall(pw)) >= rule["min_special"])
 
 
-# ── Question anti-robot (sans service extérieur, sans état serveur) ────────
-# Le jeton signe l'heure ET la bonne réponse : on revérifie la signature avec la
-# réponse envoyée, sans garder la question côté serveur. Un formulaire rempli en
-# moins de MIN_FILL_SECONDS, ou dont le champ-piège est rempli, vient d'un robot.
+# ── Anti-bot question (no external service, no server-side state) ──────────
+# The token signs the time AND the right answer: the signature is re-checked with
+# the submitted answer, without keeping the question server-side. A form filled in
+# under MIN_FILL_SECONDS, or whose trap field is filled, comes from a bot.
 
-CAPTCHA_TTL = 900          # 15 min pour répondre
-CAPTCHA_MIN_FILL = 2.0     # un humain met plus de 2 s à remplir le formulaire
-CAPTCHA_TRAP = "website"   # champ-piège, masqué : les robots le remplissent
+CAPTCHA_TTL = 900          # 15 min to answer
+CAPTCHA_MIN_FILL = 2.0     # a human takes more than 2 s to fill in the form
+CAPTCHA_TRAP = "website"   # hidden trap field: bots fill it in
 
 
 def _captcha_sig(ts: str, answer: int) -> str:
@@ -517,14 +517,14 @@ def _captcha_sig(ts: str, answer: int) -> str:
 
 
 def make_captcha() -> dict[str, str]:
-    """Question arithmétique simple + jeton signé ({"question", "token"})."""
+    """Simple arithmetic question + signed token ({"question", "token"})."""
     a, b = secrets.randbelow(8) + 2, secrets.randbelow(8) + 2
     ts = str(int(time.time()))
     return {"question": f"{a} + {b}", "token": f"{ts}.{_captcha_sig(ts, a + b)}"}
 
 
 def check_captcha(token: str | None, answer: str | None, trap: str | None = "") -> bool:
-    """Réponse juste, jeton frais, formulaire ni instantané ni pré-rempli par un robot."""
+    """Correct answer, fresh token, form neither instant nor pre-filled by a bot."""
     if (trap or "").strip():
         return False
     if not token or "." not in token:
@@ -548,12 +548,12 @@ def get_operator(call: str) -> dict[str, Any] | None:
 
 
 def operator_login(call: str, password: str) -> str:
-    """Connexion d'un opérateur avec SON mot de passe.
+    """Login of an operator with THEIR OWN password.
 
-    Renvoie ``invalid`` (indicatif incorrect), ``bad`` (mot de passe vide ou
-    faux), ``weak`` (mot de passe trop simple à la création), ``created``
-    (compte créé et actif), ``pending`` (compte à valider par un
-    administrateur), ``disabled`` (compte désactivé) ou ``ok``.
+    Returns ``invalid`` (bad callsign), ``bad`` (empty or wrong password),
+    ``weak`` (password too simple at creation), ``created`` (account created
+    and active), ``pending`` (account awaiting an administrator's approval),
+    ``disabled`` (account disabled) or ``ok``.
     """
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
@@ -571,9 +571,9 @@ def operator_login(call: str, password: str) -> str:
         return "ok"
     if not password_is_strong(password):
         return "weak"
-    # Première connexion : le mot de passe saisi devient celui du compte.
-    # Un indicatif inconnu attend l'accord d'un admin si la validation est active ;
-    # un opérateur déjà dans la liste a déjà été approuvé en y étant ajouté.
+    # First login: the password entered becomes the account's password.
+    # An unknown callsign waits for an admin's approval if approval is enabled;
+    # an operator already in the list was approved when they were added to it.
     status = "pending" if (row is None and operator_approval()) else "active"
     now = int(time.time())
     with conn() as c:
@@ -589,7 +589,7 @@ def operator_login(call: str, password: str) -> str:
 
 
 def set_operator_password_for(call: str, password: str) -> None:
-    """Mot de passe d'un opérateur, posé par un administrateur."""
+    """An operator's password, set by an administrator."""
     cs = (call or "").strip().upper()
     if not password:
         raise ValueError(_("mot de passe vide"))
@@ -603,7 +603,7 @@ def set_operator_password_for(call: str, password: str) -> None:
 
 
 def clear_operator_password(call: str) -> None:
-    """Oubli de mot de passe : le compte en choisira un neuf à la prochaine connexion."""
+    """Forgotten password: the account will choose a new one at the next login."""
     with conn() as c:
         c.execute("UPDATE operators SET password_hash='' WHERE callsign=?", ((call or "").strip().upper(),))
     maybe_backup()
@@ -617,9 +617,9 @@ def approve_operator(call: str) -> None:
 
 
 def set_operator_admin(call: str, is_admin: bool) -> None:
-    """Droits d'administration d'un opérateur (log sous tout indicatif, rapport).
+    """An operator's admin rights (log under any callsign, report).
 
-    Retirer l'admin retire aussi le superadmin : un superadmin est un admin."""
+    Removing admin also removes superadmin: a superadmin is an admin."""
     cs = (call or "").strip().upper()
     if get_operator(cs) is None:
         raise ValueError(_("indicatif inconnu"))
@@ -632,8 +632,8 @@ def set_operator_admin(call: str, is_admin: bool) -> None:
 
 
 def set_operator_superadmin(call: str, is_superadmin: bool) -> None:
-    """Accès aux Réglages. Donner le superadmin donne l'admin ; le retirer
-    laisse l'opérateur admin."""
+    """Access to the Settings. Granting superadmin grants admin; revoking it
+    leaves the operator an admin."""
     cs = (call or "").strip().upper()
     if get_operator(cs) is None:
         raise ValueError(_("indicatif inconnu"))
@@ -657,7 +657,7 @@ def _operator_usable(row: dict[str, Any] | None) -> bool:
 
 
 def operator_is_admin(call: str) -> bool:
-    """Admin ou superadmin (le second englobe le premier)."""
+    """Admin or superadmin (the latter includes the former)."""
     row = get_operator(call)
     return _operator_usable(row) and bool(row.get("is_admin") or row.get("is_superadmin"))
 
@@ -672,7 +672,7 @@ def _seed_operators() -> list[str]:
     return [str(o).upper() for o in ops if o]
 
 
-# ── Connexion / schéma ─────────────────────────────────────────────────────
+# ── Connection / schema ────────────────────────────────────────────────────
 
 
 @contextmanager
@@ -687,11 +687,11 @@ def conn() -> Iterator[sqlite3.Connection]:
         c.close()
 
 
-_schema_ready: set[str] = set()  # bases déjà créées/migrées (par chemin)
+_schema_ready: set[str] = set()  # databases already created/migrated (by path)
 
 
 def _snapshot(c: sqlite3.Connection, tag: str) -> Path:
-    """Copie cohérente de la base ouverte (hors rotation si tag ≠ activation)."""
+    """Consistent copy of the open database (outside rotation if tag ≠ activation)."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     dest = BACKUP_DIR / f"{tag}-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.sqlite"
     dst = sqlite3.connect(dest)
@@ -703,7 +703,7 @@ def _snapshot(c: sqlite3.Connection, tag: str) -> Path:
 
 
 def _seed_station(c: sqlite3.Connection) -> None:
-    """Première fiche d'indicatif, créée depuis la section ``activation`` de config.yml."""
+    """First callsign record, created from the ``activation`` section of config.yml."""
     if c.execute("SELECT 1 FROM stations LIMIT 1").fetchone():
         return
     cfg = activation_config()
@@ -722,7 +722,7 @@ def _seed_station(c: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    """Crée le schéma et applique les migrations (une seule fois par base)."""
+    """Create the schema and apply migrations (only once per database)."""
     if str(DB_PATH) in _schema_ready:
         return
     with conn() as c:
@@ -800,29 +800,29 @@ def init_db() -> None:
             );
             """
         )
-        # Migrations légères des bases déjà créées.
+        # Lightweight migrations of existing databases.
         cols = {row[1] for row in c.execute("PRAGMA table_info(contacts)").fetchall()}
         if "sat_name" not in cols:
             c.execute("ALTER TABLE contacts ADD COLUMN sat_name TEXT DEFAULT ''")
         if "source" not in {row[1] for row in c.execute("PRAGMA table_info(slots)").fetchall()}:
             c.execute("ALTER TABLE slots ADD COLUMN source TEXT DEFAULT 'manual'")
-        # Photo de la fiche QRZ (vignette montrée pendant la saisie du log).
-        # ``image_at`` : date du dernier passage CHERCHANT la photo. Les fiches
-        # d'avant cette fonction valent « ok » mais n'ont jamais eu de photo :
-        # sans ce repère, elles ne seraient plus jamais réinterrogées.
+        # Photo from the QRZ record (thumbnail shown while logging).
+        # ``image_at``: date of the last pass that LOOKED FOR the photo. Records
+        # older than this feature count as "ok" but never had a photo: without
+        # this marker, they would never be queried again.
         book_cols = {row[1] for row in c.execute("PRAGMA table_info(callbook)").fetchall()}
         for col, decl in (("image", "TEXT DEFAULT ''"), ("image_at", "INTEGER DEFAULT 0")):
             if col not in book_cols:
                 c.execute(f"ALTER TABLE callbook ADD COLUMN {col} {decl}")
-        # Comptes opérateurs (mot de passe individuel, admin, validation).
+        # Operator accounts (individual password, admin, approval).
         ops_cols = {row[1] for row in c.execute("PRAGMA table_info(operators)").fetchall()}
         for col, decl in (("password_hash", "TEXT DEFAULT ''"), ("is_admin", "INTEGER DEFAULT 0"),
                           ("status", "TEXT DEFAULT 'active'"),
                           ("is_superadmin", "INTEGER DEFAULT 0")):
             if col not in ops_cols:
                 c.execute(f"ALTER TABLE operators ADD COLUMN {col} {decl}")
-        # Passage au multi-indicatif : copie intacte de la base AVANT de toucher
-        # au schéma (premigration-*.sqlite, hors rotation des sauvegardes).
+        # Move to multi-callsign: untouched copy of the database BEFORE touching
+        # the schema (premigration-*.sqlite, outside the backup rotation).
         missing = [
             t for t in ("slots", "contacts")
             if "station" not in {row[1] for row in c.execute(f"PRAGMA table_info({t})").fetchall()}
@@ -834,11 +834,11 @@ def init_db() -> None:
         c.execute("CREATE INDEX IF NOT EXISTS idx_contact_station ON contacts(station)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_slot_station ON slots(station)")
         _seed_station(c)
-        # Créneaux / QSO d'avant le multi-indicatif → première fiche (TM25TEST).
+        # Slots / QSOs from before multi-callsign → first record (TM25TEST).
         first = c.execute("SELECT callsign FROM stations ORDER BY id LIMIT 1").fetchone()[0]
         for table in ("slots", "contacts"):
             c.execute(f"UPDATE {table} SET station=? WHERE station IS NULL OR station=''", (first,))
-        # Liste des opérateurs initialisée depuis la config au premier init (idempotent).
+        # Operator list seeded from the config on the first init (idempotent).
         for cs in _seed_operators():
             c.execute(
                 "INSERT OR IGNORE INTO operators(callsign, name, active, created_at) "
@@ -848,7 +848,7 @@ def init_db() -> None:
     _schema_ready.add(str(DB_PATH))
 
 
-# ── Validation / temps ─────────────────────────────────────────────────────
+# ── Validation / time ──────────────────────────────────────────────────────
 
 
 def valid_callsign(value: str) -> bool:
@@ -860,9 +860,9 @@ def valid_locator(value: str) -> bool:
 
 
 def paris_local_to_utc_iso(value: str) -> str | None:
-    """'YYYY-MM-DDTHH:MM' saisi en heure de Paris → ISO UTC minute.
+    """'YYYY-MM-DDTHH:MM' entered in Paris time → ISO UTC minute.
 
-    Renvoie None si le format est invalide.
+    Returns None if the format is invalid.
     """
     if not value:
         return None
@@ -883,29 +883,29 @@ def utc_iso_to_paris(value: str) -> datetime | None:
 
 
 def now_utc_parts() -> tuple[str, str]:
-    """(qso_date 'YYYYMMDD', time_on 'HHMM') à l'instant présent en UTC."""
+    """(qso_date 'YYYYMMDD', time_on 'HHMM') for the current instant in UTC."""
     now = datetime.now(UTC)
     return now.strftime("%Y%m%d"), now.strftime("%H%M")
 
 
-# ── Affichage local / UTC ──────────────────────────────────────────────────
-# Le stockage reste TOUJOURS en UTC. Ces helpers ne pilotent que l'affichage et
-# la saisie. Le « mode » vaut "utc", "local" (fuseau de la station, config.yml)
-# ou directement un fuseau IANA — celui du visiteur, que son navigateur annonce
-# (« Europe/Brussels », « America/New_York »…) : un chasseur canadien lit les
-# créneaux à son heure sans rien régler.
+# ── Local / UTC display ────────────────────────────────────────────────────
+# Storage is ALWAYS in UTC. These helpers only drive display and input.
+# The "mode" is "utc", "local" (station time zone, config.yml) or directly
+# an IANA time zone — the visitor's, as announced by their browser
+# ("Europe/Brussels", "America/New_York"…): a Canadian hunter reads the
+# slots in their own time without setting anything.
 
 TZ_MODES = ("local", "utc")
 
 
 def station_tz() -> ZoneInfo:
-    """Fuseau de la station (config.yml : site.timezone), Paris par défaut."""
+    """Station time zone (config.yml: site.timezone), Paris by default."""
     name = str(site_config().get("timezone") or "").strip()
     return _zone(name) or PARIS
 
 
 def _zone(name: str) -> ZoneInfo | None:
-    """ZoneInfo d'un nom IANA, None s'il est inconnu (cache mémoire)."""
+    """ZoneInfo for an IANA name, None if unknown (in-memory cache)."""
     key = (name or "").strip()
     if not key or len(key) > 64:
         return None
@@ -921,7 +921,7 @@ _ZONES: dict[str, ZoneInfo | None] = {}
 
 
 def valid_tz(name: str) -> bool:
-    """Nom de fuseau IANA utilisable ? (ce que renvoie le navigateur)"""
+    """Usable IANA time zone name? (what the browser returns)"""
     return _zone(name) is not None
 
 
@@ -932,7 +932,7 @@ def tzinfo_for(mode: str) -> ZoneInfo | timezone:
 
 
 def tz_label(mode: str) -> str:
-    """Étiquette courte du fuseau : « UTC », « Paris », « New York »."""
+    """Short time zone label: "UTC", "Paris", "New York"."""
     if mode == "utc":
         return "UTC"
     name = mode if _zone(mode) else str(site_config().get("timezone") or "Europe/Paris")
@@ -940,7 +940,7 @@ def tz_label(mode: str) -> str:
 
 
 def disp(utc_iso: str, mode: str = "local") -> datetime | None:
-    """ISO UTC 'YYYY-MM-DDTHH:MM' → datetime aware dans le fuseau d'affichage."""
+    """ISO UTC 'YYYY-MM-DDTHH:MM' → aware datetime in the display time zone."""
     try:
         naive = datetime.strptime((utc_iso or "").strip()[:16], "%Y-%m-%dT%H:%M")
     except (ValueError, AttributeError):
@@ -949,7 +949,7 @@ def disp(utc_iso: str, mode: str = "local") -> datetime | None:
 
 
 def contact_disp(qso_date: str, time_on: str, mode: str = "local") -> datetime | None:
-    """(qso_date 'YYYYMMDD', time_on 'HHMM' en UTC) → datetime aware affichage."""
+    """(qso_date 'YYYYMMDD', time_on 'HHMM' in UTC) → aware display datetime."""
     try:
         combo = f"{(qso_date or '').strip()}{(time_on or '').strip().ljust(4, '0')[:4]}"
         naive = datetime.strptime(combo[:12], "%Y%m%d%H%M")
@@ -959,7 +959,7 @@ def contact_disp(qso_date: str, time_on: str, mode: str = "local") -> datetime |
 
 
 def input_to_utc_iso(value: str, mode: str = "local") -> str | None:
-    """Saisie 'datetime-local' interprétée dans le fuseau `mode` → ISO UTC minute."""
+    """'datetime-local' input interpreted in time zone `mode` → ISO UTC minute."""
     if not value:
         return None
     try:
@@ -970,12 +970,12 @@ def input_to_utc_iso(value: str, mode: str = "local") -> str | None:
 
 
 def now_input(mode: str = "local") -> str:
-    """Instant présent au format d'un <input type=datetime-local> dans `mode`."""
+    """Current instant in the format of an <input type=datetime-local> in `mode`."""
     return datetime.now(tzinfo_for(mode)).strftime("%Y-%m-%dT%H:%M")
 
 
 def parts_to_utc_iso(qso_date: str, time_on: str) -> str | None:
-    """(qso_date « AAAAMMJJ », time_on « HHMM ») → « AAAA-MM-JJTHH:MM » UTC."""
+    """(qso_date "YYYYMMDD", time_on "HHMM") → "YYYY-MM-DDTHH:MM" UTC."""
     minutes = _utc_minutes(qso_date, time_on)
     return _minutes_to_iso(minutes) if minutes is not None else None
 
@@ -989,7 +989,7 @@ def utc_iso_to_parts(utc_iso: str) -> tuple[str, str] | None:
     return dt.strftime("%Y%m%d"), dt.strftime("%H%M")
 
 
-# ── Opérateurs ─────────────────────────────────────────────────────────────
+# ── Operators ──────────────────────────────────────────────────────────────
 
 
 def add_operator(call: str, name: str = "") -> None:
@@ -1017,8 +1017,8 @@ def list_operators(active_only: bool = True) -> list[dict[str, Any]]:
 
 
 def active_operators() -> list[str]:
-    """Opérateurs qui utilisent RÉELLEMENT l'indicatif : présents dans un créneau
-    (passé / en cours / futur) ou dans un QSO loggé. Exclut les inscrits inactifs."""
+    """Operators who ACTUALLY use the callsign: present in a slot (past /
+    current / future) or in a logged QSO. Excludes inactive registered ones."""
     init_db()
     with conn() as c:
         st = (callsign(),)
@@ -1027,11 +1027,11 @@ def active_operators() -> list[str]:
     return sorted(o for o in ops if o)
 
 
-# ── Créneaux ───────────────────────────────────────────────────────────────
+# ── Slots ──────────────────────────────────────────────────────────────────
 
 
 def slot_conflicts(start_utc: str, end_utc: str, band: str, exclude_id: int | None = None) -> list[dict[str, Any]]:
-    """Créneaux existants (indicatif en cours) qui chevauchent [start, end[ sur la même bande."""
+    """Existing slots (current callsign) overlapping [start, end[ on the same band."""
     init_db()
     sql = (
         "SELECT * FROM slots WHERE station=? AND band=? AND start_utc < ? AND end_utc > ?"
@@ -1066,7 +1066,7 @@ def add_slot(
 
 
 def list_slots(upcoming_only: bool = False, station: str | None = None) -> list[dict[str, Any]]:
-    """Créneaux d'un indicatif (défaut : celui en cours)."""
+    """Slots of a callsign (default: the current one)."""
     init_db()
     sql = "SELECT * FROM slots WHERE station=?"
     params: list[Any] = [_st(station)]
@@ -1111,7 +1111,7 @@ def delete_slot(slot_id: int) -> None:
 
 
 def conflicting_slot_ids() -> set[int]:
-    """Ids des créneaux qui en chevauchent un autre sur la MÊME bande."""
+    """Ids of the slots that overlap another one on the SAME band."""
     slots = list_slots()
     bad: set[int] = set()
     for i, a in enumerate(slots):
@@ -1125,26 +1125,26 @@ def conflicting_slot_ids() -> set[int]:
 
 
 def live_slots(station: str | None = None) -> list[dict[str, Any]]:
-    """TOUS les créneaux en cours (start <= maintenant < end) — plusieurs possibles."""
+    """ALL current slots (start <= now < end) — there may be several."""
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     return [s for s in list_slots(station=station) if s["start_utc"] <= now < s["end_utc"]]
 
 
 def future_slots(station: str | None = None) -> list[dict[str, Any]]:
-    """Créneaux à venir STRICTEMENT (start > maintenant) — exclut ceux en cours."""
+    """STRICTLY upcoming slots (start > now) — excludes current ones."""
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     return [s for s in list_slots(station=station) if s["start_utc"] > now]
 
 
 def past_slots(station: str | None = None) -> list[dict[str, Any]]:
-    """Activations terminées (end <= maintenant), plus récentes d'abord."""
+    """Finished activations (end <= now), most recent first."""
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     done = [s for s in list_slots(station=station) if s["end_utc"] <= now]
     return sorted(done, key=lambda s: s["start_utc"], reverse=True)
 
 
-# Heure UTC d'un QSO (qso_date « AAAAMMJJ » + time_on « HHMM ») au format des
-# créneaux (« AAAA-MM-JJTHH:MM »), pour comparer les deux en SQL.
+# UTC time of a QSO (qso_date "YYYYMMDD" + time_on "HHMM") in the slot format
+# ("YYYY-MM-DDTHH:MM"), so the two can be compared in SQL.
 _SQL_QSO_UTC = (
     "substr(c.qso_date,1,4) || '-' || substr(c.qso_date,5,2) || '-' || substr(c.qso_date,7,2)"
     " || 'T' || substr(c.time_on,1,2) || ':' || substr(c.time_on,3,2)"
@@ -1152,15 +1152,15 @@ _SQL_QSO_UTC = (
 
 
 def slot_qso_counts(station: str | None = None) -> dict[int, int]:
-    """QSO loggés par créneau : même opérateur, même bande, même mode, du début
-    à la fin **incluse**. Renvoie {id du créneau: nombre de QSO}.
+    """QSOs logged per slot: same operator, same band, same mode, from the start
+    to the end **inclusive**. Returns {slot id: number of QSOs}.
 
-    Les QSO sont horodatés à la minute : un contact noté à 19:15 a eu lieu
-    pendant la minute 19:15, donc il appartient au créneau qui finit à 19:15
-    (c'est souvent le dernier QSO du passage satellite, celui qui clôt la
-    séance). Si deux créneaux du même opérateur se touchent à cette
-    minute-là, le QSO est compté dans le plus récent — celui qui vient de
-    commencer — et jamais deux fois.
+    QSOs are timestamped to the minute: a contact noted at 19:15 happened
+    during minute 19:15, so it belongs to the slot ending at 19:15 (it is
+    often the last QSO of the satellite pass, the one that closes the
+    session). If two slots of the same operator touch at that very minute,
+    the QSO is counted in the more recent one — the one that just started —
+    and never twice.
     """
     st = _st(station)
     init_db()
@@ -1185,30 +1185,30 @@ def slot_qso_counts(station: str | None = None) -> dict[int, int]:
     return counts
 
 
-# ── Créneaux déduits du log ────────────────────────────────────────────────
-# Un opérateur qui oublie de réserver, ou qui dépasse l'heure prévue, ne perd
-# rien : les QSO enregistrés font foi. On regroupe les QSO d'un même opérateur
-# sur une même bande et un même mode tant qu'ils sont espacés de moins de
-# SESSION_GAP_MIN, puis on crée le créneau manquant ou on étire celui qui
-# existe (jamais on ne le raccourcit : l'intention du planning est gardée).
+# ── Slots inferred from the log ────────────────────────────────────────────
+# An operator who forgets to book, or who runs past the planned time, loses
+# nothing: the recorded QSOs are authoritative. QSOs from the same operator on
+# the same band and mode are grouped as long as they are less than
+# SESSION_GAP_MIN apart, then the missing slot is created or the existing one
+# is stretched (never shortened: the intent of the schedule is kept).
 
-SESSION_GAP_MIN = 30          # au-delà, c'est une autre séance de trafic
-SLOT_ATTACH_MIN = 60          # séance rattachée à un créneau proche (dépassement)
-SLOT_ROUNDING_MIN = 15        # créneaux calés sur le quart d'heure
+SESSION_GAP_MIN = 30          # beyond this, it is another operating session
+SLOT_ATTACH_MIN = 60          # session attached to a nearby slot (overrun)
+SLOT_ROUNDING_MIN = 15        # slots aligned on the quarter hour
 
 
 def auto_slots() -> bool:
-    """Créer et ajuster les créneaux d'après le log (réglage, activé par défaut)."""
+    """Create and adjust slots from the log (setting, enabled by default)."""
     return get_flag("auto_slots", True)
 
 
-# Vignettes de créneaux sur la page publique : 0 = toutes (défaut). Un chiffre
-# limite les « Prochaines activations » ET les « Activations passées ».
-PUBLIC_SLOTS_MAX = 200            # garde-fou : au-delà la page devient illisible
+# Slot tiles on the public page: 0 = all (default). A number limits
+# both the "Prochaines activations" (upcoming) AND the "Activations passées" (past).
+PUBLIC_SLOTS_MAX = 200            # safety cap: beyond this the page becomes unreadable
 
 
 def public_slots_max() -> int:
-    """Nombre de vignettes de créneaux montrées publiquement (0 = toutes)."""
+    """Number of slot tiles shown publicly (0 = all)."""
     return _clamp_int(load_settings().get("public_slots_max", 0), 0, PUBLIC_SLOTS_MAX, 0)
 
 
@@ -1232,7 +1232,7 @@ def _ceil_to(minutes: int, step: int) -> int:
 
 
 def log_sessions(station: str | None = None) -> list[dict[str, Any]]:
-    """Séances de trafic lues dans le log : (opérateur, bande, mode, début, fin)."""
+    """Operating sessions read from the log: (operator, band, mode, start, end)."""
     init_db()
     with conn() as c:
         rows = c.execute(
@@ -1261,15 +1261,15 @@ def log_sessions(station: str | None = None) -> list[dict[str, Any]]:
 
 
 def slot_lock() -> bool:
-    """Interdire de loguer sur une bande/mode réservés par un autre opérateur
-    (réglage, activé par défaut) : deux stations ne peuvent pas émettre en même
-    temps sous le même indicatif, sur la même bande et le même mode."""
+    """Forbid logging on a band/mode booked by another operator (setting,
+    enabled by default): two stations cannot transmit at the same time under
+    the same callsign, on the same band and the same mode."""
     return get_flag("slot_lock", True)
 
 
 def blocking_slot(operator_call: str, band: str, mode: str, when_utc: str | None = None,
                   station: str | None = None) -> dict[str, Any] | None:
-    """Créneau d'un AUTRE opérateur couvrant cette bande, ce mode et cet instant."""
+    """Slot of ANOTHER operator covering this band, this mode and this instant."""
     cs = (operator_call or "").strip().upper()
     moment = when_utc or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     for slot in list_slots(station=station):
@@ -1281,10 +1281,10 @@ def blocking_slot(operator_call: str, band: str, mode: str, when_utc: str | None
 
 
 def reconcile_slots_from_log(station: str | None = None, force: bool = False) -> dict[str, int]:
-    """Crée les créneaux oubliés et étire ceux qui ont débordé. {créés, étirés}.
+    """Create forgotten slots and stretch those that overran. {created, stretched}.
 
-    ``force`` : l'admin le demande depuis les Réglages, on le fait même si le
-    rattrapage automatique est décoché (bouton « Mettre à jour maintenant »).
+    ``force``: the admin asks for it from the Settings, so it runs even if
+    automatic catch-up is unchecked ("Mettre à jour maintenant" / Update now button).
     """
     if not (force or auto_slots()):
         return {"created": 0, "extended": 0}
@@ -1294,9 +1294,9 @@ def reconcile_slots_from_log(station: str | None = None, force: bool = False) ->
     for session in log_sessions(st):
         start = _minutes_to_iso(_floor_to(session["first"], SLOT_ROUNDING_MIN))
         end = _minutes_to_iso(_ceil_to(session["last"] + 1, SLOT_ROUNDING_MIN))
-        # Le créneau est rattaché s'il chevauche la séance ou s'en approche à
-        # moins de SLOT_ATTACH_MIN : trafiquer une heure après l'heure prévue
-        # prolonge le créneau réservé au lieu d'en créer un autre.
+        # The slot is attached if it overlaps the session or comes within
+        # SLOT_ATTACH_MIN of it: operating an hour past the planned time
+        # extends the booked slot instead of creating another one.
         near_start = _minutes_to_iso(session["first"] - SLOT_ATTACH_MIN)
         near_end = _minutes_to_iso(session["last"] + SLOT_ATTACH_MIN)
         same = [s for s in slots
@@ -1337,7 +1337,7 @@ def current_and_next_slot() -> tuple[dict[str, Any] | None, dict[str, Any] | Non
     return current, nxt
 
 
-# ── Contacts (QSO) ─────────────────────────────────────────────────────────
+# ── Contacts (QSOs) ────────────────────────────────────────────────────────
 
 
 def is_dupe(call: str, band: str, mode: str) -> bool:
@@ -1351,11 +1351,11 @@ def is_dupe(call: str, band: str, mode: str) -> bool:
 
 
 def worked_before(call: str, station: str | None = None) -> dict[str, Any]:
-    """Station déjà contactée ? (affiché pendant la saisie du log)
+    """Station already worked? (shown while logging)
 
-    Pour l'indicatif en cours : nombre de QSO, couples bande/mode déjà faits et
-    date du dernier contact. Signale aussi les QSO faits sous les AUTRES
-    indicatifs spéciaux du club, qui ne sont pas des doublons.
+    For the current callsign: number of QSOs, band/mode pairs already done and
+    date of the last contact. Also reports QSOs made under the club's OTHER
+    special callsigns, which are not duplicates.
     """
     cs = (call or "").strip().upper()
     empty = {"call": cs, "worked": 0, "band_modes": [], "last": "", "elsewhere": []}
@@ -1425,13 +1425,13 @@ def add_contact(
             ),
         )
         new_id = int(cur.lastrowid)
-    # Le log fait foi : créneau oublié créé, créneau dépassé étiré.
+    # The log is authoritative: forgotten slot created, overrun slot stretched.
     reconcile_slots_from_log(station)
     maybe_backup()
     return new_id
 
 
-# Champs modifiables d'un contact (édition).
+# Editable fields of a contact (editing).
 _EDITABLE = (
     "call", "band", "mode", "qso_date", "time_on", "freq_mhz",
     "rst_sent", "rst_rcvd", "gridsquare", "sat_name", "comment", "operator_call",
@@ -1439,7 +1439,7 @@ _EDITABLE = (
 
 
 def update_contact(contact_id: int, **fields: Any) -> None:
-    """Met à jour les champs fournis d'un QSO existant (avec validation)."""
+    """Update the given fields of an existing QSO (with validation)."""
     data: dict[str, Any] = {}
     for k, v in fields.items():
         if k not in _EDITABLE or v is None:
@@ -1470,7 +1470,7 @@ def update_contact(contact_id: int, **fields: Any) -> None:
 
 
 def list_contacts(limit: int | None = None, station: str | None = None) -> list[dict[str, Any]]:
-    """QSO d'un indicatif (défaut : celui en cours), plus récents d'abord."""
+    """QSOs of a callsign (default: the current one), most recent first."""
     init_db()
     sql = "SELECT * FROM contacts WHERE station=? ORDER BY qso_date DESC, time_on DESC, id DESC"
     params: list[Any] = [_st(station)]
@@ -1482,11 +1482,11 @@ def list_contacts(limit: int | None = None, station: str | None = None) -> list[
 
 
 def contacts_for_call(call: str, station: str | None = None) -> dict[str, Any]:
-    """Recherche publique : QSO d'un indicatif avec l'activation + score concours.
+    """Public lookup: a callsign's QSOs with the activation + contest score.
 
-    Renvoie le détail des contacts et les compteurs utiles au concours
-    (total, nombre de bandes, de modes, et de couples bande+mode distincts —
-    la métrique « activations » d'une station spéciale).
+    Returns the contact details and the counters used by the contest
+    (total, number of bands, of modes, and of distinct band+mode pairs —
+    the "activations" metric of a special station).
     """
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
@@ -1517,12 +1517,12 @@ def get_contact(contact_id: int) -> dict[str, Any] | None:
 
 
 def contacts_by_ids(ids: list[int]) -> list[dict[str, Any]]:
-    """QSO dont l'id est dans ``ids`` (export d'une sélection), ordre chronologique."""
+    """QSOs whose id is in ``ids`` (export of a selection), chronological order."""
     wanted = sorted({int(i) for i in ids})
     out: list[dict[str, Any]] = []
     init_db()
     with conn() as c:
-        for start in range(0, len(wanted), 500):  # limite de variables SQLite
+        for start in range(0, len(wanted), 500):  # SQLite variable limit
             chunk = wanted[start:start + 500]
             marks = ",".join("?" * len(chunk))
             out += [dict(r) for r in c.execute(f"SELECT * FROM contacts WHERE id IN ({marks})", chunk)]
@@ -1536,11 +1536,11 @@ def delete_contact(contact_id: int) -> None:
     maybe_backup()
 
 
-# ── Statistiques ───────────────────────────────────────────────────────────
+# ── Statistics ─────────────────────────────────────────────────────────────
 
 
 def stats(station: str | None = None) -> dict[str, Any]:
-    """Compteurs d'un indicatif (défaut : celui en cours)."""
+    """Counters of a callsign (default: the current one)."""
     st = (_st(station),)
     init_db()
     with conn() as c:
@@ -1567,13 +1567,13 @@ def stats(station: str | None = None) -> dict[str, Any]:
     return {"total": int(total), "by_band": by_band, "by_mode": by_mode, "by_op": by_op}
 
 
-# ── Cadence de trafic (jauges du log) ──────────────────────────────────────
-# « Combien j'en fais à l'heure ? » : le compteur qui donne envie d'enchaîner.
-# Deux fenêtres : l'heure écoulée (tendance de fond) et les 10 dernières
-# minutes (le pile-up du moment), chacune comparée à la fenêtre précédente.
+# ── Operating rate (log gauges) ────────────────────────────────────────────
+# "How many am I making per hour?": the counter that makes you want to keep going.
+# Two windows: the last hour (underlying trend) and the last 10 minutes
+# (the current pile-up), each compared with the previous window.
 
-RATE_FULL_SCALE = 60        # QSO/h correspondant à une jauge pleine
-RATE_LEVELS = (             # seuils en QSO/h → libellé affiché
+RATE_FULL_SCALE = 60        # QSO/h matching a full gauge
+RATE_LEVELS = (             # thresholds in QSO/h → displayed label
     (0, N_("station calme")),
     (6, N_("ça démarre")),
     (18, N_("bon rythme")),
@@ -1584,7 +1584,7 @@ RATE_LEVELS = (             # seuils en QSO/h → libellé affiché
 
 def _count_between(c: sqlite3.Connection, station: str, operator: str,
                    start: datetime, end: datetime) -> int:
-    """QSO enregistrés dans [start, end[ (bornes UTC)."""
+    """QSOs recorded in [start, end[ (UTC bounds)."""
     sql = ("SELECT COUNT(*) FROM contacts WHERE station=? "
            "AND (qso_date || substr(time_on, 1, 4)) >= ? "
            "AND (qso_date || substr(time_on, 1, 4)) < ?")
@@ -1596,7 +1596,7 @@ def _count_between(c: sqlite3.Connection, station: str, operator: str,
 
 
 def _rate_level(per_hour: float) -> str:
-    """Libellé de la cadence (traduit à l'affichage)."""
+    """Rate label (translated at display time)."""
     label = RATE_LEVELS[0][1]
     for threshold, text in RATE_LEVELS:
         if per_hour >= threshold:
@@ -1605,11 +1605,11 @@ def _rate_level(per_hour: float) -> str:
 
 
 def qso_rate(operator: str = "", station: str | None = None) -> dict[str, Any]:
-    """Cadence de trafic d'un opérateur (ou de la station si ``operator`` est vide).
+    """Operating rate of an operator (or of the station if ``operator`` is empty).
 
-    Renvoie, pour l'heure écoulée et pour les 10 dernières minutes, le nombre de
-    QSO, la cadence ramenée à l'heure, la variation par rapport à la période
-    précédente et le remplissage de la jauge (0 à 100).
+    Returns, for the last hour and for the last 10 minutes, the number of
+    QSOs, the rate scaled to one hour, the change from the previous period
+    and the gauge fill (0 to 100).
     """
     st = _st(station)
     op = (operator or "").strip().upper()
@@ -1618,8 +1618,8 @@ def qso_rate(operator: str = "", station: str | None = None) -> dict[str, Any]:
     windows = {}
     with conn() as c:
         for name, minutes in (("hour", 60), ("ten", 10)):
-            # Borne haute à la minute suivante : le QSO qu'on vient d'enregistrer
-            # (même minute que « maintenant ») doit compter tout de suite.
+            # Upper bound at the next minute: the QSO just recorded
+            # (same minute as "now") must count right away.
             recent = _count_between(c, st, op, now - timedelta(minutes=minutes),
                                     now + timedelta(minutes=1))
             before = _count_between(c, st, op, now - timedelta(minutes=2 * minutes),
@@ -1638,12 +1638,12 @@ def qso_rate(operator: str = "", station: str | None = None) -> dict[str, Any]:
 
 
 def worked_entities(station: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
-    """Entités DXCC contactées, la plus récemment travaillée en tête.
+    """DXCC entities worked, the most recently worked first.
 
-    Le code du drapeau vient du préfixe de l'indicatif (aucun réseau
-    nécessaire, la vignette est servie par l'application) ; le nom du pays vient
-    du callbook QRZ quand il est connu, sinon de la table des préfixes. Les
-    indicatifs dont l'entité est inconnue sont ignorés.
+    The flag code comes from the callsign prefix (no network needed, the
+    thumbnail is served by the application); the country name comes from the
+    QRZ callbook when known, otherwise from the prefix table. Callsigns whose
+    entity is unknown are skipped.
     """
     init_db()
     st = (_st(station),)
@@ -1664,7 +1664,7 @@ def worked_entities(station: str | None = None, limit: int | None = None) -> lis
         item["n"] += int(row["n"])
         item["calls"] += 1
         item["last"] = max(item["last"], row["last"] or "")
-        # Un nom venu de QRZ est plus précis que celui de la table des préfixes.
+        # A name from QRZ is more accurate than the one from the prefix table.
         qrz_name = known.get(row["call"], "")
         if qrz_name and not item["from_qrz"]:
             item["name"], item["from_qrz"] = qrz_name, True
@@ -1672,22 +1672,22 @@ def worked_entities(station: str | None = None, limit: int | None = None) -> lis
     return out[:limit] if limit else out
 
 
-# ── Callbook QRZ (nom / locator / DXCC des indicatifs contactés) ───────────
-# Cache permanent des lookups QRZ XML : chaque indicatif n'est interrogé
-# qu'une fois (à la saisie dans le log, ou par la tâche de fond qui passe
-# doucement sur les indicatifs pas encore connus). Seuls indicatif, locator
-# et DXCC sont publiés ; nom et prénom restent dans l'espace opérateurs.
+# ── QRZ callbook (name / locator / DXCC of worked callsigns) ───────────────
+# Permanent cache of QRZ XML lookups: each callsign is queried only once
+# (when logged, or by the background task that slowly goes over callsigns
+# not yet known). Only callsign, locator and DXCC are published; first and
+# last name stay in the operators' area.
 
-CALLBOOK_RETRY_NOTFOUND = 24 * 3600  # inconnu de QRZ : on retente le lendemain
-CALLBOOK_RETRY_ERROR = 15 * 60       # erreur réseau / session : on retente plus tôt
+CALLBOOK_RETRY_NOTFOUND = 24 * 3600  # unknown to QRZ: retry the next day
+CALLBOOK_RETRY_ERROR = 15 * 60       # network / session error: retry sooner
 
 logger = logging.getLogger(__name__)
 
 
-# Compte QRZ : par défaut celui de config.yml (section ``qrz``) ; l'admin peut
-# en saisir un autre dans les Réglages (ex. celui du radio-club). Il est gardé
-# à part, lisible par le seul service (0600), jamais affiché ni copié dans les
-# sauvegardes téléchargeables.
+# QRZ account: by default the one from config.yml (``qrz`` section); the admin may
+# enter another one in the Settings (e.g. the radio club's). It is kept apart,
+# readable by the service only (0600), never displayed nor copied into the
+# downloadable backups.
 QRZ_ACCOUNT_FILE = ROOT / "var" / "activation_qrz.json"
 _RE_QRZ_USER = re.compile(r"^[A-Za-z0-9_.@/-]{3,40}$")
 _qrz_own: QrzXmlClient | None = None
@@ -1695,7 +1695,7 @@ _qrz_own_lock = threading.Lock()
 
 
 def _own_qrz_account() -> dict[str, str]:
-    """Compte saisi dans les Réglages ({} si aucun)."""
+    """Account entered in the Settings ({} if none)."""
     try:
         data = json.loads(QRZ_ACCOUNT_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -1707,7 +1707,7 @@ def _own_qrz_account() -> dict[str, str]:
 
 
 def qrz_account() -> dict[str, str]:
-    """Compte QRZ en service : identifiant et source (``settings``, ``config`` ou "")."""
+    """QRZ account in use: username and source (``settings``, ``config`` or "")."""
     own = _own_qrz_account()
     if own:
         return {"username": own["username"], "source": "settings"}
@@ -1723,7 +1723,7 @@ def valid_qrz_username(username: str) -> bool:
 
 
 def check_qrz_account(username: str, password: str) -> tuple[str, str]:
-    """Essaie de se connecter à QRZ : voir ``QrzXmlClient.check_login``."""
+    """Try to log in to QRZ: see ``QrzXmlClient.check_login``."""
     return QrzXmlClient(username, password).check_login()
 
 
@@ -1739,18 +1739,18 @@ def set_qrz_account(username: str, password: str) -> None:
 
 
 def clear_qrz_account() -> None:
-    """Retire le compte des Réglages : retour au compte de config.yml (s'il existe)."""
+    """Remove the account from the Settings: back to the config.yml one (if any)."""
     QRZ_ACCOUNT_FILE.unlink(missing_ok=True)
 
 
 def own_qrz_password(username: str) -> str:
-    """Mot de passe déjà enregistré pour cet identifiant (champ laissé vide = inchangé)."""
+    """Password already saved for this username (field left empty = unchanged)."""
     own = _own_qrz_account()
     return own["password"] if own and own["username"].lower() == username.strip().lower() else ""
 
 
 def qrz_client() -> Any:
-    """Client QRZ XML : compte des Réglages, sinon celui du site (None si aucun)."""
+    """QRZ XML client: Settings account, else the site's one (None if none)."""
     global _qrz_own
     own = _own_qrz_account()
     if not own:
@@ -1762,7 +1762,7 @@ def qrz_client() -> Any:
 
 
 def locator_center(grid: str) -> tuple[float, float] | None:
-    """Centre d'un locator 4, 6 ou 8 caractères → (lat, lon), None si invalide."""
+    """Center of a 4, 6 or 8 character locator → (lat, lon), None if invalid."""
     g = (grid or "").strip().upper()
     if not (_RE_LOCATOR.match(g) or _RE_LOCATOR8.match(g)):
         return None
@@ -1781,7 +1781,7 @@ def locator_center(grid: str) -> tuple[float, float] | None:
 
 
 def distance_km(grid_a: str, grid_b: str) -> float | None:
-    """Distance orthodromique (km) entre les centres de deux locators."""
+    """Great-circle distance (km) between the centers of two locators."""
     a, b = locator_center(grid_a), locator_center(grid_b)
     if a is None or b is None:
         return None
@@ -1808,7 +1808,7 @@ def callbook_get(call: str) -> dict[str, Any] | None:
 
 
 def _callbook_put(call: str, status: str, rec: Any = None) -> None:
-    """Enregistre le résultat d'un lookup (``rec`` = XmlLookup si status ok)."""
+    """Store the result of a lookup (``rec`` = XmlLookup if status ok)."""
     grid = (getattr(rec, "grid", "") or "")[:6].upper()
     if not _RE_LOCATOR.match(grid):
         grid = ""
@@ -1829,17 +1829,17 @@ def _callbook_put(call: str, status: str, rec: Any = None) -> None:
                 land or country,
                 _int_or_none(getattr(rec, "cqzone", None)),
                 _photo_url(getattr(rec, "image", "")),
-                int(time.time()),          # photo cherchée : on ne repassera pas
+                int(time.time()),          # photo looked up: no need to come back
                 int(time.time()),
             ),
         )
 
 
 def _photo_url(url: str) -> str:
-    """Adresse de la photo QRZ, gardée seulement si elle est sûre.
+    """URL of the QRZ photo, kept only if it is safe.
 
-    On ne retient qu'une URL https vers qrz.com : la vignette est affichée dans
-    l'espace opérateurs, pas question d'y charger n'importe quel domaine."""
+    Only an https URL to qrz.com is accepted: the thumbnail is shown in the
+    operators' area, no way we load just any domain there."""
     clean = (url or "").strip()
     if not clean.lower().startswith("https://"):
         return ""
@@ -1849,22 +1849,22 @@ def _photo_url(url: str) -> str:
 
 
 def _callbook_fresh(row: dict[str, Any] | None) -> bool:
-    """La fiche dispense-t-elle de réinterroger QRZ ?"""
+    """Does the record spare us from querying QRZ again?"""
     if row is None:
         return False
     if row["status"] == "ok":
-        # Fiche antérieure à la vignette : on la relit UNE fois pour la photo.
+        # Record older than the thumbnail feature: read it again ONCE for the photo.
         return bool(row.get("image_at"))
     ttl = CALLBOOK_RETRY_NOTFOUND if row["status"] == "notfound" else CALLBOOK_RETRY_ERROR
     return time.time() - (row["fetched_at"] or 0) < ttl
 
 
 def qrz_lookup(call: str, client: Any) -> dict[str, Any] | None:
-    """Fiche callbook d'un indicatif : cache SQLite, sinon QRZ XML.
+    """Callbook record of a callsign: SQLite cache, else QRZ XML.
 
-    Renvoie la ligne ``callbook`` si l'indicatif est connu de QRZ, None sinon
-    (inconnu, erreur, ou pas de client). Un portable (``DL1ABC/P``) introuvable
-    tel quel est recherché sous son indicatif de base.
+    Returns the ``callbook`` row if the callsign is known to QRZ, None otherwise
+    (unknown, error, or no client). A portable (``DL1ABC/P``) not found as
+    is gets looked up under its base callsign.
     """
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
@@ -1880,10 +1880,10 @@ def qrz_lookup(call: str, client: Any) -> dict[str, Any] | None:
 
 
 def pending_callbook_calls(limit: int = 1) -> list[str]:
-    """Indicatifs contactés sans fiche callbook valable (jamais vus d'abord).
+    """Worked callsigns without a valid callbook record (never-seen ones first).
 
-    Comprend les fiches d'avant la vignette QRZ : elles sont correctes mais
-    n'ont jamais eu de photo, la tâche de fond les repasse une fois."""
+    Includes records from before the QRZ thumbnail: they are correct but
+    never had a photo, the background task goes over them once."""
     init_db()
     now = int(time.time())
     with conn() as c:
@@ -1900,8 +1900,8 @@ def pending_callbook_calls(limit: int = 1) -> list[str]:
 
 
 def enrich_one(client: Any) -> str | None:
-    """Interroge QRZ pour UN indicatif en attente. Renvoie le statut obtenu
-    (``ok`` / ``notfound`` / ``error``), ou None s'il n'y avait rien à faire."""
+    """Query QRZ for ONE pending callsign. Returns the resulting status
+    (``ok`` / ``notfound`` / ``error``), or None if there was nothing to do."""
     if client is None:
         return None
     pending = pending_callbook_calls(1)
@@ -1913,7 +1913,7 @@ def enrich_one(client: Any) -> str | None:
 
 
 def callbook_progress() -> dict[str, int]:
-    """Avancement de l'enrichissement QRZ (affiché dans les Réglages)."""
+    """Progress of the QRZ enrichment (shown in the Settings)."""
     init_db()
     with conn() as c:
         stations = int(c.execute("SELECT COUNT(DISTINCT call) FROM contacts").fetchone()[0])
@@ -1929,9 +1929,9 @@ def callbook_progress() -> dict[str, int]:
             "pending": stations - ok - notfound}
 
 
-# Tâche de fond : un indicatif toutes les `qrz_interval_seconds` (défaut 10 s)
-# pour ne pas charger QRZ ; pause longue quand il n'y a rien à faire ou que
-# QRZ répond mal. Le service tourne sur un seul worker uvicorn → un seul thread.
+# Background task: one callsign every `qrz_interval_seconds` (default 10 s)
+# so as not to load QRZ; long pause when there is nothing to do or when
+# QRZ misbehaves. The service runs a single uvicorn worker → a single thread.
 
 _enricher_stop = threading.Event()
 _enricher_thread: threading.Thread | None = None
@@ -1939,23 +1939,23 @@ _enricher_thread: threading.Thread | None = None
 
 def _enricher_loop(interval: float) -> None:
     while not _enricher_stop.is_set():
-        delay = 60.0                  # rien en attente : on repasse dans 1 min
+        delay = 60.0                  # nothing pending: check again in 1 min
         try:
             status = enrich_one(qrz_client())
             if status == "error":
-                delay = 300.0         # QRZ en panne / session refusée : on lève le pied
+                delay = 300.0         # QRZ down / session refused: back off
             elif status is not None:
                 delay = interval
-        except Exception:  # noqa: BLE001 — la tâche de fond ne doit jamais mourir
+        except Exception:  # noqa: BLE001 — the background task must never die
             logger.exception("enrichissement QRZ : erreur inattendue")
             delay = 300.0
         _enricher_stop.wait(delay)
 
 
 def start_enricher() -> None:
-    """Démarre l'enrichissement QRZ en tâche de fond (idempotent).
+    """Start the QRZ enrichment as a background task (idempotent).
 
-    Désactivable par ``activation.qrz_enrich: false`` dans config.yml.
+    Can be disabled with ``activation.qrz_enrich: false`` in config.yml.
     """
     global _enricher_thread
     cfg = activation_config()
@@ -1975,17 +1975,17 @@ def stop_enricher() -> None:
     _enricher_stop.set()
 
 
-# ── Board public : carte, DXCC, classement ─────────────────────────────────
+# ── Public board: map, DXCC, ranking ───────────────────────────────────────
 
 
-GRID_MISMATCH_KM = 500  # saisi à plus de 500 km de QRZ → saisie tenue pour fausse
+GRID_MISMATCH_KM = 500  # entered more than 500 km from QRZ → entry deemed wrong
 
 
 def bearing_deg(grid_from: str, grid_to: str) -> float | None:
-    """Azimut vrai (0 = nord, 90 = est) entre les centres de deux locators.
+    """True azimuth (0 = north, 90 = east) between the centers of two locators.
 
-    Sert à la boussole de la page de log : d'un coup d'œil, l'opérateur sait
-    où tourner l'antenne."""
+    Used by the compass on the log page: at a glance, the operator knows
+    where to turn the antenna."""
     start, end = locator_center(grid_from), locator_center(grid_to)
     if start is None or end is None:
         return None
@@ -1998,14 +1998,14 @@ def bearing_deg(grid_from: str, grid_to: str) -> float | None:
 
 
 def call_grids(station: str | None = None) -> dict[str, str]:
-    """Locator retenu pour chaque indicatif contacté ("" si inconnu).
+    """Locator chosen for each worked callsign ("" if unknown).
 
-    Le plus récent saisi dans un QSO, sinon celui de QRZ. Celui de QRZ
-    l'emporte quand le locator saisi n'a que 4 caractères du même carré,
-    finit par « AA » (valeur par défaut qu'inventent certains logiciels de log
-    à partir du préfixe) ou tombe à plus de ``GRID_MISMATCH_KM`` de celui de
-    QRZ (ex. locator de la station précédente resté dans le logiciel).
-    Sert à la carte et aux points de distance ; le log n'est pas modifié.
+    The most recent one entered in a QSO, else the QRZ one. The QRZ one wins
+    when the entered locator has only 4 characters of the same square, ends
+    with "AA" (default value some logging programs make up from the prefix)
+    or lies more than ``GRID_MISMATCH_KM`` away from the QRZ one (e.g. the
+    previous station's locator left in the software).
+    Used for the map and the distance points; the log is not modified.
     """
     init_db()
     with conn() as c:
@@ -2027,9 +2027,9 @@ def call_grids(station: str | None = None) -> dict[str, str]:
         grid = logged.get(call) or from_qrz.get(call) or ""
         qrz = from_qrz.get(call, "")
         if qrz and (
-            (len(grid) == 4 and qrz.startswith(grid))    # QRZ précise le même carré
-            or (len(grid) == 6 and grid.endswith("AA"))  # « xxxxAA » : rempli par un logiciel
-            or (distance_km(grid, qrz) or 0) > GRID_MISMATCH_KM  # saisie manifestement fausse
+            (len(grid) == 4 and qrz.startswith(grid))    # QRZ refines the same square
+            or (len(grid) == 6 and grid.endswith("AA"))  # "xxxxAA": filled in by software
+            or (distance_km(grid, qrz) or 0) > GRID_MISMATCH_KM  # obviously wrong entry
         ):
             grid = qrz
         out[call] = grid if locator_center(grid) else ""
@@ -2037,13 +2037,13 @@ def call_grids(station: str | None = None) -> dict[str, str]:
 
 
 def map_data(station: str | None = None) -> dict[str, Any]:
-    """Stations contactées pour la carte publique : un point par locator, bande
-    et mode.
+    """Worked stations for the public map: one point per locator, band and
+    mode.
 
-    Locator : voir ``call_grids``. Position = CENTRE du locator (jamais les
-    coordonnées précises de QRZ) et aucune donnée nominative : indicatif +
-    locator seulement. Les points d'un même carré sont écartés à l'affichage
-    (voir static/js/activation-map.js) pour rester tous visibles.
+    Locator: see ``call_grids``. Position = CENTER of the locator (never QRZ's
+    precise coordinates) and no personal data: callsign + locator only.
+    Points in the same square are spread apart on display
+    (see static/js/activation-map.js) so they all stay visible.
     """
     st = _st(station)
     grids = call_grids(st)
@@ -2078,17 +2078,17 @@ def map_data(station: str | None = None) -> dict[str, Any]:
 
 
 def _entity_name(call: str) -> str:
-    """Nom de l'entité DXCC déduit du préfixe ("" si le préfixe est inconnu)."""
+    """DXCC entity name inferred from the prefix ("" if the prefix is unknown)."""
     return dxcc_flags.entity_for_call(call)[1]
 
 
 def satellite_stats(station: str | None = None) -> dict[str, Any]:
-    """QSO passés par satellite, détaillés par satellite.
+    """QSOs made via satellite, broken down by satellite.
 
-    ``by_sat`` : [{"sat", "n", "stations"}] du plus travaillé au moins
-    travaillé ; ``total`` : nombre de QSO satellite ; ``share`` : leur part du
-    log. Le nom est celui saisi dans le log (une coquille comme « F0-29 »
-    apparaît donc telle quelle — c'est ainsi qu'on la repère).
+    ``by_sat``: [{"sat", "n", "stations"}] from most to least worked;
+    ``total``: number of satellite QSOs; ``share``: their share of the
+    log. The name is the one entered in the log (a typo such as "F0-29"
+    therefore shows up as is — that is how it gets spotted).
     """
     st = _st(station)
     init_db()
@@ -2106,12 +2106,12 @@ def satellite_stats(station: str | None = None) -> dict[str, Any]:
 
 
 def qso_timeline(station: str | None = None) -> dict[str, Any]:
-    """Rythme de l'activité : QSO par jour et par heure UTC.
+    """Activity rhythm: QSOs per day and per UTC hour.
 
-    ``by_day`` (chronologique), ``by_hour`` (24 valeurs, 0 h → 23 h UTC),
-    la meilleure journée, la meilleure heure d'horloge (toutes journées
-    confondues), le meilleur créneau d'une heure précise, le nombre d'heures
-    où la station a été active et la moyenne de QSO sur ces heures-là.
+    ``by_day`` (chronological), ``by_hour`` (24 values, 0 h → 23 h UTC),
+    the best day, the best clock hour (all days combined), the best single
+    one-hour slot, the number of hours the station was active and the
+    average number of QSOs over those hours.
     """
     st = _st(station)
     init_db()
@@ -2151,19 +2151,19 @@ def qso_timeline(station: str | None = None) -> dict[str, Any]:
     }
 
 
-# ── Périodes de « run » (pile-up) ─────────────────────────────────────────
-# Un run, c'est le moment où ça décolle : les QSO s'enchaînent sans temps mort.
-# On repère les contacts dont la cadence LOCALE (fenêtre glissante) dépasse un
-# seuil, puis on recolle ceux qui se suivent. Le résultat dit quand la station
-# a le mieux tourné, et à quelle vitesse.
+# ── "Run" periods (pile-up) ────────────────────────────────────────────────
+# A run is when things take off: QSOs follow each other with no dead time.
+# We pick the contacts whose LOCAL rate (sliding window) exceeds a threshold,
+# then stitch together those that follow each other. The result tells when the
+# station ran best, and how fast.
 
-RUN_WINDOW_MIN = 10        # fenêtre glissante d'observation
-RUN_MIN_RATE = 30          # QSO/h : en dessous, ce n'est pas un run
-RUN_MIN_QSOS = 5           # une pointe de deux contacts n'est pas un run
+RUN_WINDOW_MIN = 10        # sliding observation window
+RUN_MIN_RATE = 30          # QSO/h: below this, it is not a run
+RUN_MIN_QSOS = 5           # a burst of two contacts is not a run
 
 
 def _qso_minutes(station: str) -> list[int]:
-    """Instants des QSO, en minutes depuis l'époque, dans l'ordre."""
+    """QSO instants, in minutes since the epoch, in order."""
     init_db()
     with conn() as c:
         rows = c.execute(
@@ -2185,11 +2185,11 @@ def _qso_minutes(station: str) -> list[int]:
 
 
 def run_periods(station: str | None = None, top: int = 5) -> dict[str, Any]:
-    """Meilleurs moments de l'activation : périodes où la cadence s'emballe.
+    """Best moments of the activation: periods when the rate takes off.
 
-    Renvoie ``periods`` (les ``top`` meilleures, cadence décroissante), chacune
-    avec son début, sa fin, sa durée, son nombre de QSO et sa cadence, plus
-    ``best`` (la meilleure) et le total de QSO passés en run.
+    Returns ``periods`` (the ``top`` best ones, by decreasing rate), each with
+    its start, end, duration, number of QSOs and rate, plus ``best`` (the
+    best one) and the total number of QSOs made during runs.
     """
     minutes = _qso_minutes(_st(station))
     if not minutes:
@@ -2198,8 +2198,8 @@ def run_periods(station: str | None = None, top: int = 5) -> dict[str, Any]:
     half = RUN_WINDOW_MIN / 2.0
     low = high = 0
     for at in minutes:
-        # Fenêtre CENTRÉE sur le QSO : avec une fenêtre qui ne regarde que
-        # devant, les derniers contacts d'une rafale passaient pour calmes.
+        # Window CENTERED on the QSO: with a forward-looking-only window,
+        # the last contacts of a burst looked calm.
         while minutes[low] < at - half:
             low += 1
         while high < len(minutes) and minutes[high] <= at + half:
@@ -2228,10 +2228,10 @@ def run_periods(station: str | None = None, top: int = 5) -> dict[str, Any]:
 
 
 def _run_from(minutes: list[int]) -> dict[str, Any]:
-    """Résumé d'une suite de QSO serrés : durée, cadence, début et fin (UTC)."""
+    """Summary of a run of close QSOs: duration, rate, start and end (UTC)."""
     start, end = minutes[0], minutes[-1]
-    # Un QSO isolé dure au moins la fenêtre d'observation : sinon la cadence
-    # d'une salve de trois contacts dans la même minute serait infinie.
+    # A single QSO lasts at least the observation window: otherwise the rate
+    # of a burst of three contacts in the same minute would be infinite.
     span = max(end - start, RUN_WINDOW_MIN)
     return {
         "start": datetime.fromtimestamp(start * 60, UTC).strftime("%Y-%m-%dT%H:%M"),
@@ -2243,13 +2243,12 @@ def _run_from(minutes: list[int]) -> dict[str, Any]:
 
 
 def dxcc_table(station: str | None = None) -> dict[str, Any]:
-    """Entités DXCC contactées : stations et QSO par entité.
+    """DXCC entities worked: stations and QSOs per entity.
 
-    L'entité vient du callbook QRZ quand il la connaît, sinon du **préfixe de
-    l'indicatif** : sans compte QRZ (ou avant que le callbook soit rempli), le
-    tableau est quand même juste pour l'immense majorité des stations. Seuls
-    les indicatifs dont le préfixe est inconnu restent « pas encore
-    identifiés ».
+    The entity comes from the QRZ callbook when it knows it, else from the
+    **callsign prefix**: without a QRZ account (or before the callbook is
+    filled), the table is still right for the vast majority of stations. Only
+    callsigns whose prefix is unknown remain "not yet identified".
     """
     st = _st(station)
     init_db()
@@ -2263,10 +2262,10 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
     unidentified = 0
     for row in rows:
         qrz_name = (row["dxcc_name"] or "").strip()
-        # Regroupement par entité : le code réunit les variantes de nom
-        # (« Germany » côté préfixe, « Fed. Rep. of Germany » côté QRZ) ET les
-        # deux sources — un préfixe absent de la table ne doit pas créer une
-        # seconde entité, sans drapeau, à côté de la même entité connue.
+        # Grouping by entity: the code merges name variants
+        # ("Germany" on the prefix side, "Fed. Rep. of Germany" on the QRZ side) AND the
+        # two sources — a prefix missing from the table must not create a second
+        # entity, without a flag, next to the same known entity.
         key, code, prefix_name = dxcc_flags.entity_key(row["call"], qrz_name)
         if not key:
             unidentified += 1
@@ -2276,37 +2275,37 @@ def dxcc_table(station: str | None = None) -> dict[str, Any]:
                                        "stations": 0, "qsos": 0, "from_qrz": bool(qrz_name)})
         item["stations"] += 1
         item["qsos"] += int(row["qsos"])
-        if qrz_name and not item["from_qrz"]:      # le nom officiel QRZ l'emporte
+        if qrz_name and not item["from_qrz"]:      # the official QRZ name wins
             item["dxcc_name"], item["dxcc"], item["from_qrz"] = qrz_name, row["dxcc"], True
     entities = sorted(groups.values(),
                       key=lambda e: (-e["stations"], -e["qsos"], e["dxcc_name"]))
     return {"entities": entities, "count": len(entities), "unidentified": unidentified}
 
 
-# ── Certificats des chasseurs (réglable) ──────────────────────────────────
-# Un chasseur qui retrouve ses QSO sur la page publique peut repartir avec son
-# certificat en PDF. Désactivé tant que l'admin ne l'a pas voulu : le dessin
-# porte le nom du club, autant qu'il le relise avant.
+# ── Hunter certificates (configurable) ─────────────────────────────────────
+# A hunter who finds their QSOs on the public page can leave with their
+# certificate as a PDF. Disabled until the admin wants it: the artwork
+# bears the club's name, better have them proofread it first.
 
 DEFAULT_CERTIFICATE: dict[str, Any] = {
-    "enabled": False,    # bouton « Certificat » sur la page publique
-    "names": False,      # inscrire le nom du chasseur (sinon : son seul indicatif)
-    "ranking": True,     # médaille avec la place au classement
-    "mention": "",       # petite ligne libre en bas de page
-    "max_qso": 10,       # contacts listés sur la page principale
-    "appendix": True,    # page(s) annexe avec le journal complet
-    "flag": "auto",      # drapeau du pays : "" (aucun), "auto" (d'après l'indicatif) ou un code
-    "border": False,     # fin liseré autour de la page
+    "enabled": False,    # "Certificat" button on the public page
+    "names": False,      # print the hunter's name (otherwise: their callsign only)
+    "ranking": True,     # medal with the ranking position
+    "mention": "",       # small free-text line at the bottom of the page
+    "max_qso": 10,       # contacts listed on the main page
+    "appendix": True,    # appendix page(s) with the full log
+    "flag": "auto",      # country flag: "" (none), "auto" (from the callsign) or a code
+    "border": False,     # thin border around the page
     "border_colors": ["#0055A4", "#FFFFFF", "#EF3340"],
-    "emblem": True,      # emblème pylône + banderole sous le poste de radio
-    "emblem_text": "",   # texte de la banderole (nom du club) ; vide → « HAM RADIO »
-    "ham_symbol": False, # symbole international du radioamateur (losange)
-    "qr_url": "",        # adresse du QR code (colonne de gauche) ; vide → pas de QR
+    "emblem": True,      # pylon + banner emblem under the radio set
+    "emblem_text": "",   # banner text (club name); empty → "HAM RADIO"
+    "ham_symbol": False, # international amateur radio symbol (diamond)
+    "qr_url": "",        # QR code URL (left column); empty → no QR
 }
 _RE_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 CERTIFICATE_MENTION_MAX = 160
-CERTIFICATE_EMBLEM_MAX = 40     # au-delà, la banderole deviendrait illisible
-CERTIFICATE_QR_MAX = 200        # un QR plus dense ne se lirait plus à 2 cm
+CERTIFICATE_EMBLEM_MAX = 40     # beyond this, the banner would become unreadable
+CERTIFICATE_QR_MAX = 200        # a denser QR could no longer be read at 2 cm
 _RE_QR_URL = re.compile(r"^https?://[^\s/]+\.[^\s]*$", re.IGNORECASE)
 
 
@@ -2319,7 +2318,7 @@ def get_certificate_options() -> dict[str, Any]:
         "ranking": bool(saved.get("ranking", d["ranking"])),
         "mention": str(saved.get("mention") or "")[:CERTIFICATE_MENTION_MAX],
         "max_qso": _clamp_int(saved.get("max_qso"), 1, 14, d["max_qso"]),
-        # « annexe » : nom de la clé avant la 1.40, encore lu.
+        # "annexe": key name before 1.40, still read.
         "appendix": bool(saved.get("appendix", saved.get("annexe", d["appendix"]))),
         "flag": _clean_flag(saved.get("flag", d["flag"])),
         "border": bool(saved.get("border", d["border"])),
@@ -2332,7 +2331,7 @@ def get_certificate_options() -> dict[str, Any]:
 
 
 def _clean_qr_url(value: Any) -> str:
-    """Adresse http(s) du QR code ; « https:// » ajouté s'il manque, sinon rien."""
+    """http(s) URL of the QR code; "https://" added if missing, else nothing."""
     url = "".join(str(value or "").split())
     if url and "://" not in url:
         url = "https://" + url
@@ -2340,7 +2339,7 @@ def _clean_qr_url(value: Any) -> str:
 
 
 def _clean_flag(value: Any) -> str:
-    """« auto », un code d'entité connu, ou rien."""
+    """Either "auto", a known entity code, or nothing."""
     code = str(value or "").strip().upper()
     if code in ("", "AUTO"):
         return code.lower()
@@ -2348,7 +2347,7 @@ def _clean_flag(value: Any) -> str:
 
 
 def _clean_colors(value: Any, default: list[str]) -> list[str]:
-    """Trois couleurs #rrggbb ; toute valeur douteuse retombe sur le défaut."""
+    """Three #rrggbb colors; any dubious value falls back to the default."""
     given = list(value or [])
     return [given[i] if i < len(given) and _RE_HEX.match(str(given[i] or "")) else default[i]
             for i in range(3)]
@@ -2378,7 +2377,7 @@ def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
 
 
 def certificate_flags() -> list[tuple[str, str]]:
-    """Entités disponibles pour le drapeau du certificat : (code, nom), triées."""
+    """Entities available for the certificate flag: (code, name), sorted."""
     seen = {code: name for code, name in dxcc_flags.PREFIXES.values()}
     return sorted(seen.items(), key=lambda item: item[1])
 
@@ -2387,9 +2386,9 @@ def certificates_on() -> bool:
     return get_certificate_options()["enabled"]
 
 
-# ── Fiche du correspondant sur la page de log (réglable) ──────────────────
-# Pendant la saisie : la photo de la fiche QRZ et une boussole qui montre où
-# tourner l'antenne. Chacune se règle en pixels, 0 = on ne l'affiche pas.
+# ── Contacted station's card on the log page (configurable) ────────────────
+# While logging: the photo from the QRZ record and a compass showing where
+# to turn the antenna. Each is sized in pixels, 0 = not shown.
 
 DEFAULT_LOG_VIEW: dict[str, int] = {"photo": 96, "compass": 120}
 LOG_VIEW_MAX = 260
@@ -2414,15 +2413,15 @@ def set_log_view(form: dict[str, Any]) -> dict[str, int]:
     return get_log_view()
 
 
-# ── Rapport PDF et logo du club (réglables dans les Réglages) ─────────────
+# ── PDF report and club logo (configurable in the Settings) ────────────────
 
 DEFAULT_REPORT: dict[str, Any] = {
-    "hours": False,      # « Rythme, heure par heure » : hors du rapport par défaut
-    "dxcc_all": True,    # toutes les entités avec leur drapeau (sinon : les dix premières)
-    "hunters": 10,       # nombre de chasseurs listés (0 = pas de palmarès)
-    "sats": True,        # « Satellites » : masqué de toute façon sans QSO satellite
-    "one_page": False,   # tout tenir sur une page, quitte à couper les listes
-    "runs": 3,           # meilleurs moments (pile-up) listés ; 0 = section retirée
+    "hours": False,      # "Rythme, heure par heure": left out of the report by default
+    "dxcc_all": True,    # all entities with their flag (otherwise: the top ten)
+    "hunters": 10,       # number of hunters listed (0 = no leaderboard)
+    "sats": True,        # "Satellites": hidden anyway without satellite QSOs
+    "one_page": False,   # fit everything on one page, even if lists get cut
+    "runs": 3,           # best moments (pile-up) listed; 0 = section removed
 }
 REPORT_HUNTERS_MAX = 100
 
@@ -2432,7 +2431,7 @@ LOGO_TYPES = {"png": "image/png", "jpg": "image/jpeg"}
 
 
 def get_report_options() -> dict[str, Any]:
-    """Contenu du rapport PDF (sections facultatives)."""
+    """Content of the PDF report (optional sections)."""
     saved = load_settings().get("report") or {}
     d = DEFAULT_REPORT
     return {
@@ -2461,12 +2460,12 @@ def set_report_options(form: dict[str, Any]) -> dict[str, Any]:
 
 
 def logo_on_pages() -> bool:
-    """Le logo est-il affiché sur les pages web (bandeau des indicatifs) ?"""
+    """Is the logo shown on the web pages (callsign banner)?"""
     return get_flag("logo_on_pages", True)
 
 
 def logo_path() -> Path | None:
-    """Fichier du logo du club (None s'il n'y en a pas)."""
+    """Club logo file (None if there is none)."""
     for ext in LOGO_TYPES:
         candidate = LOGO_DIR / f"logo.{ext}"
         if candidate.is_file():
@@ -2475,7 +2474,7 @@ def logo_path() -> Path | None:
 
 
 def logo_info() -> dict[str, Any] | None:
-    """Logo publié : chemin, type, taille et date (pour l'aperçu des Réglages)."""
+    """Published logo: path, type, size and date (for the Settings preview)."""
     path = logo_path()
     if path is None:
         return None
@@ -2485,7 +2484,7 @@ def logo_info() -> dict[str, Any] | None:
 
 
 def _image_kind(data: bytes) -> str:
-    """« png », « jpg » ou "" : on se fie au CONTENU, pas au nom du fichier."""
+    """Returns "png", "jpg" or "": we trust the CONTENT, not the file name."""
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return "png"
     if data[:3] == b"\xff\xd8\xff":
@@ -2494,7 +2493,7 @@ def _image_kind(data: bytes) -> str:
 
 
 def set_logo(data: bytes) -> str:
-    """Enregistre le logo (PNG ou JPEG). Renvoie le type ; ValueError sinon."""
+    """Save the logo (PNG or JPEG). Returns the type; ValueError otherwise."""
     if not data:
         raise ValueError(_("fichier vide"))
     if len(data) > LOGO_MAX_BYTES:
@@ -2503,7 +2502,7 @@ def set_logo(data: bytes) -> str:
     if not kind:
         raise ValueError(_("format non reconnu : attendu PNG ou JPEG"))
     LOGO_DIR.mkdir(parents=True, exist_ok=True)
-    for ext in LOGO_TYPES:          # un seul logo à la fois
+    for ext in LOGO_TYPES:          # only one logo at a time
         (LOGO_DIR / f"logo.{ext}").unlink(missing_ok=True)
     (LOGO_DIR / f"logo.{kind}").write_bytes(data)
     return kind
@@ -2514,28 +2513,28 @@ def clear_logo() -> None:
         (LOGO_DIR / f"logo.{ext}").unlink(missing_ok=True)
 
 
-# ── Style de la carte publique (réglable par l'admin dans les Réglages) ────
-# Un point par locator × bande × mode : la COULEUR dit le mode, la FORME dit la
-# bande. Les deux tables sont modifiables ; un mode ou une bande absent de la
-# table prend la valeur « autres ».
+# ── Public map style (configurable by the admin in the Settings) ───────────
+# One point per locator × band × mode: the COLOR tells the mode, the SHAPE tells
+# the band. Both tables are editable; a mode or band missing from the table
+# takes the "others" value.
 
-# Ordre choisi pour que deux bandes voisines ne se ressemblent pas : la table
-# fait le tour des formes, donc au-delà de 8 bandes une forme resservira.
+# Order chosen so that two neighboring bands do not look alike: the table
+# cycles through the shapes, so beyond 8 bands a shape will be reused.
 MAP_SHAPES = ("circle", "diamond", "square", "triangle", "star", "cross", "hexagon", "pentagon")
 
 DEFAULT_MAP_STYLE: dict[str, Any] = {
-    "enabled": True,                  # décoché : tous les points identiques
-    "filters": True,                  # cases à cocher bande/mode sous la carte
+    "enabled": True,                  # unchecked: all points identical
+    "filters": True,                  # band/mode checkboxes under the map
     "mode_colors": {
         "SSB": "#e8543f", "CW": "#f2b134", "FT8": "#2f7fd1", "FT4": "#17a2a2",
         "RTTY": "#8e5bd0", "PSK31": "#d2691e", "FM": "#2fa84f", "AM": "#8a8f98",
         "SSTV": "#e0559c", "DIGI": "#1f6f8b",
     },
-    "mode_default": "#5b6b7c",        # modes absents de la table
+    "mode_default": "#5b6b7c",        # modes missing from the table
     "band_shapes": {
         band: MAP_SHAPES[i % len(MAP_SHAPES)] for i, band in enumerate(BANDS)
     },
-    "band_default": "circle",         # bandes absentes de la table
+    "band_default": "circle",         # bands missing from the table
 }
 
 _RE_COLOR = re.compile(r"^#[0-9a-f]{6}$")
@@ -2552,7 +2551,7 @@ def _clean_shape(value: Any, default: str) -> str:
 
 
 def get_map_style(station: str | None = None) -> dict[str, Any]:
-    """Couleurs (modes) et formes (bandes) de la carte d'un indicatif."""
+    """Colors (modes) and shapes (bands) of a callsign's map."""
     saved = (load_settings().get("map_style_by_station") or {}).get(_st(station)) or {}
     d = DEFAULT_MAP_STYLE
     return {
@@ -2570,7 +2569,7 @@ def get_map_style(station: str | None = None) -> dict[str, Any]:
 
 
 def set_map_style(form: dict[str, Any], station: str | None = None) -> dict[str, Any]:
-    """Enregistre le style de la carte ; « reset » revient aux valeurs par défaut."""
+    """Save the map style; "reset" goes back to the default values."""
     data = load_settings()
     key = _st(station)
     if form.get("reset"):
@@ -2595,23 +2594,23 @@ def set_map_style(form: dict[str, Any], station: str | None = None) -> dict[str,
     return get_map_style(key)
 
 
-# ── Règle de points (réglable par l'admin dans les Réglages) ───────────────
-# Points d'un QSO = points par contact + points du mode + points de distance
-# (chaque critère activable). Score d'un chasseur = somme de ses QSO ; avec
-# « un QSO par bande×mode », seul le meilleur QSO de chaque couple compte.
+# ── Points rule (configurable by the admin in the Settings) ────────────────
+# Points of a QSO = points per contact + mode points + distance points
+# (each criterion can be enabled). A hunter's score = sum of their QSOs; with
+# "one QSO per band×mode", only the best QSO of each pair counts.
 
 DEFAULT_SCORING: dict[str, Any] = {
-    "enabled": False,           # classement aux points (sinon : bande×mode)
-    "unique_band_mode": True,   # doublons bande×mode comptés 0
+    "enabled": False,           # points ranking (otherwise: band×mode)
+    "unique_band_mode": True,   # band×mode duplicates count 0
     "per_qso_on": True,
-    "per_qso": 1,               # points par contact
+    "per_qso": 1,               # points per contact
     "mode_on": True,
     "mode_points": {"CW": 3, "SSB": 2, "FM": 2, "AM": 2, "RTTY": 2, "SSTV": 2,
                     "FT8": 1, "FT4": 1, "PSK31": 1, "DIGI": 1},
-    "mode_default": 1,          # modes non listés
+    "mode_default": 1,          # unlisted modes
     "distance_on": True,
-    "km_per_point": 500,        # 1 point par tranche complète de N km
-    "distance_max": 0,          # plafond des points de distance (0 = aucun)
+    "km_per_point": 500,        # 1 point per full N km
+    "distance_max": 0,          # cap on distance points (0 = none)
 }
 
 
@@ -2623,7 +2622,7 @@ def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
 
 
 def get_scoring(station: str | None = None) -> dict[str, Any]:
-    """Règle de points d'un indicatif (défaut : en cours), complétée par les défauts."""
+    """Points rule of a callsign (default: current), completed with the defaults."""
     saved = (load_settings().get("scoring_by_station") or {}).get(_st(station)) or {}
     rule = {**DEFAULT_SCORING, **{k: v for k, v in saved.items() if k in DEFAULT_SCORING}}
     rule["mode_points"] = {**DEFAULT_SCORING["mode_points"], **(saved.get("mode_points") or {})}
@@ -2631,7 +2630,7 @@ def get_scoring(station: str | None = None) -> dict[str, Any]:
 
 
 def set_scoring(form: dict[str, Any], station: str | None = None) -> dict[str, Any]:
-    """Enregistre la règle de points d'un indicatif (défaut : en cours), valeurs bornées."""
+    """Save the points rule of a callsign (default: current), values clamped."""
     d = DEFAULT_SCORING
     rule = {
         "enabled": bool(form.get("enabled")),
@@ -2655,7 +2654,7 @@ def set_scoring(form: dict[str, Any], station: str | None = None) -> dict[str, A
 
 
 def qso_points(mode: str, km: float | None, rule: dict[str, Any]) -> int:
-    """Points d'un QSO selon la règle (distance inconnue → 0 point de distance)."""
+    """Points of a QSO under the rule (unknown distance → 0 distance points)."""
     pts = 0
     if rule["per_qso_on"]:
         pts += rule["per_qso"]
@@ -2668,7 +2667,7 @@ def qso_points(mode: str, km: float | None, rule: dict[str, Any]) -> int:
 
 
 def scoring_summary(rule: dict[str, Any] | None = None) -> str:
-    """Règle de points en une phrase (sous le classement, dans les Réglages)."""
+    """Points rule in one sentence (under the ranking, in the Settings)."""
     rule = rule or get_scoring()
     bits = []
     if rule["per_qso_on"]:
@@ -2688,17 +2687,17 @@ def scoring_summary(rule: dict[str, Any] | None = None) -> str:
 
 
 def _hunter_sort_key(h: dict[str, Any]) -> tuple:
-    # Points (tous à 0 si la règle est désactivée), puis couples bande×mode
-    # distincts, QSO, et enfin le premier à avoir atteint ce total.
+    # Points (all 0 if the rule is disabled), then distinct band×mode pairs,
+    # QSOs, and finally the first one to have reached that total.
     return (-h["points"], -h["band_modes"], -h["qsos"], h["last"], h["call"])
 
 
 def hunters_ranking(limit: int | None = 50, station: str | None = None) -> list[dict[str, Any]]:
-    """Classement des chasseurs (stations ayant contacté l'indicatif).
+    """Ranking of hunters (stations that worked the callsign).
 
-    Aux points si la règle est activée (``get_scoring``), sinon aux couples
-    bande×mode distincts. Distance : du locator de la station
-    (``my_gridsquare``) à celui retenu pour le chasseur (``call_grids``).
+    By points if the rule is enabled (``get_scoring``), otherwise by distinct
+    band×mode pairs. Distance: from the station's locator
+    (``my_gridsquare``) to the one chosen for the hunter (``call_grids``).
     """
     st = _st(station)
     rule = get_scoring(st)
@@ -2757,11 +2756,11 @@ def _adif_field(name: str, value: Any) -> str:
 
 
 def to_adif(contacts: list[dict[str, Any]] | None = None) -> str:
-    """Émet un ADIF combiné (STATION_CALLSIGN = indicatif d'activation)."""
+    """Emit a combined ADIF (STATION_CALLSIGN = activation callsign)."""
     if contacts is None:
         contacts = list_contacts()
     station = callsign()
-    grids: dict[str, str] = {}  # locator de chaque indicatif rencontré
+    grids: dict[str, str] = {}  # locator of each callsign encountered
     lines = [
         f"ADIF export {station} — {label()}",
         "<ADIF_VER:5>3.1.4",
@@ -2794,14 +2793,14 @@ def to_adif(contacts: list[dict[str, Any]] | None = None) -> str:
     return "\n".join(lines) + "\n"
 
 
-# ── Import ADIF : aperçu puis import des QSO cochés ────────────────────────
-# 1. analyze_adif() donne un statut à chaque QSO du fichier ; 2. l'opérateur
-# confirme les QSO cochés (import_rows). Entre les deux, le fichier attend
-# dans var/cache sous un jeton aléatoire (purgé au bout d'une heure).
+# ── ADIF import: preview, then import of the checked QSOs ──────────────────
+# 1. analyze_adif() gives a status to each QSO in the file; 2. the operator
+# confirms the checked QSOs (import_rows). In between, the file waits
+# in var/cache under a random token (purged after one hour).
 
 IMPORT_TMP_DIR = ROOT / "var" / "cache" / "activation-import"
 IMPORT_TMP_TTL = 3600
-IMPORT_TIME_TOLERANCE_MIN = 10  # même QSO à ±10 min (horloges des logiciels)
+IMPORT_TIME_TOLERANCE_MIN = 10  # same QSO within ±10 min (software clocks)
 
 IMPORT_STATUS = {
     "new": N_("Nouveau"),
@@ -2818,7 +2817,7 @@ _RE_IMPORT_TOKEN = re.compile(r"^[0-9a-f]{32}$")
 
 
 def _utc_minutes(qso_date: str, time_on: str) -> int | None:
-    """(YYYYMMDD, HHMM[SS]) en UTC → minutes depuis l'epoch, None si invalide."""
+    """(YYYYMMDD, HHMM[SS]) in UTC → minutes since the epoch, None if invalid."""
     try:
         dt = datetime.strptime(f"{qso_date}{(time_on or '')[:4]}", "%Y%m%d%H%M")
     except ValueError:
@@ -2829,9 +2828,9 @@ def _utc_minutes(qso_date: str, time_on: str) -> int | None:
 def _adif_mode(r: dict[str, str]) -> str:
     mode = (r.get("mode") or "").strip().upper()
     submode = (r.get("submode") or "").strip().upper()
-    if mode in ("USB", "LSB"):                   # hors norme mais fréquent
+    if mode in ("USB", "LSB"):                   # non-standard but common
         return "SSB"
-    if submode and mode in ("", "MFSK", "PSK"):  # ADIF 3 : FT4 = MFSK / FT4
+    if submode and mode in ("", "MFSK", "PSK"):  # ADIF 3: FT4 = MFSK / FT4
         return submode
     return mode
 
@@ -2839,15 +2838,15 @@ def _adif_mode(r: dict[str, str]) -> str:
 def analyze_adif(
     text: str, operator_call: str = "", prefer_file_operator: bool = False,
 ) -> list[dict[str, Any]]:
-    """Analyse un ADIF avant import : un dict par QSO, avec ``status``.
+    """Analyze an ADIF file before import: one dict per QSO, with ``status``.
 
-    Tous les QSO sont rattachés à ``operator_call`` ; avec
-    ``prefer_file_operator``, le champ ADIF OPERATOR prime quand il est valide
-    (sauf s'il vaut l'indicatif d'activation, que certains logiciels y mettent).
-    Statuts : voir ``IMPORT_STATUS``. Deux QSO sont « le même » s'ils ont même
-    indicatif, bande et mode à ±``IMPORT_TIME_TOLERANCE_MIN`` minutes.
+    All QSOs are attached to ``operator_call``; with ``prefer_file_operator``,
+    the ADIF OPERATOR field takes precedence when valid (unless it equals
+    the activation callsign, which some programs put there).
+    Statuses: see ``IMPORT_STATUS``. Two QSOs are "the same" if they have the
+    same callsign, band and mode within ±``IMPORT_TIME_TOLERANCE_MIN`` minutes.
     """
-    from app.wavelog_client import parse_adif  # import local : évite un cycle
+    from app.wavelog_client import parse_adif  # local import: avoids a cycle
 
     default_op = (operator_call or "").strip().upper()
     station = callsign()
@@ -2921,7 +2920,7 @@ def analyze_adif(
 
 
 def import_rows(rows: list[dict[str, Any]], selected: set[int]) -> dict[str, int]:
-    """Importe les QSO analysés dont l'index est coché (jamais les invalides)."""
+    """Import the analyzed QSOs whose index is checked (never the invalid ones)."""
     added = invalid = 0
     for row in rows:
         if row["status"] == "invalid":
@@ -2942,14 +2941,14 @@ def import_rows(rows: list[dict[str, Any]], selected: set[int]) -> dict[str, int
 
 
 def import_adif(text: str, operator_call: str = "", prefer_file_operator: bool = True) -> dict[str, int]:
-    """Import direct, sans aperçu : prend les QSO nouveaux ou déjà contactés
-    sur la bande/mode ; ignore ceux déjà dans le log, en double ou invalides."""
+    """Direct import, without preview: takes new QSOs or ones already worked
+    on the band/mode; skips those already in the log, duplicated or invalid."""
     rows = analyze_adif(text, operator_call, prefer_file_operator)
     return import_rows(rows, {r["idx"] for r in rows if r["status"] in IMPORT_DEFAULT_CHECKED})
 
 
 def stash_import(text: str) -> str:
-    """Garde un fichier ADIF le temps de l'aperçu ; renvoie son jeton."""
+    """Keep an ADIF file for the duration of the preview; returns its token."""
     IMPORT_TMP_DIR.mkdir(parents=True, exist_ok=True)
     now = time.time()
     for old in IMPORT_TMP_DIR.glob("*.adi"):
@@ -2994,10 +2993,10 @@ def to_csv(contacts: list[dict[str, Any]] | None = None) -> str:
     return buf.getvalue()
 
 
-# ── Sauvegardes ────────────────────────────────────────────────────────────
-# Snapshots cohérents de la base (API backup SQLite) + copie du mot de passe
-# opérateurs, dans var/backups/, avec rotation. Aucune donnée réelle n'est
-# jamais supprimée : la rotation ne touche QUE le dossier des snapshots.
+# ── Backups ────────────────────────────────────────────────────────────────
+# Consistent snapshots of the database (SQLite backup API) + copy of the
+# operators' password, in var/backups/, with rotation. No real data is ever
+# deleted: the rotation touches ONLY the snapshots folder.
 
 
 def _rotate_backups() -> None:
@@ -3008,7 +3007,7 @@ def _rotate_backups() -> None:
 
 
 def backup_now() -> Path:
-    """Écrit un snapshot horodaté de la base (+ mot de passe) et le renvoie."""
+    """Write a timestamped snapshot of the database (+ password) and return it."""
     init_db()
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
@@ -3017,17 +3016,17 @@ def backup_now() -> Path:
     try:
         dst = sqlite3.connect(dest)
         try:
-            src.backup(dst)  # snapshot cohérent même en cours d'écriture
+            src.backup(dst)  # consistent snapshot even during a write
         finally:
             dst.close()
     finally:
         src.close()
-    # Le mot de passe opérateur vit dans un fichier séparé : on le joint.
+    # The operator password lives in a separate file: include it.
     if OP_PASSWORD_FILE.is_file():
         pw_copy = BACKUP_DIR / f"password-{stamp}.txt"
         pw_copy.write_text(OP_PASSWORD_FILE.read_text(encoding="utf-8"), encoding="utf-8")
         pw_copy.chmod(0o600)
-    # Les réglages (flags) aussi.
+    # The settings (flags) too.
     if SETTINGS_FILE.is_file():
         (BACKUP_DIR / f"settings-{stamp}.json").write_text(
             SETTINGS_FILE.read_text(encoding="utf-8"), encoding="utf-8"
@@ -3039,13 +3038,13 @@ def backup_now() -> Path:
 
 
 def maybe_backup() -> None:
-    """Sauvegarde throttlée, appelée après chaque écriture (best-effort)."""
+    """Throttled backup, called after each write (best-effort)."""
     global _last_backup_ts
     if time.time() - _last_backup_ts < _BACKUP_MIN_INTERVAL:
         return
     try:
         backup_now()
-    except Exception:  # noqa: BLE001 — une sauvegarde qui échoue ne doit rien casser
+    except Exception:  # noqa: BLE001 — a failing backup must not break anything
         pass
 
 

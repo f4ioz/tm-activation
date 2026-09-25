@@ -1,8 +1,8 @@
-"""Parseur ADIF.
+"""ADIF parser.
 
-Nom de module conservé pour compatibilité avec ``app/activation.py``, partagé
-avec le site d'origine où ce parseur vit dans le client Wavelog. Seul le
-parseur est repris ici (import ADIF de l'espace opérateurs).
+Module name kept for compatibility with ``app/activation.py``, which is shared
+with the original site where this parser lives in the Wavelog client. Only the
+parser is included here (ADIF import in the operator area).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ def _strip_header(adif: str) -> str:
 
 
 def parse_adif(text: str) -> list[dict[str, str]]:
-    """Parse un blob ADIF en liste de dicts (clés en minuscules)."""
+    """Parses an ADIF blob into a list of dicts (lowercase keys)."""
     body = _strip_header(text)
     records: list[dict[str, str]] = []
     cur: dict[str, str] = {}

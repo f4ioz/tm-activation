@@ -92,9 +92,9 @@
   <div class="act-card">
     <h2>{{ _("Entités DXCC") }}</h2>
     <p class="act-big">{{ dxcc.count }}</p>
-    {# Drapeaux seuls : pays et nombre de QSO en infobulle, le détail est dans
-       le tableau « DXCC contactés » plus bas. Rangée plafonnée pour que la
-       carte reste de la taille des autres, les plus travaillés en tête. #}
+    {# Flags only: country and QSO count in a tooltip, details are in the
+       « DXCC contactés » table below. Row is capped so the card stays the
+       same size as the others, most-worked entities first. #}
     {% set flagged = dxcc.entities|selectattr("code")|list %}
     {% if flagged %}
       <ul class="act-dxcc act-dxcc-mini">

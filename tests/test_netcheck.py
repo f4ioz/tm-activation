@@ -1,4 +1,4 @@
-"""Contrôles réseau de l'installeur (deploy/netcheck.py), sans accès réseau."""
+"""Installer network checks (deploy/netcheck.py), without network access."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _response(qtype: int, answers: list[tuple[int, bytes]], rcode: int = 0) -> b
 
 
 class FakeUdp:
-    """Socket UDP simulée : ``reply(message envoyé)`` donne la réponse."""
+    """Simulated UDP socket: ``reply(sent message)`` gives the answer."""
 
     def __init__(self, reply):
         self.reply = reply
@@ -61,7 +61,7 @@ def test_parse_aaaa_only_when_asked() -> None:
 
 
 def test_query_nxdomain_is_empty(monkeypatch) -> None:
-    def reply(sent: bytes) -> bytes:  # même identifiant, NXDOMAIN, question recopiée
+    def reply(sent: bytes) -> bytes:  # same ID, NXDOMAIN, question copied back
         return sent[:2] + bytes([0x81, 0x83]) + sent[4:6] + b"\0" * 6 + sent[12:]
     monkeypatch.setattr(netcheck.socket, "socket", lambda *a, **k: FakeUdp(reply))
     assert netcheck.query("absent.example.org", 1, "1.1.1.1") == []

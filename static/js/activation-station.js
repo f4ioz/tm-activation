@@ -1,11 +1,11 @@
-/* Fiche du correspondant pendant la saisie du log : photo QRZ, boussole et
- * distance. Tout se recalcule côté navigateur à partir des deux locators (le
- * nôtre, dans data-home, et celui du correspondant) : pas d'aller-retour
- * serveur quand on tape un locator à la main.
+/* Contacted station card while logging: QRZ photo, compass and distance.
+ * Everything is computed in the browser from the two locators (ours, in
+ * data-home, and the other station's): no server round-trip when a locator
+ * is typed by hand.
  *
- * window.actStation(info) — info : {call, grid, image, name}
- * window.actStationGrid(grid) — juste le locator (champ « Locator » du log)
- * Tailles réglées dans les Réglages : data-photo et data-compass (0 = masqué).
+ * window.actStation(info) — info: {call, grid, image, name}
+ * window.actStationGrid(grid) — just the locator (the log's "Locator" field)
+ * Sizes set in Réglages: data-photo and data-compass (0 = hidden).
  */
 (function () {
   var box = document.getElementById('act-dir');
@@ -20,7 +20,7 @@
 
   function tr(key, fallback) { return T[key] || fallback; }
 
-  /* Locator → [latitude, longitude] du CENTRE du carré (4, 6 ou 8 caractères). */
+  /* Locator → [latitude, longitude] of the square's CENTRE (4, 6 or 8 characters). */
   function gridCenter(grid) {
     var g = (grid || '').trim().toUpperCase();
     if (!/^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?$/.test(g)) return null;
@@ -59,7 +59,7 @@
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
 
-  /* Rose des vents : cadran, graduations, lettres et aiguille. */
+  /* Compass rose: dial, ticks, letters and needle. */
   function compass(deg, size) {
     var r = size / 2 - 2;
     var c = size / 2;
@@ -80,11 +80,11 @@
         + (c + Math.sin(rad) * (r - 17) + 4).toFixed(1) + '" class="act-dir-card">'
         + letter + '</text>';
     });
-    /* Aiguille : un trait depuis la queue, terminé par une POINTE de flèche
-     * qui montre la direction sans ambiguïté. */
+    /* Needle: a line from the tail, ending in an ARROWHEAD that shows the
+     * direction unambiguously. */
     var tip = toRad(deg - 90), tail = toRad(deg + 90);
-    var head = Math.max(size * 0.13, 9);          // longueur de la pointe
-    var wing = Math.max(size * 0.052, 3.6);       // demi-largeur de la pointe
+    var head = Math.max(size * 0.13, 9);          // arrowhead length
+    var wing = Math.max(size * 0.052, 3.6);       // arrowhead half-width
     var tipR = r - 8, baseR = tipR - head;
     var px = function (rad, radius) { return (c + Math.cos(rad) * radius).toFixed(1); };
     var py = function (rad, radius) { return (c + Math.sin(rad) * radius).toFixed(1); };

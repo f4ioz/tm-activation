@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# TM Activation — installation guidée et mise à jour.
+# TM Activation — guided installation and upgrade.
 #
-#   sudo ./install.sh            installation guidée : questions, récapitulatif, puis
-#                                (mode Internet) réglage pas à pas de la box et du DNS
-#   sudo ./install.sh --lan      réseau local : http://<nom>.local, sans nginx
+#   sudo ./install.sh            guided installation: questions, summary, then
+#                                (Internet mode) step-by-step router and DNS setup
+#   sudo ./install.sh --lan      local network: http://<name>.local, no nginx
 #   sudo ./install.sh --domain tm.mon-club.fr --email moi@example.org --box freebox
-#                                Internet : nginx + HTTPS Let's Encrypt
+#                                Internet: nginx + Let's Encrypt HTTPS
 #   sudo ./install.sh --tunnel --domain tm.mon-club.fr
-#                                Internet par Cloudflare Tunnel : aucun port
-#                                ouvert sur la box (marche en 4G, IPv4 partagée)
-#   sudo ./install.sh --check    diagnostic : service, réseau, DNS, certificat
-#                                (après un déplacement du Pi, une panne…)
-#   ./install.sh --no-systemd --dir ~/tm-activation     sans root, sans service
+#                                Internet via Cloudflare Tunnel: no port
+#                                opened on the router (works over 4G, shared IPv4)
+#   sudo ./install.sh --check    diagnostics: service, network, DNS, certificate
+#                                (after moving the Pi, an outage…)
+#   ./install.sh --no-systemd --dir ~/tm-activation     no root, no service
 #
-# Relancé depuis une version plus récente, le script fait la MISE À JOUR avec
-# les réglages mémorisés dans install.env. Il ne touche JAMAIS à config.yml ni
-# au dossier var/ (base, mots de passe, sauvegardes) ; la base est copiée dans
-# var/backups/ avant.
+# Re-run from a newer version, the script performs an UPGRADE using the
+# settings stored in install.env. It NEVER touches config.yml or the
+# var/ directory (database, passwords, backups); the database is copied to
+# var/backups/ first.
 #
-# Le script ne fait rien quand il est sourcé (tests) : tout part de main().
+# The script does nothing when sourced (tests): everything starts in main().
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,36 +34,36 @@ RE_GRID='^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?$'
 RE_DOMAIN='^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
 RE_EMAIL='^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
 
-# Options (vide = non précisée : reprise d'install.env, sinon défaut du mode).
+# Options (empty = not given: taken from install.env, else the mode default).
 CLI_DIR="" CLI_USER="" CLI_SERVICE="" CLI_HOST="" CLI_PORT="" CLI_MODE="" CLI_DOMAIN="" CLI_BOX="" CLI_EMAIL=""
 CLI_TUNNEL_NAME=""
 USE_SYSTEMD="auto" INTERACTIVE="auto" CHECK=0
 PYTHON="${PYTHON:-python3}"
 
-# État
+# State
 MODE="" DOMAIN="" BOX="" EMAIL="" HOST="" PORT="" SVC_USER="" SERVICE="" DIR="" TUNNEL_NAME=""
 UPGRADE=0 IS_ROOT=0 FIRST_CONFIG=0 ASKED=0 OLD_PORT="" TUNNEL_READY=1
 PREV_MODE="" PREV_HOST="" PREV_PORT="" PREV_SVC_USER="" PREV_SERVICE="" PREV_DOMAIN="" PREV_BOX="" PREV_EMAIL=""
 PREV_TUNNEL_NAME=""
-CF_CONF_DIR="${CF_CONF_DIR:-/etc/cloudflared}"     # configuration du tunnel (surchargeable : tests)
-CF_LOGIN_DIR="${CF_LOGIN_DIR:-$HOME/.cloudflared}" # cert.pem et identifiants créés par « cloudflared tunnel login »
+CF_CONF_DIR="${CF_CONF_DIR:-/etc/cloudflared}"     # tunnel configuration (overridable: tests)
+CF_LOGIN_DIR="${CF_LOGIN_DIR:-$HOME/.cloudflared}" # cert.pem and credentials created by "cloudflared tunnel login"
 VPY="" PORT_SUFFIX="" GENERATED_ADMIN_PW="" SHARED_IP=0
 NC_LOCAL_IP="" NC_IFACE="" NC_MAC="" NC_PUBLIC_IP="" NC_PUBLIC_KIND="" NC_DNS_A="" NC_DNS_AAAA="" NC_DNS_VIA=""
 NC_CERT="" NC_CERT_DAYS="" NC_CERT_ERROR=""
 CALLSIGN="" LABEL="" GRID="" PUBLIC="0" CLUB_CALLSIGN="" CLUB_NAME="" CLUB_CITY="" CLUB_WEBSITE=""
 BASE_URL="" OPERATORS="" ADMIN_PASSWORD="" OPERATOR_PASSWORD="" QRZ_USER="" QRZ_PASSWORD="" TRUSTED_PROXIES=""
-MDNS_NAME="$(hostname 2>/dev/null | tr '[:upper:]' '[:lower:]')"   # adresse <nom>.local
+MDNS_NAME="$(hostname 2>/dev/null | tr '[:upper:]' '[:lower:]')"   # <name>.local address
 
-# ── Langue de l'interface ───────────────────────────────────────────────────
-# Les textes sont écrits en français dans le script ; deploy/lang/<code>.sh
-# donne leur traduction (MSG["texte français"]="texte traduit"). Un texte sans
-# traduction reste en français. Choix : --lang / TM_LANG / install.env, sinon
-# première question. Les valeurs variables passent par {1}, {2}…
+# ── Interface language ──────────────────────────────────────────────────────
+# Texts are written in French in the script; deploy/lang/<code>.sh
+# provides their translation (MSG["French text"]="translated text"). A text
+# without a translation stays in French. Choice: --lang / TM_LANG / install.env,
+# else the first question. Variable values go through {1}, {2}…
 UI_LANG="${TM_LANG:-}" CLI_LANG="" PREV_UI_LANG=""
 declare -A MSG=()
 
-t() {  # t "texte français" [valeur de {1}, de {2}…]
-  # Les espaces d'alignement en tête ne font pas partie de la clé.
+t() {  # t "French text" [value of {1}, of {2}…]
+  # Leading alignment spaces are not part of the key.
   local raw="$1" lead m i=1 a
   shift
   lead="${raw%%[! ]*}"
@@ -81,7 +81,7 @@ load_lang() {
   fi
 }
 
-ask_lang() {  # première question, avant tout le reste (rien n'est traduit encore)
+ask_lang() {  # first question, before anything else (nothing is translated yet)
   local choice
   if [[ -n $UI_LANG ]]; then load_lang; return 0; fi
   if [[ $INTERACTIVE != yes ]]; then UI_LANG="fr"; return 0; fi
@@ -161,14 +161,14 @@ Autres options :
 EOF
 }
 
-# ── Affichage et saisie ─────────────────────────────────────────────────────
+# ── Output and input ────────────────────────────────────────────────────────
 
 die()   { echo "$(t "ERREUR :") $(t "$*")" >&2; exit 1; }
 warn()  { echo "  $(t "ATTENTION :") $(t "$*")" >&2; }
 info()  { echo "==> $(t "$*")"; }
 title() { echo; echo "── $(t "$*") ──"; }
-say()   { echo "  $(t "$@")"; }   # ligne de texte courante (2 espaces d'indentation)
-line() {  # libellé aligné sur 24 caractères (accents comptés comme une lettre)
+say()   { echo "  $(t "$@")"; }   # regular text line (2-space indent)
+line() {  # label padded to 24 characters (accented letters count as one)
   local LC_ALL=C.UTF-8 pad lbl
   lbl="$(t "$1")"
   pad=$((24 - ${#lbl}))
@@ -176,7 +176,7 @@ line() {  # libellé aligné sur 24 caractères (accents comptés comme une lett
   printf '  %s%*s %s\n' "$lbl" "$pad" "" "$2"
 }
 
-ask() {  # ask VAR "Question" [défaut]
+ask() {  # ask VAR "Question" [default]
   local __var=$1 __q __def=${3:-} __ans
   __q="$(t "$2")"
   read -r -p "  $__q${__def:+ [$__def]} : " __ans || true
@@ -188,7 +188,7 @@ ask_secret() {  # ask_secret VAR "Question"
   read -r -s -p "  $__q : " __ans || true; echo
   printf -v "$__var" '%s' "$__ans"
 }
-ask_password() {  # ask_password VAR "Question" : saisi deux fois, vide autorisé
+ask_password() {  # ask_password VAR "Question" : typed twice, empty allowed
   local __var=$1 __q __a __b
   __q="$(t "$2")"
   while :; do
@@ -199,7 +199,7 @@ ask_password() {  # ask_password VAR "Question" : saisi deux fois, vide autoris�
     say "Les deux saisies diffèrent, recommencez."
   done
 }
-confirm() {  # confirm "Question" [o|n] → 0 si oui
+confirm() {  # confirm "Question" [o|n] → 0 if yes
   local __ans __def=${2:-o} __hint="O/n"
   if [[ $UI_LANG == en ]]; then __hint="Y/n"; fi
   if [[ $__def == n ]]; then __hint="${__hint,,}"; __hint="${__hint^^n}"; fi
@@ -208,13 +208,13 @@ confirm() {  # confirm "Question" [o|n] → 0 si oui
   [[ ${__ans,,} == o* || ${__ans,,} == y* ]]
 }
 pause() {  # pause ["message"]
-  # Pas d'apostrophe dans une expansion ${…} entre guillemets : bash la lirait
-  # comme un début de citation.
+  # No apostrophe inside a quoted ${…} expansion: bash would read it
+  # as the start of a quote.
   local __ans __msg="Entrée quand c'est fait…"
   if [[ $# -gt 0 ]]; then __msg=$1; fi
   read -r -p "  $(t "$__msg") " __ans || true
 }
-menu() {  # menu VAR "Question" défaut "choix 1" "choix 2"… → VAR = numéro choisi
+menu() {  # menu VAR "Question" default "choice 1" "choice 2"… → VAR = chosen number
   local __var=$1 __q __def=$3 __i=1 __opt __ans
   __q="$(t "$2")"
   shift 3
@@ -230,9 +230,9 @@ menu() {  # menu VAR "Question" défaut "choix 1" "choix 2"… → VAR = numéro
 }
 in_list() { local x=$1 y; shift; for y in "$@"; do if [[ $x == "$y" ]]; then return 0; fi; done; return 1; }
 
-# ── Contrôles réseau (deploy/netcheck.py) ───────────────────────────────────
+# ── Network checks (deploy/netcheck.py) ─────────────────────────────────────
 
-netcheck() {  # netcheck COMMANDE [ARG] → variables NC_<CLE>
+netcheck() {  # netcheck COMMAND [ARG] → variables NC_<KEY>
   local key value
   case "$1" in
     local) NC_LOCAL_IP="" NC_IFACE="" NC_MAC="" ;;
@@ -248,7 +248,7 @@ netcheck() {  # netcheck COMMANDE [ARG] → variables NC_<CLE>
   done < <("$PYTHON" "$SRC_DIR/deploy/netcheck.py" "$@" 2>/dev/null || true)
 }
 
-dns_ok() {  # le domaine pointe vers l'adresse publique, sans AAAA
+dns_ok() {  # the domain points to the public address, no AAAA
   [[ -n $NC_DNS_A && -z $NC_DNS_AAAA ]] || return 1
   [[ -z $NC_PUBLIC_IP || ",$NC_DNS_A," == *",$NC_PUBLIC_IP,"* ]]
 }
@@ -264,7 +264,7 @@ dns_explain() {
   return 0
 }
 
-# ── Aide propre à chaque box (intitulés variables selon les versions) ───────
+# ── Router-specific help (labels vary between firmware versions) ────────────
 
 box_label() {
   case "$BOX" in
@@ -375,7 +375,7 @@ EOF
   say "Ne redirigez aucun autre port (surtout pas 22/SSH) et n'utilisez pas la DMZ."
 }
 
-# ── Contexte ────────────────────────────────────────────────────────────────
+# ── Context ─────────────────────────────────────────────────────────────────
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -383,7 +383,7 @@ parse_args() {
       --lan) CLI_MODE="lan"; shift ;;
       --domain)
         CLI_DOMAIN="${2:?--domain demande un nom}"
-        if [[ -z $CLI_MODE ]]; then CLI_MODE="internet"; fi   # --tunnel garde la main
+        if [[ -z $CLI_MODE ]]; then CLI_MODE="internet"; fi   # --tunnel takes precedence
         shift 2 ;;
       --tunnel) CLI_MODE="tunnel"; shift ;;
       --tunnel-name) CLI_TUNNEL_NAME="${2:?--tunnel-name demande un nom}"; shift 2 ;;
@@ -433,12 +433,12 @@ resolve_context() {
     die "$(t "refus d'installer directement dans {1} (choisir un sous-dossier, ex. /opt/tm-activation)" "$DIR")" ;;
   esac
   if [[ -f $DIR/$MARKER ]]; then UPGRADE=1; fi
-  # Garde-fou : ne jamais écraser un dossier qui n'est pas une installation TM Activation.
+  # Safeguard: never overwrite a directory that is not a TM Activation installation.
   if [[ $CHECK == 0 && $UPGRADE == 0 && -d $DIR && -n "$(ls -A "$DIR" 2>/dev/null)" ]]; then
     die "$(t "{1} existe, n'est pas vide et n'est pas une installation TM Activation" "$DIR")"
   fi
 
-  # Réglages de l'installation précédente (clé=valeur, lus sans exécution).
+  # Settings of the previous installation (key=value, read without executing).
   if [[ -f $DIR/$STATE ]]; then
     while IFS='=' read -r key value; do
       case "$key" in
@@ -446,8 +446,8 @@ resolve_context() {
       esac
     done < "$DIR/$STATE"
   fi
-  OLD_PORT="$PREV_PORT"   # port réellement occupé par le service en place
-  # Changement de mode demandé : l'adresse et le port précédents ne valent plus.
+  OLD_PORT="$PREV_PORT"   # port actually used by the running service
+  # Mode change requested: the previous address and port no longer apply.
   if [[ -n $CLI_MODE && $CLI_MODE != "$PREV_MODE" ]]; then PREV_HOST=""; PREV_PORT=""; fi
   MODE="${CLI_MODE:-$PREV_MODE}"
   DOMAIN="${CLI_DOMAIN:-$PREV_DOMAIN}"
@@ -463,8 +463,8 @@ resolve_ports() {
   local def_host def_port
   case "$MODE" in
     lan) def_host="0.0.0.0"; def_port="8000"; if [[ $USE_SYSTEMD == yes ]]; then def_port="80"; fi ;;
-    # Tunnel : cloudflared se connecte en 127.0.0.1, l'écoute sur toutes les
-    # interfaces garde l'accès direct depuis le réseau local.
+    # Tunnel: cloudflared connects to 127.0.0.1; listening on all interfaces
+    # keeps direct access from the local network.
     tunnel) def_host="0.0.0.0"; def_port="8000" ;;
     internet|manual) def_host="127.0.0.1"; def_port="8000" ;;
     *) die "$(t "mode inconnu : {1}" "$MODE")" ;;
@@ -502,7 +502,7 @@ validate() {
   return 0
 }
 
-# ── Questions (rien n'est modifié avant le récapitulatif) ──────────────────
+# ── Questions (nothing is changed before the summary) ──────────────────────
 
 welcome() {
   if [[ $UI_LANG == en ]]; then
@@ -684,8 +684,8 @@ recap() {
 
 install_packages() {
   local pkgs=()
-  # Passage réseau local → Internet : le port 80 tenu par le service revient à
-  # nginx, qui démarre dès son installation.
+  # Switching local network → Internet: port 80 held by the service goes to
+  # nginx, which starts as soon as it is installed.
   if [[ $USE_SYSTEMD == yes && $MODE == internet && $PREV_MODE == lan ]] \
      && systemctl is-active --quiet "$SERVICE"; then
     info "Arrêt du service le temps de confier le port 80 à nginx"
@@ -698,7 +698,7 @@ install_packages() {
     if ! command -v nginx >/dev/null; then pkgs+=(nginx); fi
     if [[ -n $EMAIL ]] && ! command -v certbot >/dev/null; then pkgs+=(certbot python3-certbot-nginx); fi
   fi
-  # Adresse <nom>.local (mDNS) : présent d'origine sur Raspberry Pi OS.
+  # <name>.local address (mDNS): preinstalled on Raspberry Pi OS.
   if [[ $USE_SYSTEMD == yes && $MODE != manual ]] && ! command -v avahi-daemon >/dev/null; then
     pkgs+=(avahi-daemon)
   fi
@@ -737,7 +737,7 @@ install_code() {
     "$PYTHON" - "$DIR/var/activation.sqlite" "$DIR/var/backups/preupgrade-$stamp.sqlite" <<'PY'
 import sqlite3, sys
 src, dst = sqlite3.connect(sys.argv[1]), sqlite3.connect(sys.argv[2])
-src.backup(dst)  # copie cohérente même si le service écrit en même temps
+src.backup(dst)  # consistent copy even while the service is writing
 dst.close(); src.close()
 PY
     info "$(t "Base sauvegardée : var/backups/preupgrade-{1}.sqlite" "$stamp")"
@@ -759,7 +759,7 @@ PY
 }
 
 install_venv() {
-  # Un venv créé par un Python disparu (mise à niveau de l'OS) est recréé.
+  # A venv built by a Python that no longer exists (OS upgrade) is recreated.
   if [[ -e $DIR/.venv ]] && ! "$DIR/.venv/bin/python" -c 'import sys' 2>/dev/null; then
     info "Environnement Python obsolète : recréation"
     rm -rf "${DIR:?}/.venv"
@@ -790,7 +790,7 @@ write_config() {
 set_permissions() {
   local item
   if [[ $USE_SYSTEMD == yes ]]; then
-    # Code et venv à root (lecture seule pour le service) ; données au service.
+    # Code and venv owned by root (read-only for the service); data by the service.
     for item in "${CODE_ITEMS[@]}" "$MARKER" "$STATE" .venv; do
       if [[ -e $DIR/$item ]]; then chown -R root:root "$DIR/$item"; fi
     done
@@ -802,7 +802,7 @@ set_permissions() {
   fi
 }
 
-health() {  # 0 si l'application répond sur /healthz
+health() {  # 0 if the application answers on /healthz
   local check_host="$HOST"
   if [[ $HOST == 0.0.0.0 || $HOST == "::" ]]; then check_host="127.0.0.1"; fi
   "$VPY" - "http://$check_host:$PORT/healthz" >/dev/null 2>&1 <<'PY'
@@ -819,7 +819,7 @@ PY
 
 install_service() {
   local caps="" protect_home="true" unit="/etc/systemd/system/$SERVICE.service"
-  # Port pris par autre chose que ce service (ex. nginx après un passage Internet → réseau local).
+  # Port taken by something other than this service (e.g. nginx after switching Internet → local network).
   if command -v ss >/dev/null && [[ -n "$(ss -Hltn "sport = :$PORT" 2>/dev/null)" ]] \
      && ! { systemctl is-active --quiet "$SERVICE" && [[ $OLD_PORT == "$PORT" ]]; }; then
     die "$(t "le port {1} est déjà utilisé par un autre programme (sudo ss -ltnp 'sport = :{1}') ; si c'est nginx devenu inutile : sudo systemctl disable --now nginx — sinon choisir --port" "$PORT")"
@@ -838,7 +838,7 @@ install_service() {
   info "Le service répond"
 }
 
-# ── Mode Internet : box, DNS, nginx, HTTPS ──────────────────────────────────
+# ── Internet mode: router, DNS, nginx, HTTPS ────────────────────────────────
 
 guide_step() { echo; echo "  [$1/4] $(t "$2")"; echo "  ──────────────────────────────────────────"; }
 
@@ -909,7 +909,7 @@ setup_nginx() {
   else
     conf="/etc/nginx/conf.d/$SERVICE.conf"
   fi
-  # Jamais réécrite ensuite : certbot y ajoute le bloc HTTPS.
+  # Never rewritten afterwards: certbot adds the HTTPS block to it.
   if [[ -f $conf ]]; then
     info "$(t "Configuration nginx existante conservée : {1}" "$conf")"
   else
@@ -923,7 +923,7 @@ setup_nginx() {
   systemctl reload nginx
 }
 
-explain_certbot() {  # explain_certbot "sortie de certbot"
+explain_certbot() {  # explain_certbot "certbot output"
   local out=$1 detail
   detail="$(grep -m1 -E 'Detail:' <<<"$out" | sed -E 's/^[[:space:]]*Detail:[[:space:]]*//' || true)"
   say "Let's Encrypt n'a pas pu valider {1}." "$DOMAIN"
@@ -968,7 +968,7 @@ setup_https() {
   done
 }
 
-in_container() {  # conteneur (LXC Proxmox…) : l'horloge est celle de l'hôte
+in_container() {  # container (Proxmox LXC…): the clock is the host's
   command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet
 }
 
@@ -1052,7 +1052,7 @@ summary() {
 
 # ── Cloudflare Tunnel ───────────────────────────────────────────────────────
 
-tunnel_name() {  # nom du tunnel : celui demandé, sinon d'après le domaine
+tunnel_name() {  # tunnel name: the one requested, else derived from the domain
   if [[ -n $TUNNEL_NAME ]]; then echo "$TUNNEL_NAME"; else echo "tm-${DOMAIN//./-}"; fi
 }
 
@@ -1110,7 +1110,7 @@ EOF
   return 0
 }
 
-cf_tunnel_uuid() {  # identifiant du tunnel nommé $1 ("" s'il n'existe pas)
+cf_tunnel_uuid() {  # ID of the tunnel named $1 ("" if it does not exist)
   local json
   json="$(cloudflared tunnel list --output json 2>/dev/null || true)"
   CF_JSON="$json" "$PYTHON" -c 'import json, os, sys
@@ -1147,7 +1147,7 @@ setup_tunnel() {
   fi
   [[ -f $cred ]] || die "$(t "identifiants du tunnel introuvables ({1})" "$CF_LOGIN_DIR/$uuid.json")"
   cat > "$conf" <<EOF
-# Tunnel Cloudflare de TM Activation — généré par install.sh
+# TM Activation Cloudflare tunnel — generated by install.sh
 tunnel: $uuid
 credentials-file: $cred
 ingress:
@@ -1171,7 +1171,7 @@ EOF
   info "$(t "Tunnel Cloudflare actif : {1}" "https://$DOMAIN/")"
 }
 
-# ── Diagnostic (--check) ────────────────────────────────────────────────────
+# ── Diagnostics (--check) ───────────────────────────────────────────────────
 
 run_check() {
   local problems=0 state
@@ -1264,7 +1264,7 @@ run_check() {
   say "Tout est en ordre."
 }
 
-# ── Programme principal ─────────────────────────────────────────────────────
+# ── Main program ────────────────────────────────────────────────────────────
 
 main() {
   parse_args "$@"

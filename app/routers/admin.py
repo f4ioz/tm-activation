@@ -1,4 +1,4 @@
-"""Surveillance : connexions et robots bloqués (administrateur du site)."""
+"""Monitoring: logins and blocked bots (site administrator)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ router = APIRouter(tags=["admin"], dependencies=[Depends(i18n.request_lang)])
 
 @router.get("/admin/surveillance", response_class=HTMLResponse)
 async def surveillance(request: Request, days: int = 7, failures: str = "") -> Response:
-    """Journal des connexions et blocages en cours. Réservé à l'administrateur."""
+    """Login log and current blocks. Administrator only."""
     if not auth_mod.is_private(request):
         return RedirectResponse("/login?next=/admin/surveillance", status_code=303)
     days = days if days in (1, 7, 30, 90) else 7

@@ -1,8 +1,8 @@
-"""Installation guidée (install.sh) : fonctions testées en sourçant le script.
+"""Guided installation (install.sh): functions tested by sourcing the script.
 
-Les parties qui demandent root (paquets, systemd, nginx, certbot) ne tournent
-pas ici ; on vérifie les questions, le guide de la box et les diagnostics, avec
-des réponses simulées et des contrôles réseau factices.
+The parts that need root (packages, systemd, nginx, certbot) do not run
+here; we check the questions, the router guide and the diagnostics, with
+simulated answers and fake network checks.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Contrôles réseau factices (remplacent deploy/netcheck.py).
+# Fake network checks (replace deploy/netcheck.py).
 STUB = """
 netcheck() {
   case "$1" in
@@ -37,7 +37,7 @@ def run(script: str, stdin: str = "", env: dict[str, str] | None = None) -> subp
 
 
 def fake_cloudflared(tmp_path: Path, uuid: str = "8f1c2d3e-4b5a-6c7d-8e9f-0a1b2c3d4e5f") -> dict[str, str]:
-    """Faux cloudflared + dossiers de travail, pour exercer setup_tunnel."""
+    """Fake cloudflared + working directories, to exercise setup_tunnel."""
     bin_dir, login, conf = tmp_path / "bin", tmp_path / "login", tmp_path / "etc"
     bin_dir.mkdir()
     login.mkdir()
@@ -56,8 +56,8 @@ def fake_cloudflared(tmp_path: Path, uuid: str = "8f1c2d3e-4b5a-6c7d-8e9f-0a1b2c
 
 
 def test_no_apostrophe_inside_parameter_expansion() -> None:
-    """« "${1:-c'est}" » : bash prend l'apostrophe pour une citation et tout le
-    script devient illisible (erreur de syntaxe loin de là)."""
+    """« "${1:-c'est}" »: bash takes the apostrophe for a quote and the whole
+    script becomes unparseable (syntax error far away from it)."""
     text = (ROOT / "install.sh").read_text(encoding="utf-8")
     assert not re.search(r"\$\{[^}]*'[^}]*\}", text)
     assert subprocess.run(["bash", "-n", "install.sh"], cwd=ROOT).returncode == 0
@@ -91,10 +91,10 @@ def test_collect_config_questions() -> None:
     answers = "\n".join([
         "tm50abc", "50 ans du club", "jn18fs",                      # station
         "Radio-club de Test", "f6zzz", "Testville", "",             # club
-        "", "f1aaa, f4bbb",                                         # adresse, opérateurs
-        "secret", "autre", "secret", "secret",                      # admin : erreur puis bon
-        "",                                                          # opérateurs : plus tard
-        "",                                                          # pas de QRZ
+        "", "f1aaa, f4bbb",                                         # address, operators
+        "secret", "autre", "secret", "secret",                      # admin: wrong, then right
+        "",                                                          # operators: later
+        "",                                                          # no QRZ
     ]) + "\n"
     r = run('MODE=internet DOMAIN=tm.example.org INTERACTIVE=yes PORT=8000 PORT_SUFFIX=:8000\n'
             'collect_config\n'
@@ -202,8 +202,8 @@ def test_setup_tunnel_writes_config_and_route(tmp_path: Path) -> None:
     assert "service: http://127.0.0.1:8000" in config
     assert "service: http_status:404" in config
     calls = (tmp_path / "calls").read_text()
-    assert "ingress validate" in calls                                  # config vérifiée
-    assert "route dns tm-tm-example-org tm.example.org" in calls        # nom routé vers le tunnel
+    assert "ingress validate" in calls                                  # config validated
+    assert "route dns tm-tm-example-org tm.example.org" in calls        # name routed to the tunnel
     assert "systemctl restart cloudflared" in calls
     assert (tmp_path / "etc" / "8f1c2d3e-4b5a-6c7d-8e9f-0a1b2c3d4e5f.json").exists()
 

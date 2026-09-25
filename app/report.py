@@ -1,11 +1,11 @@
-"""Rapport PDF d'une activation : bilan illustré, pour l'administrateur.
+"""PDF report of an activation: an illustrated summary for the administrator.
 
-Une page A4 (deux si le palmarès est long) reprenant ce qui compte : le titre
-de l'activation, les compteurs, le rythme (par jour et par heure), la
-répartition par bande et par mode, les entités DXCC et les meilleurs chasseurs.
+One A4 page (two if the rankings are long) covering what matters: the
+activation title, the counters, the pace (per day and per hour), the breakdown
+by band and by mode, the DXCC entities and the top hunters.
 
-Dessiné avec :mod:`app.pdf` — aucune dépendance extérieure, donc un Pi hors
-ligne sort le même document qu'un serveur.
+Drawn with :mod:`app.pdf` — no external dependency, so an offline Pi produces
+the same document as a server.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from app import activation, dxcc_flags, pdf
 from app.config import club_config
 from app.i18n import gettext as _
 
-# ── Palette (reprise du site) ─────────────────────────────────────────────
+# ── Palette (taken from the site) ─────────────────────────────────────────
 INK = pdf.hex_color("#101623")
 MUTED = pdf.hex_color("#6b7684")
 LINE = pdf.hex_color("#dde3ec")
@@ -30,12 +30,12 @@ BAND_COLOR = pdf.hex_color("#2f7fd1")
 KPI_COLORS = ["#1e5fbf", "#0f9d8f", "#c2632a", "#7048a8", "#2f8f4e"]
 
 MARGIN = 38.0
-FOOT_ROOM = 48.0      # place réservée au pied de page
+FOOT_ROOM = 48.0      # space reserved for the footer
 SIGNATURE = "TM-Activation · F4IOZ"
 
-# Trois densités : on compose au large, et si le document déborde de peu (ou si
-# « une seule page » est demandé), on recommence en resserrant — d'abord les
-# barres du rythme et les interlignes, puis le bandeau de titre.
+# Three densities: lay out loosely first, and if the document overflows slightly (or
+# "single page" is requested), start over tighter — first the pace bars and the
+# line spacing, then the title banner.
 DENSITIES: list[dict[str, float]] = [
     {"band": 104, "kpi": 54, "day": 118, "day_hours": 92, "hour": 74,
      "grid": 15.0, "row": 14.0, "gap": 14.0, "title": 30, "kpi_value": 21,
@@ -51,12 +51,12 @@ FLAGS_DIR = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flag
 
 
 def _date_fr(day: str) -> str:
-    """« 20260911 » → « 11/09 »."""
+    """"20260911" → "11/09"."""
     return f"{day[6:8]}/{day[4:6]}" if len(day) == 8 else day
 
 
 def _period(station: dict[str, Any], timeline: dict[str, Any]) -> str:
-    """Dates de l'activation : celles de la fiche, sinon celles du log."""
+    """Activation dates: those of the station record, otherwise those of the log."""
     start, end = (station.get("start_date") or ""), (station.get("end_date") or "")
     if start and end:
         return _("Du {start} au {end}", start=_iso_fr(start), end=_iso_fr(end))
@@ -72,30 +72,29 @@ def _iso_fr(iso: str) -> str:
 
 
 def sat_icon(page: pdf.Page, x: float, y: float, size: float, color: pdf.Color) -> None:
-    """Petit satellite vectoriel : deux panneaux, un corps, une antenne.
+    """Small vector satellite: two panels, a body, an antenna.
 
-    Helvetica n'a pas de symbole satellite et on n'embarque pas de police
-    supplémentaire : quelques rectangles suffisent, et restent nets à
-    l'impression comme à l'écran."""
-    u = size / 14.0                      # le dessin est pensé sur une grille de 14
+    Helvetica has no satellite symbol and we do not embed an extra font: a few
+    rectangles are enough, and stay sharp both in print and on screen."""
+    u = size / 14.0                      # the drawing is designed on a 14-unit grid
     panel = pdf.mix(WHITE, color, 0.55)
     body_w, body_h = 4 * u, 7 * u
     cx = x + size / 2
-    top = y + 3 * u                      # 3 unités réservées à l'antenne
-    # Panneaux solaires de part et d'autre, avec leurs cellules.
+    top = y + 3 * u                      # 3 units reserved for the antenna
+    # Solar panels on either side, with their cells.
     for left in (cx - body_w / 2 - 1 * u - 4 * u, cx + body_w / 2 + 1 * u):
         page.rect(left, top + 1 * u, 4 * u, 5 * u, fill=panel)
         for k in (1, 2, 3):
             page.line(left + k * u, top + 1 * u, left + k * u, top + 6 * u, color=WHITE, width=0.4)
-    # Corps.
+    # Body.
     page.rect(cx - body_w / 2, top, body_w, body_h, fill=color, radius=0.8 * u)
-    # Antenne et son petit réflecteur.
+    # Antenna and its small reflector.
     page.line(cx, top, cx, y + 0.8 * u, color=color, width=0.9)
     page.line(cx - 1.6 * u, y + 0.9 * u, cx + 1.6 * u, y + 0.9 * u, color=color, width=0.9)
 
 
 def flag_bytes(code: str) -> bytes | None:
-    """Vignette PNG d'une entité DXCC (None si elle manque)."""
+    """PNG flag thumbnail of a DXCC entity (None if missing)."""
     if not code:
         return None
     path = FLAGS_DIR / f"{dxcc_flags.flag_file(code)}.png"
@@ -106,7 +105,7 @@ def flag_bytes(code: str) -> bytes | None:
 
 
 class _Sheet:
-    """Une page du rapport, avec un curseur vertical et les blocs de dessin."""
+    """One report page, with a vertical cursor and the drawing blocks."""
 
     def __init__(self, doc: pdf.Pdf, m: dict[str, float]) -> None:
         self.page = doc.page()
@@ -114,7 +113,7 @@ class _Sheet:
         self.y = MARGIN
         self.width = self.page.width - 2 * MARGIN
 
-    # ── briques ───────────────────────────────────────────────────────────
+    # ── building blocks ───────────────────────────────────────────────────
     def title_band(self, callsign: str, label: str, period: str, club: str,
                    logo: bytes | None = None) -> None:
         page = self.page
@@ -123,25 +122,25 @@ class _Sheet:
         page.rect(0, band_h - 6, page.width, 6, fill=ACCENT_DARK)
         text_left = MARGIN
         if logo:
-            # Le logo occupe la gauche du bandeau, à hauteur fixe et sans
-            # déformation ; le titre se décale d'autant.
+            # The logo sits on the left of the banner, at a fixed height and
+            # undistorted; the title shifts right accordingly.
             try:
-                # Dimensions lues dans l'en-tête (PNG comme JPEG) : décoder
-                # l'image entière juste pour ses proportions coûterait cher, et
-                # le rapport est composé plusieurs fois.
+                # Dimensions read from the header (PNG and JPEG alike): decoding
+                # the whole image just for its aspect ratio would be costly, and
+                # the report is laid out several times.
                 lw, lh = pdf.image_size(logo)
             except (ValueError, IndexError):
                 lw = lh = 0
             if lw and lh:
-                # Presque toute la hauteur du bandeau, sans cadre : le PNG est
-                # détouré, sa transparence est conservée par le masque PDF.
+                # Nearly the full banner height, no frame: the PNG has a cut-out
+                # background, its transparency is kept by the PDF mask.
                 box_h = band_h - 22
                 box_w = min(box_h * lw / lh, 170.0)
                 page.image(MARGIN, (band_h - box_h) / 2, box_w, box_h, logo, max_side=340)
                 text_left = MARGIN + box_w + 16
-        # Les lignes sont EMPILÉES et le bloc centré : le bandeau change de
-        # hauteur selon la densité, des positions en dur finissaient par se
-        # chevaucher (vu sur un rapport resserré à une page).
+        # Lines are STACKED and the block centred: the banner height changes
+        # with the density, and hard-coded positions ended up overlapping
+        # (seen on a report squeezed onto one page).
         title_size, label_size, meta_size = self.m["title"], self.m["label"], self.m["meta"]
         stamp = datetime.now(UTC).strftime("%d/%m/%Y %H:%M")
         line = " · ".join(bit for bit in (period, club) if bit)
@@ -183,7 +182,7 @@ class _Sheet:
         self.y += min(12.0, self.m["gap"])
 
     def kpis(self, items: list[tuple[str, str]]) -> None:
-        """Bandeau de compteurs : un pavé coloré par chiffre clé."""
+        """Counter strip: one coloured tile per key figure."""
         gap = 9.0
         count = max(len(items), 1)
         w = (self.width - gap * (count - 1)) / count
@@ -202,7 +201,7 @@ class _Sheet:
 
     def columns(self, values: list[float], labels: list[str], height: float,
                 color: pdf.Color, every: int = 1, value_labels: bool = True) -> None:
-        """Histogramme en colonnes (rythme)."""
+        """Column histogram (pace)."""
         top = self.y
         peak = max(values) if values and max(values) > 0 else 1
         n = max(len(values), 1)
@@ -226,7 +225,7 @@ class _Sheet:
 
     def bars(self, x: float, width: float, rows: list[tuple[str, int, pdf.Color]],
              total: int) -> float:
-        """Barres horizontales « libellé | barre | compte » (bandes, modes)."""
+        """Horizontal bars "label | bar | count" (bands, modes)."""
         y = self.y
         for label, value, color in rows:
             self.page.text(x, y, label, size=9, bold=True, color=INK, width=52)
@@ -242,7 +241,7 @@ class _Sheet:
 
     def table(self, x: float, width: float, head: tuple[str, ...], rows: list[tuple[str, ...]],
               widths: tuple[float, ...]) -> float:
-        """Petit tableau (entités DXCC, chasseurs)."""
+        """Small table (DXCC entities, hunters)."""
         y = self.y
         cx = x
         for title, w in zip(head, widths):
@@ -265,10 +264,10 @@ class _Sheet:
 
     def flag_grid(self, entities: list[dict[str, Any]], columns: int = 3,
                   more: int = 0) -> None:
-        """Toutes les entités contactées : drapeau, nom et nombre de QSO.
+        """All contacted entities: flag, name and number of QSOs.
 
-        Disposées en colonnes pour qu'une centaine d'entités tienne sans
-        transformer le rapport en annuaire."""
+        Laid out in columns so that a hundred entities fit without turning the
+        report into a directory."""
         gap = 14.0
         col_w = (self.width - gap * (columns - 1)) / columns
         rows = (len(entities) + columns - 1) // columns
@@ -293,12 +292,12 @@ class _Sheet:
             self.y += 12
 
     def room_left(self) -> float:
-        """Hauteur disponible avant le pied de page."""
+        """Height available before the footer."""
         return self.page.height - FOOT_ROOM - self.y
 
     @staticmethod
     def footer_on(page: pdf.Page, text: str, page_no: int, pages: int) -> None:
-        """Pied de page, posé à la fin quand le nombre de pages est connu."""
+        """Footer, drawn at the end once the page count is known."""
         width = page.width - 2 * MARGIN
         y = page.height - 26
         page.line(MARGIN, y - 8, MARGIN + width, y - 8, color=LINE, width=0.7)
@@ -309,7 +308,7 @@ class _Sheet:
 
 
 class _Book:
-    """Suite de pages : ``room(n)`` renvoie une page où il reste la place voulue."""
+    """Sequence of pages: ``room(n)`` returns a page with the requested space left."""
 
     def __init__(self, doc: pdf.Pdf, m: dict[str, float]) -> None:
         self.doc = doc
@@ -328,10 +327,10 @@ class _Book:
 
 
 def _gather(call: str) -> dict[str, Any]:
-    """Toutes les données du rapport, lues une seule fois.
+    """All the report data, read only once.
 
-    La composition peut être rejouée à plusieurs densités pour tenir en une
-    page : inutile d'interroger la base à chaque essai."""
+    The layout may be replayed at several densities to fit on one page: no need
+    to query the database on every attempt."""
     return {
         "station": activation.get_station(call),
         "stats": activation.stats(call),
@@ -347,10 +346,10 @@ def _gather(call: str) -> dict[str, Any]:
 
 def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str, float],
              logo: bytes | None, club_line: str, single: bool) -> pdf.Pdf:
-    """Compose le document à une densité donnée.
+    """Lay out the document at a given density.
 
-    ``single`` : on s'interdit la deuxième page — les listes sont coupées à ce
-    qui tient, avec la mention du reste."""
+    ``single``: a second page is forbidden — lists are cut to what fits, with a
+    note about the rest."""
     st, stats = data["station"], data["stats"]
     timeline, dxcc, hunters = data["timeline"], data["dxcc"], data["hunters"]
     doc = pdf.Pdf()
@@ -368,7 +367,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
         (f"{timeline['per_hour']:g}", _("QSO/h en trafic")),
     ])
 
-    # ── Rythme jour par jour (les barres rétrécissent quand on resserre) ──
+    # ── Day-by-day pace (the bars shrink when tightening) ─────────────────
     best_day = timeline["best_day"]
     hint = _("Meilleure journée : {day} ({n} QSO)",
              day=_date_fr(best_day["day"]), n=best_day["n"]) if best_day else ""
@@ -397,7 +396,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
                     size=8.5, color=MUTED, width=sheet.width)
     sheet.y += m["gap"] + 8
 
-    # ── Meilleurs moments (pile-up) ───────────────────────────────────────
+    # ── Best moments (pile-up) ────────────────────────────────────────────
     runs = data["runs"]["periods"][:opts["runs"]] if opts["runs"] else []
     if runs:
         sheet = book.room(34 + m["row"] * (len(runs) + 1)) if not single else book.sheet
@@ -425,7 +424,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
             y += m["row"] + 2
         sheet.y = y + m["gap"] - 4
 
-    # ── Bandes et modes ───────────────────────────────────────────────────
+    # ── Bands and modes ───────────────────────────────────────────────────
     lines = max(len(stats["by_band"][:8]), len(stats["by_mode"][:8]))
     sheet = book.room(34 + 17 * lines) if not single else book.sheet
     sheet.section(_("Bandes et modes"),
@@ -443,7 +442,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
     end_right = sheet.bars(MARGIN + half + 26, half, modes, stats["total"])
     sheet.y = max(end_left, end_right) + m["gap"]
 
-    # ── Satellites (à la suite des modes) ─────────────────────────────────
+    # ── Satellites (right after the modes) ────────────────────────────────
     sats = data["sats"] if opts["sats"] else {"by_sat": [], "total": 0, "share": 0}
     if sats["by_sat"]:
         shown = sats["by_sat"][:8]
@@ -456,7 +455,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
                               for item in shown],
                              max(sats["total"], 1)) + m["gap"]
 
-    # ── Entités DXCC ──────────────────────────────────────────────────────
+    # ── DXCC entities ─────────────────────────────────────────────────────
     entities = dxcc["entities"]
     if entities:
         if opts["dxcc_all"]:
@@ -469,7 +468,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
                 per_col = max(int(room // m["grid"]), 3)
                 chunk = entities[start:start + per_col * columns]
                 if single and start + len(chunk) < len(entities):
-                    # Une seule page : on garde ce qui tient et on annonce le reste.
+                    # Single page: keep what fits and mention the rest.
                     keep = max(per_col * columns - columns, columns)
                     chunk = entities[start:start + keep]
                     sheet.flag_grid(chunk, columns=columns,
@@ -489,7 +488,7 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
                                    for e in entities[:10]],
                                   (sheet.width * 0.58 - 96, 56, 40)) + m["gap"]
 
-    # ── Chasseurs (facultatif) ────────────────────────────────────────────
+    # ── Hunters (optional) ────────────────────────────────────────────────
     top = hunters[:opts["hunters"]] if opts["hunters"] else []
     if top:
         columns = 2 if len(top) > 8 else 1
@@ -526,12 +525,12 @@ def _compose(call: str, data: dict[str, Any], opts: dict[str, Any], m: dict[str,
 
 
 def build_report(station: str | None = None) -> bytes:
-    """PDF du bilan d'une activation (défaut : l'indicatif en cours).
+    """PDF summary of an activation (default: the current special callsign).
 
-    Le contenu suit les options des Réglages. Le document est composé au large ;
-    s'il ne déborde que d'un cheveu — ou si « une seule page » est demandé — il
-    est recomposé plus serré (barres du rythme, interlignes, puis bandeau de
-    titre) avant, en dernier recours, de couper les listes.
+    The content follows the Settings options. The document is laid out loosely;
+    if it overflows by only a hair — or if "single page" is requested — it is laid
+    out again more tightly (pace bars, line spacing, then the title banner)
+    before, as a last resort, cutting the lists.
     """
     st = activation.get_station(station) if station else activation.current_station()
     if st is None:
@@ -541,7 +540,7 @@ def build_report(station: str | None = None) -> bytes:
     data = _gather(call)
     club = club_config()
     name, sign = (club.get("name") or "").strip(), (club.get("callsign") or "").strip()
-    # « Radioclub F6ABC · F6ABC » : on ne répète pas l'indicatif déjà dans le nom.
+    # « Radioclub F6ABC · F6ABC »: do not repeat the callsign already in the name.
     club_line = name if (not sign or sign.upper() in name.upper()) else \
         " · ".join(bit for bit in (name, sign) if bit)
     logo = None
@@ -564,8 +563,8 @@ def build_report(station: str | None = None) -> bytes:
             if len(tried.pages) == 1:
                 return tried.output()
         return compose(len(DENSITIES) - 1, single=True).output()
-    # Débordement minime (la deuxième page est presque vide) : on resserre d'un
-    # cran plutôt que d'imprimer une page pour trois lignes.
+    # Minimal overflow (the second page is almost empty): tighten one notch
+    # rather than print a page for three lines.
     if len(doc.pages) == 2 and _tail_height(doc) < 230:
         for level in (1, 2):
             tried = compose(level)
@@ -575,7 +574,7 @@ def build_report(station: str | None = None) -> bytes:
 
 
 def _tail_height(doc: pdf.Pdf) -> float:
-    """Hauteur occupée sur la dernière page (repère du « ça déborde de peu »)."""
+    """Height used on the last page (the "overflows only slightly" gauge)."""
     page = doc.pages[-1]
     stream = page.stream()
     lowest = 0.0

@@ -1,20 +1,20 @@
-/* Comptes à rebours des activations.
- * Chaque élément .act-countdown porte data-start / data-end en ISO UTC
- * ('YYYY-MM-DDTHH:MM'). On affiche le temps restant avant le début, ou
- * l'état en direct / terminé.
+/* Countdown timers for activations.
+ * Each .act-countdown element carries data-start / data-end in ISO UTC
+ * ('YYYY-MM-DDTHH:MM'). Shows the time left before the start, or the
+ * on-air / finished state.
  */
 (function () {
   var els = Array.prototype.slice.call(document.querySelectorAll('.act-countdown'));
   if (!els.length) return;
 
-  // Textes traduits : window.ACT_I18N (rempli par _base.html hors français).
+  // Translated strings: window.ACT_I18N (filled by _base.html for non-French).
   function t(s, p) {
     var m = (window.ACT_I18N || {})[s] || s;
     return p ? m.replace(/\{(\w+)\}/g, function (_, k) { return p[k]; }) : m;
   }
 
   function toUTC(iso) {
-    // 'YYYY-MM-DDTHH:MM' interprété comme UTC.
+    // 'YYYY-MM-DDTHH:MM' interpreted as UTC.
     return iso ? new Date(iso.slice(0, 16) + ':00Z').getTime() : NaN;
   }
 

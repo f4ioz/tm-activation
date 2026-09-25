@@ -1,5 +1,5 @@
-{# Drapeaux du bandeau (fiche de l'indicatif : « fr,be ») avec leur préfixe radio ;
-   le dernier est en miroir (préfixe puis drapeau) : F 🤝 ON. #}
+{# Banner flags (from the callsign record: « fr,be ») with their radio prefix;
+   the last one is mirrored (prefix then flag): F 🤝 ON. #}
 <span class="act-flags">
   {%- for f in station.flags.split(',') if f %}
     {%- set p = flag_prefixes.get(f, f|upper) %}

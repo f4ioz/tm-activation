@@ -1,13 +1,13 @@
-"""Durcissement du site : en-têtes, redirections sûres, limites de débit,
-blocage automatique des scanners et des attaques sur les mots de passe.
+"""Site hardening: headers, safe redirects, rate limits, automatic blocking
+of scanners and password-guessing attacks.
 
-Constats dans les logs de prod (sept. 2026) : ~2 200 requêtes/jour de
-scanners (WordPress, .env, .git, .php), la doc FastAPI récupérée, et une
-attaque par essais de mots de passe sur /login (123 échecs le 3 septembre).
+Seen in the production logs (Sept. 2026): ~2,200 requests/day from scanners
+(WordPress, .env, .git, .php), the FastAPI docs being fetched, and a
+password-guessing attack on /login (123 failures on 3 September).
 
-État de blocage en mémoire (un seul worker uvicorn) : perdu au redémarrage,
-ce qui convient à des blocages temporaires. Les échecs de connexion sont
-lus dans le journal persistant (visits.auth_events).
+Blocking state is kept in memory (a single uvicorn worker): lost on restart,
+which is fine for temporary bans. Login failures are read from the persistent
+log (visits.auth_events).
 """
 
 from __future__ import annotations
@@ -23,22 +23,22 @@ from fastapi.responses import PlainTextResponse, Response
 from app import auth as _auth
 from app import visits
 
-SCAN_THRESHOLD = 5          # requêtes de scan (wp-, .env, .php…) en SCAN_WINDOW → blocage
+SCAN_THRESHOLD = 5          # scan requests (wp-, .env, .php…) within SCAN_WINDOW → ban
 SCAN_WINDOW = 600
 BAN_SECONDS = 3600
-LOGIN_MAX_FAILURES = 5      # échecs de connexion (admin + opérateurs) par IP en LOGIN_WINDOW
+LOGIN_MAX_FAILURES = 5      # login failures (admin + operators) per IP within LOGIN_WINDOW
 LOGIN_WINDOW = 900
-FAILED_LOGIN_DELAY = 1.0    # secondes d'attente après un échec (ralentit les essais)
-QRZ_PUBLIC_LIMIT = 30       # /api/qrz/lookup pour le public : 30 recherches / 10 min / IP
+FAILED_LOGIN_DELAY = 1.0    # seconds to wait after a failure (slows down guessing)
+QRZ_PUBLIC_LIMIT = 30       # public /api/qrz/lookup: 30 lookups / 10 min / IP
 QRZ_PUBLIC_WINDOW = 600
 
 SECURITY_HEADERS = {
-    # Géolocalisation (/grid) et micro (/sstv) réservés au site lui-même.
+    # Geolocation (/grid) and microphone (/sstv) restricted to the site itself.
     "Permissions-Policy": "geolocation=(self), microphone=(self), camera=(), payment=(), usb=()",
-    # Politique minimale compatible avec les scripts inline et CDN du site.
+    # Minimal policy, compatible with the site's inline and CDN scripts.
     "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
 }
-_NO_STORE_PREFIXES = ("/admin", "/activation", "/login")  # pages privées : jamais en cache
+_NO_STORE_PREFIXES = ("/admin", "/activation", "/login")  # private pages: never cached
 
 _lock = threading.Lock()
 _scan_hits: dict[str, deque[float]] = {}
@@ -47,16 +47,16 @@ _rate: dict[str, deque[float]] = {}
 
 
 def reset() -> None:
-    """Oublie blocages et compteurs (tests)."""
+    """Forget bans and counters (tests)."""
     with _lock:
         _scan_hits.clear()
         _bans.clear()
         _rate.clear()
 
 
-# Réseaux locaux jamais bloqués. Liste explicite : ``ip.is_private`` de Python
-# inclut aussi les plages de documentation (203.0.113.0/24…), à traiter comme
-# des IP publiques.
+# Local networks, never banned. Explicit list: Python's ``ip.is_private`` also
+# includes the documentation ranges (203.0.113.0/24…), which must be treated as
+# public IPs.
 _LAN_NETS = [ipaddress.ip_network(n) for n in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16",
     "::1/128", "fe80::/10", "fc00::/7",
@@ -64,7 +64,7 @@ _LAN_NETS = [ipaddress.ip_network(n) for n in (
 
 
 def _public_ip(ip: str) -> bool:
-    """IP valide hors réseau local (le LAN et les IP invalides ne sont jamais bloqués)."""
+    """Valid IP outside the local network (the LAN and invalid IPs are never banned)."""
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
@@ -73,11 +73,11 @@ def _public_ip(ip: str) -> bool:
 
 
 def safe_next(value: str | None, default: str = "/", prefix: str = "/") -> str:
-    """Cible de redirection interne uniquement.
+    """Internal redirect target only.
 
-    Refuse « //hôte », « /\\hôte » et les caractères de contrôle (les
-    navigateurs suppriment tabulations et retours ligne : « /\\t/hôte »
-    devient « //hôte »), et tout ce qui ne commence pas par ``prefix``.
+    Rejects "//host", "/\\host" and control characters (browsers strip tabs
+    and newlines: "/\\t/host" becomes "//host"), and anything that does not
+    start with ``prefix``.
     """
     v = value or ""
     if (not v.startswith(prefix) or v.startswith("//") or "\\" in v
@@ -87,12 +87,12 @@ def safe_next(value: str | None, default: str = "/", prefix: str = "/") -> str:
 
 
 def is_https(request: Any) -> bool:
-    """Requête arrivée en HTTPS (nginx → X-Forwarded-Proto) : cookies « Secure »."""
+    """Request received over HTTPS (nginx → X-Forwarded-Proto): "Secure" cookies."""
     return request.url.scheme == "https"
 
 
 def rate_limited(key: str, limit: int, window: float) -> bool:
-    """True si ``key`` a déjà fait ``limit`` requêtes dans la fenêtre."""
+    """True if ``key`` has already made ``limit`` requests within the window."""
     now = time.time()
     with _lock:
         q = _rate.setdefault(key, deque())
@@ -105,7 +105,7 @@ def rate_limited(key: str, limit: int, window: float) -> bool:
 
 
 def login_blocked(ip: str) -> bool:
-    """Trop d'échecs de connexion récents depuis cette IP (essais de mots de passe) ?"""
+    """Too many recent login failures from this IP (password guessing)?"""
     if not _public_ip(ip):
         return False
     return visits.failed_logins(ip, int(time.time() - LOGIN_WINDOW)) >= LOGIN_MAX_FAILURES
@@ -119,11 +119,11 @@ def _prune(now: float) -> None:
 
 
 def check_request(request: Any) -> Response | None:
-    """Blocage des scanners : 403 si l'IP est bloquée, sinon None.
+    """Scanner blocking: 403 if the IP is banned, otherwise None.
 
-    Une IP publique qui demande ``SCAN_THRESHOLD`` chemins de failles en
-    ``SCAN_WINDOW`` secondes est bloquée ``BAN_SECONDS`` sur tout le site.
-    Jamais bloqués : le LAN, l'admin connecté, les IP étiquetées par l'admin.
+    A public IP that requests ``SCAN_THRESHOLD`` exploit paths within
+    ``SCAN_WINDOW`` seconds is banned from the whole site for ``BAN_SECONDS``.
+    Never banned: the LAN, the logged-in admin, IPs labelled by the admin.
     """
     ip = visits.client_ip(request)
     if not _public_ip(ip) or _auth.is_private(request):
@@ -137,8 +137,8 @@ def check_request(request: Any) -> Response | None:
             return PlainTextResponse("Accès temporairement bloqué.", status_code=403)
         if ban:
             del _bans[ip]
-        # /static/ exclu : les drapeaux DXCC sont servis depuis /static/vendor/flags/
-        # (« /vendor/ » est un motif de scan → bannissement des visiteurs de /tm25test)
+        # /static/ excluded: DXCC flags are served from /static/vendor/flags/
+        # ("/vendor/" is a scan pattern → visitors of /tm25test would get banned)
         if path.startswith("/static/") or not visits._SCAN_RE.search(path):
             return None
         q = _scan_hits.setdefault(ip, deque())
@@ -163,7 +163,7 @@ def add_headers(request: Any, response: Response) -> None:
 
 
 def banned_ips() -> list[dict[str, Any]]:
-    """IP actuellement bloquées (page admin)."""
+    """Currently banned IPs (admin page)."""
     now = time.time()
     with _lock:
         rows = [{"ip": ip, **b, "remaining": int(b["until"] - now)}

@@ -1,14 +1,14 @@
-"""Générateur PDF minimal — texte, aplats de couleur, barres.
+"""Minimal PDF generator — text, solid colour fills, bars.
 
-Écrit à la main (bibliothèque standard seulement) : le package d'activation
-tourne sur un Raspberry Pi avec huit dépendances, on n'en ajoute pas une
-neuvième pour sortir une page. Un PDF est un fichier texte structuré ; ce
-module écrit le strict nécessaire — catalogue, pages, flux de contenu et les
-polices de base (Helvetica), présentes dans tous les lecteurs.
+Hand-written (standard library only): the activation package runs on a
+Raspberry Pi with eight dependencies, and we do not add a ninth just to output
+a page. A PDF is a structured text file; this module writes the bare minimum —
+catalog, pages, content streams and the base fonts (Helvetica), available in
+every reader.
 
-Repère de coordonnées : ORIGINE EN HAUT À GAUCHE, en points (1/72 pouce),
-comme on raisonne pour une mise en page. La conversion vers le repère PDF
-(origine en bas) est faite ici.
+Coordinate system: ORIGIN AT THE TOP LEFT, in points (1/72 inch), the way one
+thinks about a page layout. Conversion to the PDF coordinate system (origin at
+the bottom) is done here.
 
     doc = Pdf()
     page = doc.page()
@@ -26,10 +26,9 @@ from typing import Any
 A4 = (595.28, 841.89)          # points
 Color = tuple[float, float, float]
 
-# Largeurs Helvetica (millièmes de cadratin) pour les caractères ASCII : elles
-# servent à centrer, aligner à droite et couper les textes trop longs. Un
-# caractère accenté prend la largeur de sa lettre de base (é → e), ce qui est
-# exact pour les polices Helvetica.
+# Helvetica widths (thousandths of an em) for ASCII characters: used to centre,
+# right-align and truncate texts that are too long. An accented character takes
+# the width of its base letter (é → e), which is exact for the Helvetica fonts.
 _W_REGULAR = (
     "278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 "
     "556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 "
@@ -56,13 +55,13 @@ _WIDTHS = {False: _widths(_W_REGULAR), True: _widths(_W_BOLD)}
 
 
 def _base_char(ch: str) -> str:
-    """« é » → « e » : la largeur d'un accentué est celle de sa lettre de base."""
+    """"é" → "e": an accented letter has the width of its base letter."""
     plain = unicodedata.normalize("NFD", ch)
     return next((c for c in plain if not unicodedata.combining(c)), ch)
 
 
 def text_width(s: str, size: float, bold: bool = False) -> float:
-    """Largeur d'un texte, en points."""
+    """Width of a text, in points."""
     table = _WIDTHS[bool(bold)]
     total = 0
     for ch in s or "":
@@ -73,7 +72,7 @@ def text_width(s: str, size: float, bold: bool = False) -> float:
 
 
 def fit(s: str, size: float, max_width: float, bold: bool = False) -> str:
-    """Texte raccourci avec une ellipse pour tenir dans ``max_width``."""
+    """Text shortened with an ellipsis to fit within ``max_width``."""
     s = s or ""
     if text_width(s, size, bold) <= max_width:
         return s
@@ -84,13 +83,13 @@ def fit(s: str, size: float, max_width: float, bold: bool = False) -> str:
 
 
 def read_png(data: bytes) -> tuple[int, int, bytes, bytes | None]:
-    """PNG → (largeur, hauteur, pixels RGB, couche alpha ou None).
+    """PNG → (width, height, RGB pixels, alpha channel or None).
 
-    Gère les images non entrelacées en niveaux de gris, RGB, palette (1, 2, 4
-    ou 8 bits) et leurs variantes avec transparence. L'alpha est RENDU tel
-    quel : dans le PDF il devient un masque, donc un logo détouré reste détouré
-    sur le bandeau de couleur (l'aplatir sur du blanc lui collait un rectangle
-    blanc). De quoi afficher les drapeaux DXCC et le logo du club sans Pillow.
+    Handles non-interlaced greyscale, RGB and palette (1, 2, 4 or 8 bits) images
+    and their variants with transparency. The alpha is RETURNED as is: in the
+    PDF it becomes a mask, so a logo with a cut-out background stays cut out on
+    the coloured banner (flattening it onto white stuck a white rectangle on
+    it). Enough to show the DXCC flags and the club logo without Pillow.
     """
     if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise ValueError("ce n'est pas une image PNG")
@@ -181,10 +180,10 @@ def read_png(data: bytes) -> tuple[int, int, bytes, bytes | None]:
 
 
 def read_jpeg(data: bytes) -> tuple[int, int, int]:
-    """(largeur, hauteur, composantes) d'un JPEG, lues dans son marqueur SOF.
+    """(width, height, components) of a JPEG, read from its SOF marker.
 
-    Un JPEG s'embarque tel quel dans un PDF (filtre DCTDecode) : inutile de le
-    décoder, il suffit de connaître ses dimensions."""
+    A JPEG is embedded as is in a PDF (DCTDecode filter): no need to decode it,
+    knowing its dimensions is enough."""
     if data[:3] != b"\xff\xd8\xff":
         raise ValueError("ce n'est pas une image JPEG")
     pos = 2
@@ -197,7 +196,7 @@ def read_jpeg(data: bytes) -> tuple[int, int, int]:
             pos += 2
             continue
         length = int.from_bytes(data[pos + 2:pos + 4], "big")
-        # SOF0..SOF15 sauf les marqueurs qui ne décrivent pas l'image.
+        # SOF0..SOF15 except the markers that do not describe the image.
         if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
             height = int.from_bytes(data[pos + 5:pos + 7], "big")
             width = int.from_bytes(data[pos + 7:pos + 9], "big")
@@ -208,14 +207,14 @@ def read_jpeg(data: bytes) -> tuple[int, int, int]:
 
 def downsample(width: int, height: int, rgb: bytes, max_side: int,
                alpha: bytes | None = None) -> tuple[int, int, bytes, bytes | None]:
-    """Réduit une image RGB d'un facteur entier (moyenne des blocs).
+    """Shrink an RGB image by an integer factor (block averaging).
 
-    Suffisant pour un logo : pas de rééchantillonnage savant, mais pas d'effet
-    d'escalier non plus, et aucune dépendance."""
+    Good enough for a logo: no fancy resampling, but no staircase effect either,
+    and no dependency."""
     longest = max(width, height)
     if longest <= max_side:
         return width, height, rgb, alpha
-    factor = -(-longest // max_side)            # arrondi au supérieur
+    factor = -(-longest // max_side)            # rounded up
     new_w, new_h = max(width // factor, 1), max(height // factor, 1)
     out = bytearray(new_w * new_h * 3)
     mask = bytearray(new_w * new_h) if alpha else None
@@ -243,7 +242,7 @@ def downsample(width: int, height: int, rgb: bytes, max_side: int,
 
 
 def image_size(data: bytes) -> tuple[int, int]:
-    """Dimensions d'une image PNG ou JPEG."""
+    """Dimensions of a PNG or JPEG image."""
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         width = int.from_bytes(data[16:20], "big")
         height = int.from_bytes(data[20:24], "big")
@@ -253,10 +252,10 @@ def image_size(data: bytes) -> tuple[int, int]:
 
 
 def _unpack(line: bytearray, depth: int, count: int) -> list[int]:
-    """Échantillons d'une ligne, quelle que soit la profondeur (1, 2, 4, 8 bits).
+    """Samples of a scanline, whatever the bit depth (1, 2, 4, 8 bits).
 
-    En dessous de 8 bits, la valeur reste l'INDICE de palette : pas de mise à
-    l'échelle, sinon les couleurs des drapeaux seraient fausses."""
+    Below 8 bits, the value stays the palette INDEX: no scaling, otherwise the
+    flag colours would be wrong."""
     if depth == 8:
         return list(line[:count])
     per_byte = 8 // depth
@@ -270,14 +269,14 @@ def _unpack(line: bytearray, depth: int, count: int) -> list[int]:
     return values
 
 
-# Images déjà décodées (et réduites) : le rapport peut être recomposé plusieurs
-# fois pour tenir en une page, inutile de refaire le travail à chaque essai.
+# Already decoded (and shrunk) images: the report may be laid out several times
+# to fit on one page, no need to redo the work on every attempt.
 _PREPARED: dict[tuple[str, int], tuple[Any, ...]] = {}
 _PREPARED_MAX = 64
 
 
-# Caractères absents du jeu WinAnsi des polices de base : plutôt qu'un « ? »,
-# on écrit l'équivalent le plus proche (vu sur une flèche « → » dans un rapport).
+# Characters missing from the WinAnsi set of the base fonts: rather than a "?",
+# write the closest equivalent (seen with an arrow "→" in a report).
 _SUBSTITUTES = str.maketrans({
     "→": "-", "←": "-", "↔": "-", "⇒": "=>", "≥": ">=", "≤": "<=", "≠": "!=",
     "–": "-", "—": "-", "•": "·", "∅": "0", "⚑": "!", "🛰": "", "☀": "",
@@ -285,13 +284,13 @@ _SUBSTITUTES = str.maketrans({
 
 
 def _escape(s: str) -> bytes:
-    """Chaîne PDF : encodage WinAnsi (accents compris) et parenthèses échappées."""
+    """PDF string: WinAnsi encoding (accents included) and escaped parentheses."""
     raw = (s or "").translate(_SUBSTITUTES).encode("cp1252", "replace")
     return raw.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
 
 
 class Page:
-    """Une page : on y empile des ordres de dessin, en coordonnées « haut-gauche »."""
+    """A page: drawing operations are stacked on it, in "top-left" coordinates."""
 
     def __init__(self, width: float, height: float, doc: "Pdf | None" = None) -> None:
         self.width, self.height = width, height
@@ -304,7 +303,7 @@ class Page:
 
     def rect(self, x: float, y: float, w: float, h: float, fill: Color | None = None,
              stroke: Color | None = None, line_width: float = 1.0, radius: float = 0.0) -> None:
-        """Rectangle (coin supérieur gauche en x, y). ``radius`` : coins arrondis."""
+        """Rectangle (top-left corner at x, y). ``radius``: rounded corners."""
         parts = []
         if fill:
             parts.append(b"%.3f %.3f %.3f rg" % fill)
@@ -344,9 +343,9 @@ class Page:
 
     def text(self, x: float, y: float, s: str, size: float = 10, bold: bool = False,
              color: Color = (0, 0, 0), align: str = "left", width: float = 0) -> None:
-        """Texte dont ``y`` est la ligne de base du haut (le texte descend).
+        """Text whose ``y`` is the top reference line (the text extends downwards).
 
-        ``align`` : "left", "center" ou "right" dans la boîte [x, x + width]."""
+        ``align``: "left", "center" or "right" within the box [x, x + width]."""
         drawn = s or ""
         if width:
             drawn = fit(drawn, size, width, bold)
@@ -361,10 +360,10 @@ class Page:
 
     def image(self, x: float, y: float, w: float, h: float, png: bytes,
               max_side: int = 0) -> None:
-        """Image PNG ou JPEG dessinée dans le rectangle (x, y, w, h).
+        """PNG or JPEG image drawn in the rectangle (x, y, w, h).
 
-        ``max_side`` : réduit un PNG trop grand avant de l'embarquer — un logo
-        de 700 pixels imprimé sur 2 cm n'a pas besoin de peser 800 ko."""
+        ``max_side``: shrinks an oversized PNG before embedding it — a 700-pixel
+        logo printed 2 cm wide does not need to weigh 800 KB."""
         if self.doc is None:
             raise RuntimeError("page détachée du document")
         name = self.doc.add_image(png, max_side=max_side)
@@ -376,15 +375,15 @@ class Page:
 
 
 class Pdf:
-    """Document : une suite de pages, puis ``output()``."""
+    """Document: a sequence of pages, then ``output()``."""
 
     def __init__(self, size: tuple[float, float] = A4) -> None:
         self.size = size
         self.pages: list[Page] = []
         self.title = ""
         self.author = ""
-        # Images embarquées, dédoublonnées par empreinte : un drapeau répété
-        # n'alourdit le fichier qu'une fois.
+        # Embedded images, deduplicated by hash: a repeated flag adds to the
+        # file size only once.
         self._images: dict[str, tuple[Any, ...]] = {}
 
     def page(self) -> Page:
@@ -393,10 +392,10 @@ class Pdf:
         return page
 
     def add_image(self, data: bytes, max_side: int = 0) -> bytes:
-        """Enregistre une image PNG ou JPEG, renvoie son nom de ressource (/Im3).
+        """Register a PNG or JPEG image, return its resource name (/Im3).
 
-        Le PNG est décodé puis recompressé ; le JPEG part tel quel (DCTDecode),
-        donc sans perte de qualité ni recompression."""
+        The PNG is decoded then recompressed; the JPEG goes in as is (DCTDecode),
+        so with no quality loss and no recompression."""
         key = hashlib.sha1(data).hexdigest()
         known = self._images.get(key)
         if known is not None:
@@ -427,7 +426,7 @@ class Pdf:
 
         def add(body: bytes) -> int:
             objects.append(body)
-            return len(objects)            # numéro d'objet (1-based)
+            return len(objects)            # object number (1-based)
 
         font_regular = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                            b"/Encoding /WinAnsiEncoding >>")
@@ -451,7 +450,7 @@ class Pdf:
         xobjects = (b" /XObject << %s >>" % b" ".join(image_refs)) if image_refs else b""
         resources = (b"<< /Font << /F1 %d 0 R /F2 %d 0 R >>%s >>" % (
             font_regular, font_bold, xobjects))
-        pages_id = add(b"")          # objet « Pages » réservé : les pages le citent
+        pages_id = add(b"")          # reserved "Pages" object: the pages refer to it
         page_ids: list[int] = []
         for page in self.pages:
             data = page.stream()
@@ -482,7 +481,7 @@ class Pdf:
 
 
 def hex_color(value: str, default: Color = (0.2, 0.2, 0.2)) -> Color:
-    """« #e8543f » → (0.91, 0.33, 0.25), pour réutiliser les couleurs du site."""
+    """"#e8543f" → (0.91, 0.33, 0.25), to reuse the site colours."""
     s = (value or "").strip().lstrip("#")
     if len(s) != 6:
         return default
@@ -493,7 +492,7 @@ def hex_color(value: str, default: Color = (0.2, 0.2, 0.2)) -> Color:
 
 
 def mix(color: Color, other: Color, ratio: float) -> Color:
-    """Mélange deux couleurs (``ratio`` = part de ``other``)."""
+    """Blend two colours (``ratio`` = share of ``other``)."""
     return tuple(a + (b - a) * ratio for a, b in zip(color, other))  # type: ignore[return-value]
 
 

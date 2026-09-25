@@ -1,4 +1,4 @@
-"""Connexion administrateur : /login (formulaire), /logout."""
+"""Administrator login: /login (form), /logout."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ DEFAULT_NEXT = "/activation/settings"
 
 
 def _safe_next(value: str | None) -> str:
-    """Restreint la redirection à des chemins relatifs internes."""
+    """Restricts redirects to internal relative paths."""
     return security.safe_next(value, DEFAULT_NEXT)
 
 
@@ -69,7 +69,7 @@ async def login_submit(
             path="/",
         )
         return resp
-    await asyncio.sleep(security.FAILED_LOGIN_DELAY)  # ralentit les essais de mots de passe
+    await asyncio.sleep(security.FAILED_LOGIN_DELAY)  # slows down password guessing
     return _page(request, target, _("Mot de passe incorrect") if expected else _("Administration non configurée"), 401)
 
 

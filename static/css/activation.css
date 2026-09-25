@@ -1,8 +1,8 @@
-/* Module d'activation indicatif temporaire (TM…) — mobile-first.
- * Site "spécial" autonome : layout propre (barre + wrap + footer), sans le
- * chrome du site d'origine. */
+/* Temporary special-callsign activation module (TM…) — mobile-first.
+ * Standalone "special" site: its own layout (bar + wrap + footer), without the
+ * original site's chrome. */
 
-/* ── Layout autonome ──────────────────────────────────────────────────── */
+/* ── Standalone layout ────────────────────────────────────────────────── */
 body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-bar {
   position: sticky; top: 0; z-index: 20;
@@ -52,22 +52,22 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .act-kpi-l { display: block; margin-top: 0.25rem; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
 
-/* ── Comptes à rebours ────────────────────────────────────────────────── */
+/* ── Countdowns ───────────────────────────────────────────────────────── */
 .act-countdown { margin: 0.5rem 0 0; font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--text-muted); }
 .act-countdown.is-soon { color: var(--cyan); }
 .act-countdown.is-onair { color: var(--green, #2ecc71); font-weight: 600; }
 .act-countdown.is-done { color: var(--text-dim, var(--text-muted)); }
 
-/* ── Conflits de créneaux ─────────────────────────────────────────────── */
+/* ── Slot conflicts ───────────────────────────────────────────────────── */
 .act-row-conflict td { background: color-mix(in srgb, var(--warn, #e0a800) 12%, transparent); }
 .act-conflict-flag { color: var(--warn, #e0a800); }
 .act-conflict-count { color: var(--warn, #e0a800); font-size: 0.75rem; font-weight: 700; margin-left: 0.4rem; }
 
-/* ── Résultats de recherche mis en avant (haut de page) ───────────────── */
+/* ── Highlighted search results (top of page) ─────────────────────────── */
 .act-results-top { border-left: 4px solid var(--accent); }
 .act-results-top h2 { text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--text); }
 
-/* ── Recherche publique (compacte) ────────────────────────────────────── */
+/* ── Public search (compact) ──────────────────────────────────────────── */
 .act-search-slim { padding: 0.6rem 0.9rem; }
 .act-search-slim h2 { margin: 0 0 0.4rem; font-size: 0.78rem; }
 .act-search-slim .act-inline { margin: 0; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap; }
@@ -75,10 +75,10 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-search-slim .act-inline input { max-width: 180px; }
 .act-search-results { margin-top: 0.7rem; }
 
-/* ── Coche satellite ──────────────────────────────────────────────────── */
+/* ── Satellite checkbox ───────────────────────────────────────────────── */
 .act-satrow { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
 
-/* ── Sélecteur de fuseau d'affichage (Local / UTC) ────────────────────── */
+/* ── Display time zone switch (Local / UTC) ───────────────────────────── */
 .act-tzswitch { display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono, monospace); font-size: 0.8rem; flex-wrap: wrap; }
 .act-tz-lbl { color: var(--text-muted); }
 .act-tzswitch a {
@@ -88,11 +88,11 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-tzswitch a:hover { color: var(--accent); border-color: var(--accent); }
 .act-tzswitch a.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 
-/* Bandeau du tableau de bord : fuseau à gauche, rapport PDF à droite. */
+/* Dashboard banner: time zone on the left, PDF report on the right. */
 .act-dash-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
 .act-report-link { text-decoration: none; font-size: 0.8rem; }
 
-/* ── Sélecteur de langue (FR | EN) du bandeau ─────────────────────────── */
+/* ── Banner language switch (FR | EN) ─────────────────────────────────── */
 .act-lang { display: flex; gap: 0.2rem; font-family: var(--font-mono, monospace); font-size: 0.75rem; }
 .act-lang a {
   text-decoration: none; color: var(--text-muted);
@@ -109,7 +109,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .act-sub { color: var(--text-muted); margin: 0.2rem 0 0; }
 
-/* ── Hero (bandeau de l'indicatif) — compact ──────────────────────────────── */
+/* ── Hero (callsign banner) — compact ───────────────────────── */
 .act-hero {
   position: relative; overflow: hidden;
   border: 1px solid var(--border); border-radius: var(--radius, 4px);
@@ -120,18 +120,18 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
     radial-gradient(120% 140% at 100% 0%, rgba(214,40,40,0.18), transparent 55%),
     var(--panel);
 }
-/* Avec un logo : il occupe toute la hauteur du bandeau, à gauche du texte,
-   qui reste centré dans la place restante. Sous 640 px, il repasse au-dessus. */
+/* With a logo: it fills the banner's full height, left of the text, which
+   stays centred in the remaining space. Below 640 px it moves back on top. */
 .act-hero.has-logo { flex-direction: row; align-items: center; gap: 1.1rem; text-align: left; }
 .act-hero.has-logo .act-hero-text {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
 }
-/* Étiré sur la hauteur du bandeau (qui dépend du texte), jamais déformé. */
+/* Stretched to the banner's height (which depends on the text), never distorted. */
 .act-hero-logo { align-self: stretch; height: auto; min-height: 76px; max-height: 150px;
   width: auto; max-width: 30%; object-fit: contain; flex: none; }
 @media (max-width: 640px) {
-  /* Téléphone : le logo passe AU-DESSUS du titre et se recentre. Sans
-     align-self, le « stretch » du grand écran le collait à gauche. */
+  /* Phone: the logo moves ABOVE the title and is re-centred. Without
+     align-self, the large-screen "stretch" pinned it to the left. */
   .act-hero.has-logo { flex-direction: column; text-align: center; gap: 0.5rem; }
   .act-hero-logo {
     align-self: center; height: 74px; min-height: 0; max-height: 74px; max-width: 62%;
@@ -160,7 +160,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-hero .act-sub { color: var(--text); font-size: 0.92rem; margin: 0; }
 .act-hero-cities { color: var(--text-muted); margin: 0; font-size: 0.8rem; letter-spacing: 0.03em; }
 
-/* ── Drapeaux CSS (rendu garanti) + préfixes radio F / ON ─────────────── */
+/* ── CSS flags (guaranteed rendering) + radio prefixes F / ON ─────────── */
 .act-flags { display: inline-flex; align-items: center; gap: 0.4rem; }
 .flag {
   display: inline-block; width: 22px; height: 15px; border-radius: 2px;
@@ -179,7 +179,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
   letter-spacing: 0.06em; color: var(--text); font-size: 0.85rem;
 }
 
-/* ── Prochaines activations (mises en avant) ──────────────────────────── */
+/* ── Upcoming activations (highlighted) ───────────────────────────────── */
 .act-next-title {
   font-family: var(--font-display, 'Orbitron', sans-serif); letter-spacing: 0.08em;
   margin: 0.4rem 0 0.2rem; font-size: 1.1rem;
@@ -199,41 +199,41 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .act-next-when { font-family: var(--font-mono, monospace); color: var(--cyan); font-size: 1.15rem; font-weight: 600; }
 .act-next-op { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: 1.6rem; color: var(--accent); margin: 0.25rem 0; }
-/* Indicatif opérateur sous l'indicatif spécial (dans les cartes) : nouvelle ligne, même
-   police qu'au-dessus, plus gros et plus voyant. */
+/* Operator callsign under the special callsign (in the cards): new line, same font as
+   above, larger and more prominent. */
 .act-op-sub {
   display: block; margin-top: 0.1em; margin-left: 0;
   font-family: var(--font-display, 'Orbitron', sans-serif); font-weight: 700;
   font-size: 0.72em; letter-spacing: 0.04em; white-space: normal;
-  /* Cyan rehaussé vers la couleur de texte → un peu plus visible dans les
-     deux thèmes (plus lumineux en sombre, plus contrasté en clair). */
+  /* Cyan lifted towards the text colour → a bit more visible in both
+     themes (brighter in dark, higher contrast in light). */
   color: color-mix(in srgb, var(--cyan) 70%, var(--text) 30%);
 }
-/* Bandeau « EN DIRECT » : on garde l'opérateur sur la même ligne. */
+/* "EN DIRECT" banner: keep the operator on the same line. */
 .act-live-op .act-op-sub {
   display: inline; margin-top: 0; margin-left: 0.5em; font-size: 0.6em;
 }
 .act-next-bm { color: var(--text-muted); font-family: var(--font-mono, monospace); }
-/* Note du créneau (ex. « QRV Sat FO-29 ») : sur sa propre ligne, lisible. */
+/* Slot note (e.g. "QRV Sat FO-29"): on its own line, readable. */
 .act-next-note {
   margin: 0.35rem 0 0; padding-left: 0.5rem; border-left: 2px solid var(--cyan);
   color: var(--text); font-size: 0.9rem; overflow-wrap: anywhere;
 }
 .act-past-card .act-next-note { color: var(--text-muted); border-left-color: var(--text-muted); }
-.act-sat-icon { font-style: normal; }  /* 🛰️ devant une note « SAT … » */
+.act-sat-icon { font-style: normal; }  /* 🛰️ before a "SAT …" note */
 .act-live-tag {
   display: inline-block; font-size: 0.7rem; letter-spacing: 0.12em; font-weight: 700;
   background: var(--green, #2ecc71); color: var(--bg); border-radius: 3px; padding: 0.1rem 0.45rem; margin-left: 0.4rem;
 }
 .act-sat-tag { color: var(--cyan); font-weight: 600; }
 
-/* Cartes « activations passées » : même format que les futures, couleur mutée. */
+/* "Past activations" cards: same layout as upcoming ones, muted colour. */
 .act-past-title { color: var(--text-muted); }
 .act-past-card { border-left-color: var(--text-muted); opacity: 0.8; }
 .act-past-card .act-next-when { color: var(--text-muted); }
 .act-past-card .act-next-op { color: var(--text-muted); }
 
-/* ── Bandeau « EN DIRECT » (activation en cours) ──────────────────────── */
+/* ── "EN DIRECT" banner (activation in progress) ─────────────────────── */
 .act-live-now {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem;
   padding: 0.75rem 1.1rem; border-radius: var(--radius, 4px);
@@ -291,7 +291,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .act-bars li b { color: var(--accent); }
 
-/* Formulaires */
+/* Forms */
 .act-form { display: flex; flex-direction: column; gap: 0.7rem; }
 .act-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-muted); }
 .act-row { display: grid; gap: 0.7rem; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
@@ -311,7 +311,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 
 .act-inline { display: flex; align-items: flex-end; gap: 0.6rem; flex-wrap: wrap; }
 .act-op-select { display: flex; flex-direction: column; gap: 0.4rem; }
-/* Carte « Opérateur au micro » : sélecteur à gauche, jauges de cadence à droite. */
+/* "Opérateur au micro" card: selector on the left, rate gauges on the right. */
 .act-op-select { flex-direction: row; flex-wrap: wrap; align-items: flex-start;
   justify-content: space-between; gap: 0.8rem; }
 .act-op-select > .act-op-left { flex: 0 1 15rem; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -345,8 +345,8 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
   font-family: var(--font-mono, monospace); font-size: 0.85rem;
 }
 .act-cancel-btn:hover { color: var(--text); border-color: var(--text-muted); }
-/* Bouton secondaire DANS un formulaire (ex. « Valeurs par défaut ») : la règle
-   .act-form button est plus spécifique, il faut la repasser derrière. */
+/* Secondary button INSIDE a form (e.g. "Valeurs par défaut"): the
+   .act-form button rule is more specific, so it must be overridden after it. */
 .act-form button.act-cancel-btn {
   background: transparent; color: var(--text-muted); border: 1px solid var(--border);
   font-weight: 400; padding: 0.4rem 0.9rem;
@@ -369,13 +369,13 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-qrz-hint.is-miss { color: var(--text-muted); }
 .act-lotw-note { font-size: 0.82rem; margin: 0.8rem 0 0; }
 
-/* ── Log : coches « Maintenant » / QRZ ────────────────────────────────── */
+/* ── Log: "Maintenant" / QRZ checkboxes ───────────────────────────────── */
 .act-toggles { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
 .act-when { display: flex; flex-direction: column; gap: 0.35rem; }
 .act-when input[type="datetime-local"]:disabled { opacity: 0.55; cursor: not-allowed; }
-@media (min-width: 700px) { .act-when { grid-column: span 2; } }  /* date + heure lisibles */
+@media (min-width: 700px) { .act-when { grid-column: span 2; } }  /* readable date + time */
 
-/* ── Board public : carte, DXCC, classement ───────────────────────────── */
+/* ── Public board: map, DXCC, ranking ─────────────────────────────────── */
 .act-map {
   height: clamp(320px, 55vh, 520px); margin: 0.2rem 0 0.4rem;
   border: 1px solid var(--border); border-radius: var(--radius, 3px);
@@ -383,16 +383,16 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-map.leaflet-container { background: var(--bg-2, var(--bg)); font-family: var(--font-mono, monospace); }
 .act-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--text-muted); }
 .act-map .leaflet-control-attribution a { color: var(--cyan); }
-/* Contour foncé : points lisibles sur le fond clair d'OpenStreetMap. */
-/* Point de la carte : symbole SVG (couleur = mode, forme = bande). Sans
-   style personnalisé, le SVG reprend le cyan du site. */
+/* Dark outline: points readable on the light OpenStreetMap background. */
+/* Map point: SVG symbol (colour = mode, shape = band). Without custom
+   styling, the SVG uses the site's cyan. */
 .act-map-pt { background: none; border: 0; line-height: 0; }
 .act-map-pt svg { display: block; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
-/* Légende sous la carte : un symbole + son libellé par mode puis par bande. */
+/* Legend below the map: one symbol + label per mode, then per band. */
 .act-map-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0.5rem 0 0;
   font-family: var(--font-mono, monospace); font-size: 0.75rem; color: var(--text-muted); }
 .act-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; }
-/* Légende cliquable : chaque entrée filtre sa bande ou son mode. */
+/* Clickable legend: each entry filters its band or mode. */
 .act-legend-item.is-filter { cursor: pointer; user-select: none; }
 .act-legend-item.is-filter input { margin: 0; accent-color: var(--accent); cursor: pointer; }
 .act-legend-item.is-filter:has(input:not(:checked)) { opacity: 0.45; }
@@ -410,7 +410,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .leaflet-tooltip.act-map-label::before { display: none; }
 .leaflet-tooltip.act-map-label.is-home { color: var(--accent); border-color: var(--accent); }
-/* Étiquettes d'indicatifs masquées à petite échelle (illisibles), sauf la station. */
+/* Callsign labels hidden at small scale (unreadable), except the station. */
 .act-map .act-map-label:not(.is-home) { display: none; }
 .act-map.act-map-labels .act-map-label { display: block; }
 .act-map-note { font-size: 0.8rem; margin: 0.4rem 0 0; }
@@ -419,7 +419,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-rank tr.is-me td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .act-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 
-/* ── ADIF : sélection à la souris, aperçu d'import ────────────────────── */
+/* ── ADIF: mouse selection, import preview ────────────────────────────── */
 .act-sel-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 0.8rem; margin: 0 0 0.6rem; }
 .act-sel-bar label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; color: var(--text-muted); }
 .act-sel-bar select {
@@ -445,12 +445,12 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-imp-in_log, .act-imp-file_dupe { color: var(--warn, #e0a800); }
 .act-imp-invalid { color: var(--red, #c0392b); }
 
-/* ── Réglages : règle de points ───────────────────────────────────────── */
+/* ── Settings: scoring rule ───────────────────────────────────────────── */
 .act-card-wide { grid-column: 1 / -1; }
 
-/* Carte mise en avant (ex. « Réserver un créneau ») : c'est là qu'on agit.
-   Cadre d'accent, léger halo et bandeau de titre pour attirer l'œil sans
-   crier — le reste de la page garde ses cartes sobres. */
+/* Highlighted card (e.g. "Réserver un créneau"): this is where you act.
+   Accent border, light glow and title strip to catch the eye without
+   shouting — the rest of the page keeps its plain cards. */
 .act-card-focus {
   position: relative;
   border: 2px solid var(--accent);
@@ -466,7 +466,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
   content: "▶"; font-size: 0.7em; line-height: 1;
 }
 @media (prefers-reduced-motion: no-preference) {
-  /* Un seul battement à l'arrivée sur la page, puis plus rien. */
+  /* A single pulse on page arrival, then nothing more. */
   .act-card-focus { animation: act-focus-in 1.4s ease-out 1; }
   @keyframes act-focus-in {
     0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
@@ -479,7 +479,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 }
 .act-fieldset legend { padding: 0 0.3rem; }
 .act-mode-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
-/* Réglages de la carte : une case « libellé + couleur/forme » par mode et par bande. */
+/* Map settings: one "label + colour/shape" box per mode and per band. */
 .act-logo-preview { max-height: 70px; max-width: 100%; border: 1px solid var(--border);
   border-radius: 4px; background: #fff; padding: 4px; }
 .act-style-grid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); }
@@ -490,7 +490,7 @@ body.act-site { min-height: 100vh; display: flex; flex-direction: column; }
 .act-style-cell select { min-width: 0; flex: 1 1 5rem; }
 .act-form input[type="number"] { max-width: 9rem; }
 
-/* ── Indicatifs spéciaux ──────────────────────────────────────────────── */
+/* ── Special callsigns ─────────────────────────────────────────────────── */
 a.act-station-card { display: block; text-decoration: none; color: inherit; }
 a.act-station-card:hover { border-color: var(--accent); }
 .act-station-card.is-current { border-left-color: var(--green, #2ecc71); }
@@ -500,20 +500,20 @@ a.act-station-card:hover { border-color: var(--accent); }
 .act-archive-note { border-left: 4px solid var(--text-muted); }
 .act code { font-family: var(--font-mono, monospace); background: var(--bg-2, var(--bg)); padding: 0 0.25em; border-radius: 2px; }
 
-/* Bilan d'un créneau : nombre de QSO loggés pendant celui-ci. */
+/* Slot summary: number of QSOs logged during it. */
 .act-slot-qso { color: var(--accent); }
-/* Boutons de gestion des comptes opérateurs (Réglages) : au fil du texte. */
+/* Operator account management buttons (Settings): inline with the text. */
 .act-acct-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
 .act-acct-actions form { margin: 0; }
-/* Sortie du mode administrateur, depuis n'importe quelle page d'activation. */
+/* Leaving admin mode, from any activation page. */
 .act-admin-out button { font-family: var(--font-mono, monospace); font-size: 0.75rem; }
 
-/* Question anti-robot : champ court ; le champ-piège reste hors écran (les
-   robots le remplissent, pas les humains). */
+/* Anti-bot question: short field; the honeypot field stays off-screen (bots
+   fill it in, humans do not). */
 .act-captcha { max-width: 6rem; }
 .act-trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
-/* ── Calendrier de saisie (flatpickr) aux couleurs du site ────────────────── */
+/* ── Date picker (flatpickr) in the site's colours ─────────────────────── */
 .flatpickr-calendar {
   background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--radius, 4px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -534,7 +534,7 @@ a.act-station-card:hover { border-color: var(--accent); }
 .flatpickr-time input:hover, .flatpickr-time input:focus { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .flatpickr-innerContainer, .flatpickr-time { border-color: var(--border); }
 
-/* Certificat du chasseur, sous ses QSO sur la page publique. */
+/* Hunter's certificate, below their QSOs on the public page. */
 .act-cert-line { margin: 0.7rem 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
 .act-cert-btn {
   display: inline-block; text-decoration: none; font-family: var(--font-mono, monospace);
@@ -543,8 +543,8 @@ a.act-station-card:hover { border-color: var(--accent); }
 }
 .act-cert-btn:hover { background: var(--accent-hover, var(--accent)); }
 
-/* Fiche du correspondant pendant la saisie : photo QRZ, boussole, distance.
-   Les tailles viennent des Réglages (attributs data-photo / data-compass). */
+/* Contacted station card while logging: QRZ photo, compass, distance.
+   Sizes come from Settings (data-photo / data-compass attributes). */
 .act-dir {
   display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
   border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem;
@@ -564,13 +564,13 @@ a.act-station-card:hover { border-color: var(--accent); }
 .act-dir-needle { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
 .act-dir-head, .act-dir-pivot { fill: var(--accent); }
 
-/* Indication « station déjà contactée ? » pendant la saisie du log. */
+/* "Station already worked?" hint while logging. */
 .act-worked-hint { margin: 0.2rem 0 0; min-height: 1.1em; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
 .act-worked-hint.is-fresh { color: var(--green, #2ecc71); }
 .act-worked-hint.is-worked { color: var(--cyan); }
 .act-worked-hint.is-dupe { color: var(--warn, #e0a800); font-weight: 600; }
 
-/* Raccourcis de saisie (Maintenant, +2 h…) sous les champs date/heure. */
+/* Input shortcuts (Maintenant, +2 h…) below the date/time fields. */
 .act-quick { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: -0.3rem 0 0.2rem; }
 .act-quick button {
   background: transparent; border: 1px solid var(--border); color: var(--text-muted);
@@ -579,8 +579,8 @@ a.act-station-card:hover { border-color: var(--accent); }
 }
 .act-quick button:hover { color: var(--accent); border-color: var(--accent); }
 
-/* Calendrier Air Datepicker : palette du site (clair et sombre). La feuille de
-   la bibliothèque étant chargée après la nôtre, on passe par body.act-site. */
+/* Air Datepicker calendar: site palette (light and dark). The library's
+   stylesheet loads after ours, so we go through body.act-site. */
 body.act-site .air-datepicker {
   --adp-background-color: var(--panel);
   --adp-background-color-hover: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -614,7 +614,7 @@ body.act-site .air-datepicker--buttons { border-top: 1px solid var(--border); }
 body.act-site .air-datepicker-cell.-day-.-other-month-,
 body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-muted); opacity: 0.45; }
 
-/* Créneaux du moment, sur la page de log. */
+/* Current slots, on the log page. */
 .act-slots-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .act-slots-list li {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
@@ -624,12 +624,12 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-slots-list li.act-slot-live { border-left-color: var(--green, #2ecc71); }
 .act-slots-list li.is-me { background: color-mix(in srgb, var(--accent) 12%, transparent); border-left-color: var(--accent); }
 .act-slot-auto { font-style: italic; }
-/* Bande/mode réservés par un autre opérateur : blocage signalé à la saisie. */
+/* Band/mode booked by another operator: block flagged while logging. */
 .act-block-hint { margin: 0.2rem 0 0; font-size: 0.85rem; font-family: var(--font-mono, monospace); }
 .act-block-hint.is-blocked { color: var(--red, #c0392b); font-weight: 600; }
 
-/* Spots DX de l'indicatif activé : à gauche de la cadence, compact, une ligne
-   par spot. Rafraîchi chaque minute ; absent s'il n'y a rien (ou pas de réseau). */
+/* DX spots of the activated callsign: left of the rate, compact, one line
+   per spot. Refreshed every minute; hidden if empty (or no network). */
 .act-spots { border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem; }
 .act-spots-list { list-style: none; margin: 0.25rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .act-spots-list li {
@@ -648,7 +648,7 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-spot-comment { font-style: italic; color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12rem; }
 
-/* Pays (entités DXCC) contactés, mis à jour à chaque QSO enregistré. */
+/* Countries (DXCC entities) worked, updated with each logged QSO. */
 .act-dxcc { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .act-dxcc-item {
   display: inline-flex; align-items: center; gap: 0.3rem;
@@ -656,26 +656,26 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
   font-family: var(--font-mono, monospace); font-size: 0.8rem;
 }
 .act-dxcc-item.is-last { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-/* Vignette servie par l'application : les emojis drapeaux ne s'affichent pas
-   sous Windows, ni sur un Linux sans police emoji. */
+/* Image served by the app: flag emojis do not render on Windows, nor on
+   Linux without an emoji font. */
 .act-dxcc-flag { width: 24px; height: 18px; border: 1px solid var(--border); border-radius: 2px; }
 .act-dxcc-name { color: var(--text-muted); }
 .act-dxcc-n { color: var(--accent); font-weight: 600; }
 @media (max-width: 640px) {
-  .act-dxcc-name { display: none; }   /* écran étroit : drapeau + compteur suffisent */
+  .act-dxcc-name { display: none; }   /* narrow screen: flag + count are enough */
 }
-/* Carte « Entités DXCC » de la page publique : drapeaux seuls, serrés ; le pays
-   et le nombre de QSO restent en infobulle pour ne pas gonfler la carte. */
+/* Public page "Entités DXCC" card: flags only, tightly packed; country and
+   QSO count stay in the tooltip so the card does not grow. */
 .act-dxcc-mini { margin-top: 0.6rem; gap: 0.25rem; }
 .act-dxcc-mini .act-dxcc-item { padding: 0; border: 0; border-radius: 0; }
 .act-dxcc-more { font-family: var(--font-mono, monospace); font-size: 0.75rem;
   color: var(--text-muted); align-self: center; }
 
-/* Cellule « drapeau + libellé » des tableaux publics. */
+/* "Flag + label" cell in the public tables. */
 .act-dxcc-cell { white-space: nowrap; }
 .act-dxcc-cell .act-dxcc-flag { vertical-align: -0.2em; margin-right: 0.15rem; }
 
-/* Jauges de cadence (QSO/h et 10 min) — le compteur qui motive à enchaîner. */
+/* Rate gauges (QSO/h and 10 min) — the counter that keeps you going. */
 .act-rate { display: flex; flex-direction: column; gap: 0.5rem;
   border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.6rem; }
 .act-rate-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem;
@@ -699,10 +699,10 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-trend.is-flat { color: var(--text-muted); }
 .act-rate-level { margin: 0; color: var(--text); }
 
-/* ── Page de log compacte ──────────────────────────────────────────────────
-   Objectif : voir les derniers QSO enregistrés SANS quitter le formulaire.
-   Sur grand écran, saisie à gauche et carnet à droite ; partout, des marges
-   resserrées et les lignes d'aide qui disparaissent tant qu'elles sont vides. */
+/* ── Compact log page ──────────────────────────────────────────────────────
+   Goal: see the latest logged QSOs WITHOUT leaving the form.
+   On large screens, entry on the left and logbook on the right; everywhere,
+   tighter margins and help lines hidden while they are empty. */
 .act-log-page { max-width: 1440px; gap: 0.7rem; }
 .act-log-page .act-card { padding: 0.7rem 0.85rem; }
 .act-log-page .act-card h2 { margin-bottom: 0.45rem; }
@@ -715,9 +715,9 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-log-page .act-lotw-note { margin-top: 0.5rem; font-size: 0.75rem; }
 .act-log-page .act-map-note { margin-top: 0.35rem; }
 .act-log-page .act-slots-list li { padding: 0.2rem 0.45rem; }
-.act-log-page p:empty { display: none; }          /* aides QRZ / doublon / blocage */
-/* Carnet : pastilles « drapeau + nombre » seules (le pays reste en infobulle),
-   pour que la liste des contacts remonte à l'écran. */
+.act-log-page p:empty { display: none; }          /* QRZ / duplicate / block hints */
+/* Logbook: "flag + count" badges only (country stays in the tooltip),
+   so the contact list moves up the screen. */
 .act-log-page .act-dxcc-name { display: none; }
 .act-log-page .act-dxcc-item { padding: 0.15rem 0.4rem; }
 .act-log-page .act-table { font-size: 0.8rem; }
@@ -728,17 +728,17 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-log-page .act-log-date { white-space: nowrap; }
 
 .act-log-cols { display: grid; gap: 0.7rem; align-items: start; }
-.act-log-cols > * { min-width: 0; }        /* sinon une colonne élargit la page */
+.act-log-cols > * { min-width: 0; }        /* otherwise a column widens the page */
 @media (min-width: 1040px) {
   .act-log-cols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
-  /* Le carnet suit la saisie : il reste à l'écran et défile tout seul. */
+  /* The logbook follows the entry form: it stays on screen and scrolls by itself. */
   .act-log-cols > #act-log-result { position: sticky; top: 0.7rem; }
   .act-log-cols .act-scroll { max-height: calc(100vh - 12rem); overflow: auto; }
 }
 
-/* Jauges côte à côte (gain de hauteur dans la carte « Opérateur au micro »). */
+/* Side-by-side gauges (saves height in the "Opérateur au micro" card). */
 .act-gauges { display: flex; flex-wrap: wrap; gap: 0.9rem; }
 .act-gauges > .act-gauge { flex: 1 1 8.5rem; min-width: 8.5rem; }
-/* Indicatif imposé (compte opérateur non administrateur) : affiché, pas choisi. */
+/* Fixed callsign (non-admin operator account): shown, not chosen. */
 .act-op-me { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
 .act-op-me .act-call { font-size: 1rem; }

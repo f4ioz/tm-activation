@@ -1,40 +1,40 @@
-# Reverse proxy nginx pour TM Activation.
+# Nginx reverse proxy for TM Activation.
 #
-# `sudo ./install.sh --domain …` génère ce fichier tout seul (domaine et nom
-# .local remplacés) : rien à faire à la main dans ce cas.
+# `sudo ./install.sh --domain …` generates this file by itself (domain and
+# .local name filled in): nothing to do by hand in that case.
 #
-# Usage manuel (mode --manual) :
+# Manual use (--manual mode):
 #   sudo cp nginx.conf.example /etc/nginx/sites-available/tm-activation
-#   (adapter les deux server_name et proxy_pass)
+#   (adjust both server_name and proxy_pass)
 #   sudo ln -s /etc/nginx/sites-available/tm-activation /etc/nginx/sites-enabled/
 #   sudo nginx -t && sudo systemctl reload nginx
-#   sudo certbot --nginx -d tm.mon-club.fr     # HTTPS Let's Encrypt + redirection 80 → 443
+#   sudo certbot --nginx -d tm.mon-club.fr     # Let's Encrypt HTTPS + redirect 80 → 443
 #
-# Nginx sur une AUTRE machine que l'application : installer avec
-#   --host 0.0.0.0   et mettre l'IP de nginx dans server.trusted_proxies (config.yml).
+# Nginx on a DIFFERENT machine from the application: install with
+#   --host 0.0.0.0   and put nginx's IP in server.trusted_proxies (config.yml).
 
-# Accès public : https://tm.mon-club.fr (certbot ajoute le bloc HTTPS).
+# Public access: https://tm.mon-club.fr (certbot adds the HTTPS block).
 server {
     listen 80;
     listen [::]:80;
     server_name tm.mon-club.fr;
 
-    client_max_body_size 10m;          # import de fichiers ADIF
+    client_max_body_size 10m;          # ADIF file import
 
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
-        # $remote_addr (et non $proxy_add_x_forwarded_for) : l'IP transmise
-        # est celle vue par nginx, jamais une valeur fournie par le client.
+        # $remote_addr (not $proxy_add_x_forwarded_for): the IP passed on
+        # is the one nginx sees, never a value supplied by the client.
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
-# Accès depuis le réseau local : http://nom-machine.local. Indispensable quand
-# la box ne renvoie pas l'adresse publique vers l'intérieur (« NAT loopback »
-# absent) : les opérateurs sur place passent par ici. Refusé depuis Internet.
+# Access from the local network: http://machine-name.local. Required when
+# the router does not loop the public address back inside (no "NAT loopback"
+# support): on-site operators come in here. Refused from the Internet.
 server {
     listen 80;
     listen [::]:80;

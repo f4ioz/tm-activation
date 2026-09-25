@@ -1,4 +1,4 @@
-"""Isolation commune : aucun test ne touche aux vraies données (var/)."""
+"""Shared isolation: no test touches the real data (var/)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from app import activation, auth, security, visits
 
 @pytest.fixture(autouse=True)
 def _reset_security(monkeypatch):
-    """Blocages / compteurs en mémoire remis à zéro ; pas d'attente après échec."""
+    """In-memory blocks / counters reset; no delay after a failure."""
     security.reset()
     monkeypatch.setattr(security, "FAILED_LOGIN_DELAY", 0)
     yield
@@ -25,4 +25,4 @@ def _isolate_data(tmp_path, monkeypatch):
     monkeypatch.setattr(activation, "BACKUP_DIR", tmp_path / "backups")
     monkeypatch.setattr(activation, "SETTINGS_FILE", tmp_path / "activation_settings.json")
     monkeypatch.setattr(activation, "IMPORT_TMP_DIR", tmp_path / "import")
-    monkeypatch.setattr(activation, "qrz_client", lambda: None)  # jamais de vrai QRZ en test
+    monkeypatch.setattr(activation, "qrz_client", lambda: None)  # never the real QRZ in tests

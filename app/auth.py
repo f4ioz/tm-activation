@@ -1,9 +1,9 @@
-"""Authentification administrateur.
+"""Administrator authentication.
 
-Pas de comptes : un seul mot de passe admin défini dans config.yml
-(``auth.password``). À la connexion, on pose un cookie HMAC signé avec un
-secret persistant (var/auth_secret). L'admin accède aux Réglages de l'espace
-activation (indicatifs, mot de passe opérateurs, points, sauvegardes).
+No accounts: a single admin password set in config.yml
+(``auth.password``). On login, an HMAC cookie is set, signed with a
+persistent secret (var/auth_secret). The admin gets access to the activation
+Settings (callsigns, operator password, points, backups).
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def auth_password() -> str:
 
 
 def get_secret() -> bytes:
-    """Secret HMAC persistant (partagé pour signer les cookies de session)."""
+    """Persistent HMAC secret (shared, used to sign session cookies)."""
     return _secret()
 
 
@@ -64,12 +64,12 @@ def verify_token(token: str | None) -> bool:
 
 
 def is_private(request: Request) -> bool:
-    """Administrateur connecté pour la requête courante (cookie valide)."""
+    """Administrator logged in for the current request (valid cookie)."""
     if not auth_password():
         return False
     return verify_token(request.cookies.get(COOKIE_NAME))
 
 
 def auth_enabled() -> bool:
-    """Mot de passe admin configuré → la connexion admin est possible."""
+    """Admin password configured → admin login is possible."""
     return bool(auth_password())

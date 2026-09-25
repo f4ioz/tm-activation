@@ -1,10 +1,10 @@
-"""Génère config.yml à partir de config.yml.example et des réponses d'install.sh.
+"""Generates config.yml from config.yml.example and install.sh's answers.
 
     python make_config.py config.yml.example config.yml
 
-Les valeurs arrivent par variables d'environnement TMCFG_* (pas en argument :
-les mots de passe n'apparaissent pas dans la liste des processus). Refuse
-d'écraser un config.yml existant.
+Values come in through TMCFG_* environment variables (not as arguments:
+passwords must not show up in the process list). Refuses to
+overwrite an existing config.yml.
 """
 
 from __future__ import annotations

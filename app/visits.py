@@ -1,9 +1,9 @@
-"""Journal des connexions (admin et opérateurs) pour la protection anti-bruteforce.
+"""Login log (admin and operators) for anti-bruteforce protection.
 
-Version réduite du journal des visites du site d'origine : seules les
-tentatives de connexion sont conservées (``var/auth_log.sqlite``, 90 jours),
-pour que ``security.login_blocked()`` compte les échecs par IP et que les
-Réglages les affichent. Aucune visite n'est journalisée.
+Reduced version of the original site's visit log: only login
+attempts are kept (``var/auth_log.sqlite``, 90 days),
+so that ``security.login_blocked()`` counts failures per IP and the
+Settings page shows them. No visits are logged.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ RETENTION_DAYS = 90
 
 logger = logging.getLogger(__name__)
 
-# Chemins typiques des robots qui cherchent une faille (l'application n'a rien
-# de tout ça) : security.py bloque l'IP après quelques requêtes de ce genre.
+# Typical paths probed by bots looking for vulnerabilities (the app has none
+# of these): security.py blocks the IP after a few such requests.
 _SCAN_RE = re.compile(
     r"wp-|wordpress|xmlrpc|phpmyadmin|\.php|\.env|\.git|\.aws|/cgi-bin|/boaform|/hnap1|"
     r"/actuator|/vendor/|/owa/|/solr|/manager/html|/admin\.|/shell|/setup\.cgi|\.asp",
@@ -33,18 +33,18 @@ _SCAN_RE = re.compile(
 
 
 def client_ip(request: Any) -> str:
-    """IP du visiteur.
+    """Visitor IP.
 
-    Derrière le reverse proxy, ProxyHeadersMiddleware (main.py) a déjà
-    remplacé l'adresse du proxy par celle du visiteur — uniquement si le proxy
-    figure dans ``server.trusted_proxies`` : un X-Forwarded-For envoyé
-    directement par un client est ignoré (pas d'usurpation d'IP du LAN).
+    Behind the reverse proxy, ProxyHeadersMiddleware (main.py) has already
+    replaced the proxy's address with the visitor's — only if the proxy
+    is listed in ``server.trusted_proxies``: an X-Forwarded-For sent
+    directly by a client is ignored (no spoofing of LAN IPs).
     """
     return (request.client.host if request.client else "")[:64]
 
 
 def get_override(ip: str) -> dict[str, Any] | None:
-    """IP étiquetées par l'admin (jamais bloquées) : non gérées ici."""
+    """IPs labelled by the admin (never blocked): not handled here."""
     return None
 
 
@@ -86,7 +86,7 @@ def init_db() -> None:
 
 
 def record_auth(request: Any, kind: str, callsign: str, success: bool) -> None:
-    """Tentative de connexion (admin ou opérateur) : jamais bloquant, jamais fatal."""
+    """Login attempt (admin or operator): never blocking, never fatal."""
     try:
         init_db()
         now = int(time.time())
@@ -102,7 +102,7 @@ def record_auth(request: Any, kind: str, callsign: str, success: bool) -> None:
 
 
 def failed_logins(ip: str, since: int) -> int:
-    """Échecs de connexion (admin + opérateurs) d'une IP depuis ``since``."""
+    """Failed logins (admin + operators) from an IP since ``since``."""
     init_db()
     with conn() as c:
         return int(c.execute("SELECT COUNT(*) FROM auth_events WHERE ip = ? AND success = 0 AND ts >= ?",
@@ -110,7 +110,7 @@ def failed_logins(ip: str, since: int) -> int:
 
 
 def auth_counts(days: int) -> dict[str, int]:
-    """Connexions réussies / ratées sur les ``days`` derniers jours."""
+    """Successful / failed logins over the last ``days`` days."""
     init_db()
     since = int(time.time()) - days * 86400
     with conn() as c:
@@ -120,7 +120,7 @@ def auth_counts(days: int) -> dict[str, int]:
 
 
 def auth_log(days: int = 7, limit: int = 200, failures_only: bool = False) -> list[dict[str, Any]]:
-    """Journal des connexions, le plus récent d'abord (page de surveillance)."""
+    """Login log, most recent first (monitoring page)."""
     init_db()
     since = int(time.time()) - days * 86400
     sql = "SELECT ts, ip, kind, callsign, success, ua FROM auth_events WHERE ts >= ?"
@@ -136,7 +136,7 @@ def auth_log(days: int = 7, limit: int = 200, failures_only: bool = False) -> li
 
 
 def failed_by_ip(days: int = 7, limit: int = 20) -> list[dict[str, Any]]:
-    """IP qui ont le plus échoué (essais de mots de passe)."""
+    """IPs with the most failures (password attempts)."""
     init_db()
     since = int(time.time()) - days * 86400
     with conn() as c:
@@ -150,7 +150,7 @@ def failed_by_ip(days: int = 7, limit: int = 20) -> list[dict[str, Any]]:
 
 
 def quick_summary() -> dict[str, Any]:
-    """Encart « Connexions » des Réglages : 7 derniers jours."""
+    """« Connexions » box in the Settings: last 7 days."""
     init_db()
     since = int(time.time()) - 7 * 86400
     with conn() as c:

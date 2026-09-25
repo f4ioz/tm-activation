@@ -10,13 +10,13 @@ Group=@USER@
 WorkingDirectory=@DIR@
 Environment=TM_CONFIG=@DIR@/config.yml
 Environment=PYTHONDONTWRITEBYTECODE=1
-# Un seul worker (blocages en memoire + tache de fond QRZ). Les en-tetes du
-# proxy sont traites par l'application selon server.trusted_proxies.
+# A single worker (in-memory blocking + QRZ background task). The proxy
+# headers are handled by the application according to server.trusted_proxies.
 ExecStart=@DIR@/.venv/bin/uvicorn app.main:app --host @HOST@ --port @PORT@ --workers 1 --no-proxy-headers
 Restart=on-failure
 RestartSec=3
 
-# Durcissement : seul var/ (base, sauvegardes, secret) est inscriptible.
+# Hardening: only var/ (database, backups, secret) is writable.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -27,7 +27,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-# Port < 1024 (80 en réseau local) : seule capacité accordée ; sinon aucune.
+# Port < 1024 (80 on the local network): the only capability granted; else none.
 AmbientCapabilities=@CAPS@
 CapabilityBoundingSet=@CAPS@
 
