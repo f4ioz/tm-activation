@@ -14,7 +14,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from app import activation
+from app import activation, i18n
 from app.config import club_config
 from app.i18n import gettext as _
 
@@ -61,10 +61,48 @@ def _period(station: dict[str, Any]) -> str:
     return _("le {day}", day=_day(first, year=True))
 
 
+def _months() -> list[str]:
+    return [_("janvier"), _("février"), _("mars"), _("avril"), _("mai"), _("juin"),
+            _("juillet"), _("août"), _("septembre"), _("octobre"), _("novembre"),
+            _("décembre")]
+
+
+def _labels() -> dict[str, Any]:
+    """Printed texts of the certificate, in the language of the request.
+
+    French is also tmcert's default wording; other languages get their date
+    and number formats too ("11 Sep 2026" in the tables, "11 September 2026"
+    in the footer, "14.190")."""
+    labels: dict[str, Any] = {
+        "title": _("CERTIFICAT"),
+        "subtitle": _("ACTIVATION SPÉCIALE · {event}"),
+        "awarded_to": _("CE CERTIFICAT EST DÉCERNÉ À"),
+        "award_text": _("pour avoir contacté la station spéciale {callsign}, activée lors du {event} {period}."),
+        "columns": [_("DATE"), "UTC", _("BANDE"), _("FRÉQ. MHz"), _("MODE"), _("RST ENV."), _("RST REÇU")],
+        "more_qso": _("… et {n} autres QSO"),
+        "see_appendix": " — " + _("journal complet en annexe"),
+        # Leading spaces separate the summary items: added here, the catalog
+        # keys have none.
+        "summary": [_("QSO") + " "] + ["   " + _(k) + " " for k in ("BANDES", "MODES", "POINTS")],
+        "manager": _("GESTIONNAIRE"),
+        "number": _("N° DU CERTIFICAT"),
+        "date": _("DATE"),
+        "rank_of": _("SUR {total}"),
+        "appendix_title": _("JOURNAL DES CONTACTS · {callsign}"),
+        "appendix_header": _("{callsign} · {event} · annexe {n}/{total}"),
+        "appendix_footer": _("{count} QSO · {bands} bandes · {modes} · {points} points · certificat n° {number}"),
+        "pdf_title": _("Certificat {callsign} — {recipient}"),
+    }
+    if i18n.current() != i18n.DEFAULT:
+        long_names = _months()
+        labels.update(date_format="{d:02d} {mon} {y}", issue_date_format="{d} {month} {y}",
+                      months=[m[:3] for m in long_names],   # Jan, Feb… (English)
+                      months_long=long_names, decimal=".")
+    return labels
+
+
 def _day(when: date, year: bool = False) -> str:
-    months = [_("janvier"), _("février"), _("mars"), _("avril"), _("mai"), _("juin"),
-              _("juillet"), _("août"), _("septembre"), _("octobre"), _("novembre"),
-              _("décembre")]
+    months = _months()
     out = f"{when.day} {months[when.month - 1]}"
     return f"{out} {when.year}" if year else out
 
@@ -133,7 +171,8 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
         },
         "options": {"max_qso": options["max_qso"], "appendix": options["appendix"]},
         "recipient": {"callsign": cs, "name": name, "locator": grid},
-        "ranking": ({"position": place["rank"], "total": len(ranking)}
+        "ranking": ({"position": place["rank"], "total": len(ranking),
+                     "suffix": i18n.ordinal(place["rank"])}
                     if place and options["ranking"] else None),
         "scoring": scoring,
         "qso": qso,
@@ -157,6 +196,7 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
         data["emblem"] = {"text": options["emblem_text"] or "HAM RADIO"}
     if options["ham_symbol"]:
         data["ham_symbol"] = True
+    data["labels"] = _labels()
     if options["qr_url"]:
         data["qr_url"] = options["qr_url"]
     return data

@@ -235,8 +235,11 @@ def serration(c, cx, cy, r1, r2, n, col):
     c.drawPath(p, stroke=0, fill=1)
 
 
-def medal(c, position, total, cx, cy):
-    """Medal with red ribbons: "1er / SUR 126". position=None → medal without a ranking."""
+def medal(c, position, total, cx, cy, suffix=None, of_total="SUR {total}"):
+    """Medal with red ribbons: "1er / SUR 126". position=None → medal without a ranking.
+
+    ``suffix``: ordinal suffix printed after the rank (default: French "er"/"e");
+    ``of_total``: line below the rank, with a {total} field."""
     for s in (-1, 1):
         c.setFillColor(RED if s < 0 else RED2)
         p = c.beginPath()
@@ -262,7 +265,8 @@ def medal(c, position, total, cx, cy):
         c.drawCentredString(cx, cy - 4, "QSO")
         return
     num = str(position)
-    suffix = "er" if position == 1 else "e"  # French ordinal
+    if suffix is None:
+        suffix = "er" if position == 1 else "e"  # French ordinal
     fs = 38 if len(num) == 1 else (30 if len(num) == 2 else 22)
     w = pdfmetrics.stringWidth(num, "PopExtraBold", fs)
     sw = pdfmetrics.stringWidth(suffix, "PopBold", fs * 0.37)
@@ -275,7 +279,7 @@ def medal(c, position, total, cx, cy):
     if total:
         c.setFillColor(NAVY2)
         c.setFont("PopBold", 8)
-        c.drawCentredString(cx, cy - 20, f"SUR {total}")
+        c.drawCentredString(cx, cy - 20, of_total.format(total=total))
 
 
 def logo(c, cx, cy, diam, path=None):

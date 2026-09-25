@@ -2123,6 +2123,65 @@ def test_certificate_points_match_the_ranking(monkeypatch, tmp_path) -> None:
     assert sum(q["points"] for q in qso) == ranking["ON4ZZ"]["band_modes"] == 2
 
 
+def test_certificate_follows_the_page_language() -> None:
+    """Texts printed on the certificate: French by default, English on request."""
+    from app import certificate, i18n
+    from app.tmcert.render import DEFAULT_LABELS
+
+    activation.set_flag("auto_slots", False)
+    activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ",
+                           qso_date="20260911", time_on="1000", freq_mhz="14.19")
+    activation.set_certificate_options({"enabled": "1", "ranking": "1"})
+    try:
+        i18n.use("fr")
+        data = certificate.hunter_data("DL1ABC")
+        # French = tmcert's own wording: the French certificate is unchanged.
+        assert all(DEFAULT_LABELS[k] == v for k, v in data["labels"].items())
+        assert data["ranking"]["suffix"] == "er"
+        fr = certificate.build_certificate("DL1ABC")
+        i18n.use("en")
+        data = certificate.hunter_data("DL1ABC")
+        assert data["labels"]["awarded_to"] == "THIS CERTIFICATE IS AWARDED TO"
+        assert data["labels"]["columns"][2] == "BAND" and data["labels"]["decimal"] == "."
+        assert data["labels"]["summary"][1] == "   BANDS "
+        assert data["ranking"]["suffix"] == "st"
+        assert data["activation"]["period"] == "" or "September" in data["activation"]["period"]
+        en = certificate.build_certificate("DL1ABC")
+    finally:
+        i18n.use("fr")
+    assert en.startswith(b"%PDF-") and en != fr
+    assert b"Certificate TM25TEST" in en and b"Certificat TM25TEST" in fr   # PDF title
+
+
+def test_certificate_table_never_runs_into_the_footer() -> None:
+    """14 contacts asked for: only what fits above the footer, the rest in the appendix."""
+    import importlib
+
+    tm = importlib.import_module("app.tmcert.render")   # the module, not the render() function
+
+    long_event = "Cinquantième anniversaire du radio-club, avec des stations portables dans toute la région"
+    data = {"activation": {"callsign": "TM1X", "event": long_event},
+            "recipient": {"callsign": "F4XYZ"},
+            "options": {"max_qso": 14, "appendix": True},
+            "certificate": {"issue_date": "2026-09-24"},
+            "qso": [{"date": "2026-09-10", "time_utc": f"10:{i:02d}", "mode": "SSB", "freq_mhz": 14.2}
+                    for i in range(20)]}
+    d = tm.normalize(data)
+    drawn = []
+
+    class Canvas:                      # records the y of every drawn QSO row
+        def __getattr__(self, name):
+            return lambda *a, **k: None
+
+    real_row = tm.qso_row
+    tm.qso_row = lambda c, x0, y, *a, **k: drawn.append(y)
+    try:
+        assert tm.table_p1(Canvas(), d, 230.28) is True       # two-line award sentence
+    finally:
+        tm.qso_row = real_row
+    assert 0 < len(drawn) < 14 and min(drawn) >= tm.TABLE_BOTTOM
+
+
 def test_certificate_page_options(monkeypatch, tmp_path) -> None:
     """Number of contacts on page 1 and in the appendix: adjustable in the Settings."""
     import re

@@ -1,7 +1,8 @@
 """DYNAMIC layer: fills in the certificate from a dict described in SPEC.md.
 API:  render(data: dict) -> bytes (PDF)
 
-The printed wording is French for now; only the code is in English."""
+Every printed text comes from ``data["labels"]`` (see DEFAULT_LABELS, French by
+default): the caller translates them."""
 
 import io
 from datetime import date, datetime
@@ -30,6 +31,60 @@ from .decor import (
 
 MAX_ROWS_P1 = 10  # QSO rows shown on page 1 (default; see options)
 
+# Printed texts. {…} fields are filled in here; the caller may override any key
+# through data["labels"] (e.g. with translated texts).
+DEFAULT_LABELS = {
+    "title": "CERTIFICAT",
+    "subtitle": "ACTIVATION SPÉCIALE · {event}",
+    "awarded_to": "CE CERTIFICAT EST DÉCERNÉ À",
+    "award_text": "pour avoir contacté la station spéciale {callsign}, activée lors du {event} {period}.",
+    "columns": ["DATE", "UTC", "BANDE", "FRÉQ. MHz", "MODE", "RST ENV.", "RST REÇU"],
+    "more_qso": "… et {n} autres QSO",
+    "see_appendix": " — journal complet en annexe",
+    "summary": ["QSO ", "   BANDES ", "   MODES ", "   POINTS "],
+    "manager": "GESTIONNAIRE",
+    "number": "N° DU CERTIFICAT",
+    "date": "DATE",
+    "rank_of": "SUR {total}",
+    "appendix_title": "JOURNAL DES CONTACTS · {callsign}",
+    "appendix_header": "{callsign} · {event} · annexe {n}/{total}",
+    "appendix_footer": "{count} QSO · {bands} bandes · {modes} · {points} points · certificat n° {number}",
+    "pdf_title": "Certificat {callsign} — {recipient}",
+    # Dates: {d} day, {m} month, {y} year, {mon} short and {month} long month
+    # name. date_format is used in the QSO tables, issue_date_format in the footer.
+    "date_format": "{d:02d}/{m:02d}/{y}",
+    "issue_date_format": "{d:02d}/{m:02d}/{y}",
+    "months": [
+        "janv.",
+        "févr.",
+        "mars",
+        "avr.",
+        "mai",
+        "juin",
+        "juil.",
+        "août",
+        "sept.",
+        "oct.",
+        "nov.",
+        "déc.",
+    ],
+    "months_long": [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre",
+    ],
+    "decimal": ",",
+}
+
 
 def options(d):
     """Layout options: ``max_qso`` (rows on page 1) and ``appendix``."""
@@ -41,6 +96,7 @@ def options(d):
     return {"max_qso": max(1, min(max_rows, 14)), "appendix": bool(o.get("appendix", True))}
 
 
+TABLE_BOTTOM = 90  # lowest y of the page-1 table: the summary line stays above the footer
 APPENDIX_ROWS = 28  # QSO rows per appendix page
 X0, BW = 228, 420  # content column
 CAP = 0.70  # Poppins cap height, as a fraction of the font size
@@ -82,15 +138,22 @@ def band_of(freq):
     return "?"
 
 
-def fmt_freq(f):
-    return f"{f:,.3f}".replace(",", " ").replace(".", ",")
+def fmt_freq(f, labels=DEFAULT_LABELS):
+    return f"{f:,.3f}".replace(",", " ").replace(".", labels["decimal"])
 
 
-def fmt_date(s):
+def fmt_date(s, labels=DEFAULT_LABELS, key="date_format"):
     try:
-        return datetime.strptime(s, "%Y-%m-%d").strftime("%d/%m/%Y")
+        d = datetime.strptime(s, "%Y-%m-%d")
     except (ValueError, TypeError):
         return s or ""
+    return labels[key].format(
+        d=d.day,
+        m=d.month,
+        y=d.year,
+        mon=labels["months"][d.month - 1],
+        month=labels["months_long"][d.month - 1],
+    )
 
 
 def normalize(data):
@@ -117,6 +180,7 @@ def normalize(data):
     )
     cert = d.setdefault("certificate", {})
     cert.setdefault("issue_date", date.today().isoformat())
+    d["labels"] = {**DEFAULT_LABELS, **(d.get("labels") or {})}
     return d
 
 
@@ -139,41 +203,35 @@ def wrap(txt, font, size, maxw):
 
 
 # ------------------------------------------------------------------ QSO table
-COLS = [
-    ("DATE", 0, "l"),
-    ("UTC", 70, "l"),
-    ("BANDE", 112, "l"),
-    ("FRÉQ. MHz", 160, "l"),
-    ("MODE", 236, "c"),
-    ("RST ENV.", 300, "c"),
-    ("RST REÇU", 360, "c"),
-]
+# (x offset, alignment) of each column; titles come from labels["columns"].
+COLS = [(0, "l"), (70, "l"), (112, "l"), (160, "l"), (236, "c"), (300, "c"), (360, "c")]
+BAND_COL = 2  # printed in bold
 
 
-def table_header(c, x0, y, tw, hh=16):
+def table_header(c, x0, y, tw, labels, hh=16):
     c.setFillColor(NAVY)
     c.roundRect(x0, y, tw, hh, 3, stroke=0, fill=1)
     c.setFillColor(white)
     c.setFont("PopSemiBold", 7)
-    for lab, dx, al in COLS:
+    for (dx, al), lab in zip(COLS, labels["columns"]):
         (c.drawCentredString if al == "c" else c.drawString)(x0 + 6 + dx, y + 5, lab)
 
 
-def qso_row(c, x0, y, tw, q, i, rh=13.5):
+def qso_row(c, x0, y, tw, q, i, labels, rh=13.5):
     if i % 2:
         c.setFillColor(HexColor("#F2F3F6"))
         c.rect(x0, y, tw, rh, stroke=0, fill=1)
     freq = q.get("freq_mhz")
     vals = [
-        fmt_date(q["date"]),
+        fmt_date(q["date"], labels),
         q["time_utc"],
         q["band"],
-        fmt_freq(float(freq)) if freq else "—",
+        fmt_freq(float(freq), labels) if freq else "—",
         None,
         q.get("rst_sent", ""),
         q.get("rst_rcvd", ""),
     ]
-    for (lab, dx, al), v in zip(COLS, vals):
+    for col, ((dx, al), v) in enumerate(zip(COLS, vals)):
         x = x0 + 6 + dx
         if v is None:
             c.setFillColor(HexColor(MODE_COL.get(q["mode"], "#5A6478")))
@@ -183,48 +241,46 @@ def qso_row(c, x0, y, tw, q, i, rh=13.5):
             c.drawCentredString(x, y + 4.3, q["mode"])
             continue
         c.setFillColor(NAVY2)
-        c.setFont("PopBold" if lab == "BANDE" else "PopMedium", 8)
+        c.setFont("PopBold" if col == BAND_COL else "PopMedium", 8)
         (c.drawCentredString if al == "c" else c.drawString)(x, y + 4, str(v))
 
 
 def table_p1(c, d, ytop):
-    qso = d["qso"]
+    qso, labels = d["qso"], d["labels"]
     rh, hh = 13.5, 16
     opt = options(d)
-    max_rows = opt["max_qso"]
+    # Never more rows than fit above the footer (the award sentence may take
+    # one or two lines): the rest goes to the appendix.
+    fit_rows = int((ytop - hh - TABLE_BOTTOM) // rh)
+    max_rows = min(opt["max_qso"], fit_rows)
     overflow = len(qso) > max_rows
     shown = qso[: max_rows - 1] if overflow else qso
     y = ytop - hh
-    table_header(c, X0, y, BW, hh)
+    table_header(c, X0, y, BW, labels, hh)
     for i, q in enumerate(shown):
         y -= rh
-        qso_row(c, X0, y, BW, q, i, rh)
+        qso_row(c, X0, y, BW, q, i, labels, rh)
     if overflow:
         y -= rh
         rest = len(qso) - len(shown)
-        more = " — journal complet en annexe" if opt["appendix"] else ""
+        more = labels["see_appendix"] if opt["appendix"] else ""
         c.setFillColor(NAVY3)
         c.setFont("PopMedium", 7.5)
-        c.drawCentredString(X0 + BW / 2, y + 4, f"… et {rest} autres QSO{more}")
+        c.drawCentredString(X0 + BW / 2, y + 4, labels["more_qso"].format(n=rest) + more)
     c.setStrokeColor(GOLD)
     c.setLineWidth(1.2)
     c.line(X0, y, X0 + BW, y)
     s = d["stats"]
-    parts = [
-        ("QSO ", str(s["count"])),
-        ("   BANDES ", str(s["bands"])),
-        ("   MODES ", " / ".join(s["modes"])),
-        ("   POINTS ", str(s["points"])),
-    ]
+    values = [str(s["count"]), str(s["bands"]), " / ".join(s["modes"]), str(s["points"])]
     y -= 18
     x = X0
-    for k, v in parts:
+    for idx, (k, v) in enumerate(zip(labels["summary"], values)):
         c.setFont("PopMedium", 8)
         c.setFillColor(GREY)
         c.drawString(x, y, k)
         x += pdfmetrics.stringWidth(k, "PopMedium", 8)
         c.setFont("PopExtraBold", 11)
-        c.setFillColor(RED2 if "POINTS" in k else NAVY2)
+        c.setFillColor(RED2 if idx == 3 else NAVY2)  # points in red
         c.drawString(x, y, v)
         x += pdfmetrics.stringWidth(v, "PopExtraBold", 11)
     return overflow
@@ -326,11 +382,19 @@ def qr_tile(c, url, cx=65, cy=162, side=66):
 
 def main_page(c, d):
     act, rcpt = d["activation"], d["recipient"]
-    rank, cert = d.get("ranking") or {}, d["certificate"]
+    rank, cert, labels = d.get("ranking") or {}, d["certificate"], d["labels"]
     decor(c, d.get("logo_path"))
     if d.get("border"):
         border(c, d["border"])
-    medal(c, rank.get("position"), rank.get("total"), W - 115, H - 110)
+    medal(
+        c,
+        rank.get("position"),
+        rank.get("total"),
+        W - 115,
+        H - 110,
+        suffix=rank.get("suffix"),
+        of_total=labels["rank_of"],
+    )
     # Below the radio set: the emblem (banner with the club name, otherwise
     # "HAM RADIO") and/or the amateur radio symbol, each one optional.
     emb, sym = d.get("emblem"), d.get("ham_symbol")
@@ -341,7 +405,7 @@ def main_page(c, d):
             c, 808 if emb is not None else 745, 205 if emb is not None else 205, 46 if emb is not None else 70
         )
 
-    title = act.get("title") or "CERTIFICAT"
+    title = act.get("title") or labels["title"]
     # Country flag to the RIGHT of the title, on its line and at the height of
     # its capitals; the title shrinks if both would run into the medal.
     ratio = None
@@ -374,7 +438,7 @@ def main_page(c, d):
         except OSError:
             pass
     # Subtitle: the one given; an empty string removes it altogether.
-    st = act["subtitle"] if "subtitle" in act else f"ACTIVATION SPÉCIALE · {act['event'].upper()}"
+    st = act["subtitle"] if "subtitle" in act else labels["subtitle"].format(event=act["event"].upper())
     if st:
         c.setFillColor(NAVY)  # morse_rule left gold in the brush
         c.setFont("PopSemiBold", fit(st, "PopSemiBold", 20, 400, 12))
@@ -386,7 +450,7 @@ def main_page(c, d):
     c.rect(X0, H - 222, BW, 24, stroke=0, fill=1)
     c.setFillColor(white)
     c.setFont("PopSemiBold", 10)
-    c.drawCentredString(X0 + BW / 2, H - 214, "CE CERTIFICAT EST DÉCERNÉ À")
+    c.drawCentredString(X0 + BW / 2, H - 214, labels["awarded_to"])
 
     name = (rcpt.get("name") or "").strip()
     if name:
@@ -417,9 +481,8 @@ def main_page(c, d):
     c.setFillColor(NAVY)
     c.drawString(xs + w1, H - 318, loc)
 
-    text = d.get("award_text") or (
-        f"pour avoir contacté la station spéciale {act['callsign']}, "
-        f"activée lors du {act['event']} {act.get('period', '')}."
+    text = d.get("award_text") or labels["award_text"].format(
+        callsign=act["callsign"], event=act["event"], period=act.get("period", "")
     ).replace(" .", ".")
     c.setFont("PopRegular", 9.5)
     c.setFillColor(GREY)
@@ -430,9 +493,9 @@ def main_page(c, d):
     overflow = table_p1(c, d, yy - 4)
 
     fields = [
-        (X0 + 40, cert.get("manager", act["callsign"]), "GESTIONNAIRE"),
-        (585, cert.get("number", ""), "N° DU CERTIFICAT"),
-        (735, fmt_date(cert["issue_date"]), "DATE"),
+        (X0 + 40, cert.get("manager", act["callsign"]), labels["manager"]),
+        (585, cert.get("number", ""), labels["number"]),
+        (735, fmt_date(cert["issue_date"], labels, "issue_date_format"), labels["date"]),
     ]
     for x, v, lab in fields:
         c.setFillColor(NAVY2)
@@ -452,7 +515,7 @@ def main_page(c, d):
 
 
 def appendix_pages(c, d):
-    act, rcpt, qso = d["activation"], d["recipient"], d["qso"]
+    act, rcpt, qso, labels = d["activation"], d["recipient"], d["qso"], d["labels"]
     pages = [qso[i : i + APPENDIX_ROWS] for i in range(0, len(qso), APPENDIX_ROWS)]
     for n, chunk in enumerate(pages, 1):
         c.setFillColor(white)
@@ -463,16 +526,22 @@ def appendix_pages(c, d):
         c.rect(0, H - 76, W, 6, stroke=0, fill=1)
         c.setFillColor(white)
         c.setFont("PopExtraBold", 20)
-        c.drawString(40, H - 45, f"JOURNAL DES CONTACTS · {rcpt['callsign']}")
+        c.drawString(40, H - 45, labels["appendix_title"].format(callsign=rcpt["callsign"]))
         c.setFont("PopMedium", 10)
-        c.drawRightString(W - 40, H - 45, f"{act['callsign']} · {act['event']} · annexe {n}/{len(pages)}")
+        c.drawRightString(
+            W - 40,
+            H - 45,
+            labels["appendix_header"].format(
+                callsign=act["callsign"], event=act["event"], n=n, total=len(pages)
+            ),
+        )
         tw = 420
         x0 = (W - tw) / 2
         y = H - 110
-        table_header(c, x0, y, tw)
+        table_header(c, x0, y, tw, labels)
         for i, q in enumerate(chunk):
             y -= 14.5
-            qso_row(c, x0, y, tw, q, i, 14.5)
+            qso_row(c, x0, y, tw, q, i, labels, 14.5)
         c.setStrokeColor(GOLD)
         c.setLineWidth(1.2)
         c.line(x0, y, x0 + tw, y)
@@ -482,9 +551,13 @@ def appendix_pages(c, d):
         c.drawCentredString(
             W / 2,
             30,
-            f"{s['count']} QSO · {s['bands']} bandes · "
-            f"{' / '.join(s['modes'])} · {s['points']} points · "
-            f"certificat n° {d['certificate'].get('number', '')}",
+            labels["appendix_footer"].format(
+                count=s["count"],
+                bands=s["bands"],
+                modes=" / ".join(s["modes"]),
+                points=s["points"],
+                number=d["certificate"].get("number", ""),
+            ),
         )
         c.showPage()
 
@@ -494,7 +567,11 @@ def render(data: dict) -> bytes:
     d = normalize(data)
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
-    c.setTitle(f"Certificat {d['activation']['callsign']} — {d['recipient']['callsign']}")
+    c.setTitle(
+        d["labels"]["pdf_title"].format(
+            callsign=d["activation"]["callsign"], recipient=d["recipient"]["callsign"]
+        )
+    )
     c.setAuthor(d["certificate"].get("manager", d["activation"]["callsign"]))
     if main_page(c, d) and options(d)["appendix"]:
         appendix_pages(c, d)

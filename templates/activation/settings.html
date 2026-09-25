@@ -292,6 +292,7 @@
         <label class="act-check"><input type="checkbox" name="appendix" value="1"{% if certificate_options.appendix %} checked{% endif %}> {{ _("Joindre le journal complet en annexe quand il y a plus de contacts") }}</label>
         <label>{{ _("Contacts listés sur la page principale") }}
           <input type="number" name="max_qso" min="1" max="14" value="{{ certificate_options.max_qso }}"></label>
+        <p class="act-muted act-map-note">{{ _("Au plus ce qui tient au-dessus du pied de page (9 ou 10 selon la longueur du texte) ; les autres vont en annexe. Le certificat suit la langue de la page : français ou anglais.") }}</p>
         <label>{{ _("Drapeau du pays de l'activation") }}
           <select name="flag">
             <option value=""{% if not certificate_options.flag %} selected{% endif %}>{{ _("Aucun") }}</option>
