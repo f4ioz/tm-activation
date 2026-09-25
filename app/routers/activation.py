@@ -612,7 +612,7 @@ async def change_report_options(
 async def change_certificate_options(
     request: Request, enabled: str = Form(""), names: str = Form(""),
     ranking: str = Form(""), mention: str = Form(""), max_qso: str = Form(""),
-    annexe: str = Form(""), flag: str = Form(""), border: str = Form(""),
+    appendix: str = Form(""), flag: str = Form(""), border: str = Form(""),
     border1: str = Form(""), border2: str = Form(""), border3: str = Form(""),
     emblem: str = Form(""), emblem_text: str = Form(""), ham_symbol: str = Form(""),
     qr_url: str = Form(""),
@@ -622,7 +622,7 @@ async def change_certificate_options(
         return g
     activation.set_certificate_options({"enabled": enabled, "names": names,
                                         "ranking": ranking, "mention": mention,
-                                        "max_qso": max_qso, "annexe": annexe,
+                                        "max_qso": max_qso, "appendix": appendix,
                                         "flag": flag, "border": border,
                                         "border1": border1, "border2": border2,
                                         "border3": border3, "emblem": emblem,

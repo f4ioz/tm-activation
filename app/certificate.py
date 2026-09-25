@@ -1,12 +1,11 @@
-"""Certificat PDF d'un chasseur, à partir du log de l'activation.
+"""A hunter's PDF certificate, built from the activation log.
 
-Le dessin n'est pas refait ici : il vient du module :mod:`app.tmcert`, fourni
-comme référence visuelle (voir ``app/tmcert/SPEC.md``). Ce fichier ne fait que
-préparer les données — QSO du chasseur, classement, points, logo du club — et
-appeler ``tmcert.render``.
+The drawing is not done here: it comes from :mod:`app.tmcert` (layout and data
+format in ``app/tmcert/SPEC.md``). This file only prepares the data — the
+hunter's QSOs, ranking, points, club logo — and calls ``tmcert.render``.
 
-Reportlab est nécessaire (il porte les polices du certificat). Sans lui, la
-fonction le dit clairement plutôt que de planter au milieu d'une page.
+Reportlab is required (it carries the certificate fonts). Without it, the
+function says so plainly instead of failing halfway through a page.
 """
 
 from __future__ import annotations
@@ -19,15 +18,15 @@ from app import activation
 from app.config import club_config
 from app.i18n import gettext as _
 
-MAX_QSO = 200          # au-delà, l'annexe deviendrait un annuaire
+MAX_QSO = 200          # beyond that, the appendix would turn into a phone book
 
 
 class CertificateUnavailable(RuntimeError):
-    """Le moteur de certificats n'est pas installé (reportlab manquant)."""
+    """The certificate engine is not installed (reportlab missing)."""
 
 
 def engine_ready() -> bool:
-    """Le moteur de certificats est-il utilisable sur cette machine ?"""
+    """Can the certificate engine be used on this machine?"""
     try:
         import reportlab  # noqa: F401
     except ImportError:
@@ -36,7 +35,7 @@ def engine_ready() -> bool:
 
 
 def _band_label(band: str) -> str:
-    """« 40M » → « 40 m », « 70CM » → « 70 cm » (présentation du certificat)."""
+    """"40M" → "40 m", "70CM" → "70 cm" (certificate display)."""
     raw = (band or "").strip().upper()
     if raw.endswith("CM"):
         return f"{raw[:-2]} cm"
@@ -48,7 +47,7 @@ def _band_label(band: str) -> str:
 
 
 def _period(station: dict[str, Any]) -> str:
-    """« du 6 au 20 septembre 2026 », d'après les dates de la fiche."""
+    """"du 6 au 20 septembre 2026", from the station record's dates."""
     start, end = (station.get("start_date") or ""), (station.get("end_date") or "")
     if not start:
         return ""
@@ -71,7 +70,7 @@ def _day(when: date, year: bool = False) -> str:
 
 
 def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
-    """Données du certificat d'un chasseur, ou None s'il n'est pas au log."""
+    """A hunter's certificate data, or None if they are not in the log."""
     cs = (call or "").strip().upper()
     st = activation.get_station(station) if station else activation.current_station()
     if st is None or not activation.valid_callsign(cs):
@@ -85,10 +84,10 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
     ranking = activation.hunters_ranking(None, target)
     place = next((h for h in ranking if h["call"] == cs), None)
     rule = activation.get_scoring(target)
-    bareme = {**rule["mode_points"], "*": rule["mode_default"]} if rule["enabled"] \
+    scoring = {**rule["mode_points"], "*": rule["mode_default"]} if rule["enabled"] \
         else {"*": 1}
-    # Les points imprimés sont CEUX DE L'APPLICATION : même règle que le
-    # classement public, doublons bande×mode compris.
+    # The printed points are THE APPLICATION'S: same rule as the public
+    # ranking, band×mode duplicates included.
     km = activation.distance_km(activation.my_gridsquare(target),
                                 activation.call_grids(target).get(cs, ""))
     club = club_config()
@@ -108,11 +107,11 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
         hhmm = (c["time_on"] or "0000")[:4].ljust(4, "0")
         entry: dict[str, Any] = {
             "date": f"{day[:4]}-{day[4:6]}-{day[6:8]}" if len(day) == 8 else day,
-            "heure_utc": f"{hhmm[:2]}:{hhmm[2:]}",
-            "bande": _band_label(c["band"]),
+            "time_utc": f"{hhmm[:2]}:{hhmm[2:]}",
+            "band": _band_label(c["band"]),
             "mode": (c["mode"] or "").upper(),
-            "rst_envoye": c["rst_sent"] or "",
-            "rst_recu": c["rst_rcvd"] or "",
+            "rst_sent": c["rst_sent"] or "",
+            "rst_rcvd": c["rst_rcvd"] or "",
         }
         if c["freq_mhz"]:
             entry["freq_mhz"] = float(c["freq_mhz"])
@@ -123,41 +122,41 @@ def hunter_data(call: str, station: str | None = None) -> dict[str, Any] | None:
 
     data: dict[str, Any] = {
         "activation": {
-            "indicatif": target,
-            "evenement": st.get("label") or target,
-            "periode": _period(st),
-            # L'indicatif spécial prend la place du gros titre, souligné de son
-            # propre morse ; le libellé de l'activation vient juste dessous.
-            "titre": target,
-            "sous_titre": (st.get("label") or "").strip().upper(),
+            "callsign": target,
+            "event": st.get("label") or target,
+            "period": _period(st),
+            # The special callsign takes the big title's place, underlined with
+            # its own Morse code; the activation label comes right below.
+            "title": target,
+            "subtitle": (st.get("label") or "").strip().upper(),
             "morse": target,
         },
-        "options": {"max_qso": options["max_qso"], "annexe": options["annexe"]},
-        "destinataire": {"indicatif": cs, "nom": name, "locator": grid},
-        "classement": ({"position": place["rank"], "total": len(ranking)}
-                       if place and options["ranking"] else None),
-        "bareme": bareme,
+        "options": {"max_qso": options["max_qso"], "appendix": options["appendix"]},
+        "recipient": {"callsign": cs, "name": name, "locator": grid},
+        "ranking": ({"position": place["rank"], "total": len(ranking)}
+                    if place and options["ranking"] else None),
+        "scoring": scoring,
         "qso": qso,
-        "certificat": {
-            "numero": f"{target}-{cs}".replace("/", "-"),
-            "date_emission": datetime.now(UTC).date().isoformat(),
-            "gestionnaire": manager,
+        "certificate": {
+            "number": f"{target}-{cs}".replace("/", "-"),
+            "issue_date": datetime.now(UTC).date().isoformat(),
+            "manager": manager,
         },
     }
     if options["mention"]:
-        data["mention"] = options["mention"]
+        data["footnote"] = options["mention"]
     logo = _certificate_logo()
     if logo:
         data["logo_path"] = str(logo)
     flag = _flag_path(options["flag"], target)
     if flag:
-        data["drapeau"] = str(flag)
+        data["flag"] = str(flag)
     if options["border"]:
-        data["liseret"] = options["border_colors"]
+        data["border"] = options["border_colors"]
     if options["emblem"]:
-        data["embleme"] = {"texte": options["emblem_text"] or "HAM RADIO"}
+        data["emblem"] = {"text": options["emblem_text"] or "HAM RADIO"}
     if options["ham_symbol"]:
-        data["symbole_ra"] = True
+        data["ham_symbol"] = True
     if options["qr_url"]:
         data["qr_url"] = options["qr_url"]
     return data
@@ -167,7 +166,7 @@ FLAGS_DIR = Path(__file__).resolve().parent.parent / "static" / "vendor" / "flag
 
 
 def _flag_path(choice: str, station: str) -> Path | None:
-    """Vignette du drapeau choisi (« auto » = d'après l'indicatif spécial)."""
+    """Thumbnail of the chosen flag ("auto" = from the special callsign)."""
     from app import dxcc_flags
 
     code = (choice or "").strip()
@@ -182,38 +181,38 @@ def _flag_path(choice: str, station: str) -> Path | None:
 
 
 def _apply_best_per_pair(qso: list[dict[str, Any]], rule: dict[str, Any]) -> None:
-    """Un seul QSO compté par bande × mode, comme au classement.
+    """Only one QSO counted per band × mode, as in the ranking.
 
-    Le meilleur de chaque couple garde ses points, les autres tombent à zéro :
-    le total du certificat colle alors au score affiché sur la page publique.
-    Sans règle de points, c'est le nombre de couples bande×mode qui fait foi —
-    c'est déjà le critère du classement.
+    The best of each pair keeps its points, the others drop to zero: the
+    certificate total then matches the score shown on the public page.
+    Without a points rule, the number of band×mode pairs is what counts —
+    that is already the ranking criterion.
     """
     if rule["enabled"] and not rule["unique_band_mode"]:
         return
     best: dict[tuple[str, str], int] = {}
     for entry in qso:
-        key = (entry["bande"], entry["mode"])
+        key = (entry["band"], entry["mode"])
         best[key] = max(best.get(key, 0), entry["points"])
     kept: set[tuple[str, str]] = set()
     for entry in qso:
-        key = (entry["bande"], entry["mode"])
+        key = (entry["band"], entry["mode"])
         if key not in kept and entry["points"] == best[key]:
             kept.add(key)
         else:
             entry["points"] = 0
 
 
-LOGO_SIDE = 420        # le logo est imprimé sur ~6 cm : 420 px suffisent
+LOGO_SIDE = 420        # the logo is printed about 6 cm wide: 420 px is plenty
 
 
 def _certificate_logo() -> Path | None:
-    """Logo du club, réduit et mis en cache pour le certificat.
+    """Club logo, shrunk and cached for the certificate.
 
-    Le logo déposé par l'admin peut peser près d'un mégaoctet : embarqué tel
-    quel dans chaque certificat, il ferait des PDF de 1 Mo pour une vignette de
-    six centimètres. On garde la transparence (le disque du certificat est doré)
-    et on ne refait la réduction que si le fichier d'origine a changé.
+    The logo uploaded by the admin can weigh nearly a megabyte: embedded as is
+    in every certificate, it would make 1 MB PDFs for a six-centimetre
+    thumbnail. Transparency is kept (the certificate disc is gold) and the
+    shrinking is only redone when the original file has changed.
     """
     info = activation.logo_info()
     if info is None:
@@ -223,19 +222,19 @@ def _certificate_logo() -> Path | None:
     if cached.is_file() and cached.stat().st_mtime >= source.stat().st_mtime:
         return cached
     try:
-        from PIL import Image      # livré avec reportlab
+        from PIL import Image      # shipped with reportlab
 
         with Image.open(source) as img:
             small = img.convert("RGBA")
             small.thumbnail((LOGO_SIDE, LOGO_SIDE), Image.LANCZOS)
             small.save(cached, "PNG", optimize=True)
-    except Exception:              # noqa: BLE001 — un logo illisible ne doit pas tout bloquer
+    except Exception:              # noqa: BLE001 — an unreadable logo must not block everything
         return source
     return cached
 
 
 def build_certificate(call: str, station: str | None = None) -> bytes | None:
-    """PDF du certificat d'un chasseur (None s'il n'a aucun QSO avec nous)."""
+    """A hunter's certificate PDF (None if they have no QSO with us)."""
     if not engine_ready():
         raise CertificateUnavailable(
             _("moteur de certificats absent : installez reportlab (pip install reportlab)")
@@ -243,6 +242,6 @@ def build_certificate(call: str, station: str | None = None) -> bytes | None:
     data = hunter_data(call, station)
     if data is None:
         return None
-    from app.tmcert import render        # importé tard : reportlab est lourd
+    from app.tmcert import render        # imported late: reportlab is heavy
 
     return render(data)

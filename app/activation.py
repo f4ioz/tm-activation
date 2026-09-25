@@ -2294,7 +2294,7 @@ DEFAULT_CERTIFICATE: dict[str, Any] = {
     "ranking": True,     # médaille avec la place au classement
     "mention": "",       # petite ligne libre en bas de page
     "max_qso": 10,       # contacts listés sur la page principale
-    "annexe": True,      # page(s) annexe avec le journal complet
+    "appendix": True,    # page(s) annexe avec le journal complet
     "flag": "auto",      # drapeau du pays : "" (aucun), "auto" (d'après l'indicatif) ou un code
     "border": False,     # fin liseré autour de la page
     "border_colors": ["#0055A4", "#FFFFFF", "#EF3340"],
@@ -2319,7 +2319,8 @@ def get_certificate_options() -> dict[str, Any]:
         "ranking": bool(saved.get("ranking", d["ranking"])),
         "mention": str(saved.get("mention") or "")[:CERTIFICATE_MENTION_MAX],
         "max_qso": _clamp_int(saved.get("max_qso"), 1, 14, d["max_qso"]),
-        "annexe": bool(saved.get("annexe", d["annexe"])),
+        # « annexe » : nom de la clé avant la 1.40, encore lu.
+        "appendix": bool(saved.get("appendix", saved.get("annexe", d["appendix"]))),
         "flag": _clean_flag(saved.get("flag", d["flag"])),
         "border": bool(saved.get("border", d["border"])),
         "border_colors": _clean_colors(saved.get("border_colors"), d["border_colors"]),
@@ -2361,7 +2362,7 @@ def set_certificate_options(form: dict[str, Any]) -> dict[str, Any]:
         "ranking": bool(form.get("ranking")),
         "mention": str(form.get("mention") or "").strip()[:CERTIFICATE_MENTION_MAX],
         "max_qso": _clamp_int(form.get("max_qso"), 1, 14, DEFAULT_CERTIFICATE["max_qso"]),
-        "annexe": bool(form.get("annexe")),
+        "appendix": bool(form.get("appendix")),
         "flag": _clean_flag(form.get("flag")),
         "border": bool(form.get("border")),
         "border_colors": _clean_colors(

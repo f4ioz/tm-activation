@@ -1,5 +1,3 @@
-# Le module app/tmcert/ est un kit EXTERNE, gardé tel quel : il sert de
-# référence visuelle pour le certificat (voir app/tmcert/SPEC.md). On ne le
-# reformate pas, sinon les mises à jour du kit deviendraient impossibles à
-# rejouer. Le reste du projet garde les règles ruff par défaut.
-exclude = ["app/tmcert"]
+# Règles ruff par défaut pour tout le projet, app/tmcert compris (le module de
+# certificat n'est plus un kit externe gardé tel quel depuis son passage en
+# anglais : il est maintenu ici).

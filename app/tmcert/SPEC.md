@@ -1,78 +1,119 @@
-# Spécification de mise en page — certificat TM-activation
+# Layout specification — TM Activation certificate
 
-Page A4 paysage, 841,89 × 595,28 pt, origine en bas à gauche (reportlab).
+A4 landscape page, 841.89 × 595.28 pt, origin at the bottom left (reportlab).
 
-## Couches
-1. **Statique** (`decor.py`) : fond blanc, arc marine + double arc or (gauche), forme marine
-   (haut droit), bande or dégradée (bas droit), micro, manipulateur, Yagi, **poste de radio**
-   (droite, sous la médaille), étoiles, logo.
-2. **Médaille** : position fixe (726, 485), rubans rouges ; contenu = rang + « er/e » + « SUR n ».
-   Sans classement → médaille affichant « QSO ».
-3. **Dynamique** (`render.py`) : tout le reste.
+```python
+from app.tmcert import render
+pdf_bytes = render(data)          # data: see "Data format" below
+```
+
+The printed wording is French for now (title band, column headers, footer
+labels); the code and the data keys are English.
+
+## Layers
+1. **Static** (`decor.py`): white background, navy arc + double gold arc (left), navy shape
+   (top right), gold gradient band (bottom right), microphone, Morse key, Yagi, **radio set**
+   (right, below the medal), stars, logo.
+2. **Medal**: fixed position (726, 485), red ribbons; content = rank + "er/e" + "SUR n".
+   Without a ranking → the medal shows "QSO".
+3. **Dynamic** (`render.py`): everything else.
+
+## Data format
+
+| Key | Required | Content |
+|---|---|---|
+| `activation` | yes | `callsign`, `event`; optional `period` (free text, e.g. "du 6 au 20 septembre 2026"), `title` (default "CERTIFICAT"), `subtitle` (an empty string removes it; missing → "ACTIVATION SPÉCIALE · EVENT"), `morse` (text of the Morse underline; default: the title) |
+| `recipient` | yes | `callsign`; optional `name`, `locator` |
+| `qso` | yes | list of `{date: "YYYY-MM-DD", time_utc: "HH:MM", mode, freq_mhz?, band?, rst_sent?, rst_rcvd?, points?}` |
+| `certificate` | yes | optional `number`, `issue_date` (ISO, default today), `manager` (default: the activation callsign) |
+| `ranking` | no | `{position, total}` — shown on the medal |
+| `scoring` | no | points per mode, e.g. `{"CW": 3, "*": 1}` (`*` = default) |
+| `options` | no | see "Caller options" |
+| `award_text` | no | replaces the "pour avoir contacté…" sentence |
+| `footnote` | no | small line at the bottom of the page |
+| `logo_path` | no | club logo (PNG with transparency, or JPEG); default: the neutral emblem in `assets/` |
+| `flag` | no | path to a flag PNG, drawn right of the title |
+| `border` | no | three `#rrggbb` colours for the thin page border |
+| `emblem` | no | `{text}` — see "Emblem and symbol" |
+| `ham_symbol` | no | `true` — see "Emblem and symbol" |
+| `qr_url` | no | address encoded in a QR code, left column below the logo, printed underneath without `https://` |
+
+`render()` also adds `stats` (`count`, `bands`, `modes`, `points`) while normalizing.
 
 ## Palette
-| Rôle | Hex |
+| Role | Hex |
 |---|---|
-| Marine / marine foncé / gris-bleu | `#2B3547` / `#1D2533` / `#5A6478` |
-| Or / or clair / or pâle | `#C9982E` / `#E9C46A` / `#F6E3A8` |
-| Rouge / rouge foncé | `#B0202B` / `#7E131B` |
-| Texte courant | `#4A4F5A` |
-| Badges mode | SSB `#C9982E`, CW `#B0202B`, FT8/FT4/DIGI `#2C6E9C`, FM `#3B7D4F`, RTTY `#6A4C93`, autre `#5A6478` |
+| Navy / dark navy / grey-blue | `#2B3547` / `#1D2533` / `#5A6478` |
+| Gold / light gold / pale gold | `#C9982E` / `#E9C46A` / `#F6E3A8` |
+| Red / dark red | `#B0202B` / `#7E131B` |
+| Body text | `#4A4F5A` |
+| Mode badges | SSB `#C9982E`, CW `#B0202B`, FT8/FT4/DIGI `#2C6E9C`, FM `#3B7D4F`, RTTY `#6A4C93`, other `#5A6478` |
 
-## Polices
-Poppins (Regular, Medium, SemiBold, Bold, ExtraBold) ; Great Vibes pour le nom.
+## Fonts
+Poppins (Regular, Medium, SemiBold, Bold, ExtraBold); Great Vibes is registered as `Script`.
 
-## Zones dynamiques (colonne de contenu x = 228, largeur 420)
-| Élément | y (pt) | Police | Règle |
+## Dynamic areas (content column x = 228, width 420)
+| Element | y (pt) | Font | Rule |
 |---|---|---|---|
-| Titre | 445 | Poppins ExtraBold 60 | défaut « CERTIFICAT » ; l'application y met l'indicatif spécial |
-| Souligné morse | 435 | pavés or, unité calculée | traduction du titre (ou `activation.morse`), calée sur sa largeur |
-| Sous-titre | 415 | Poppins SemiBold 20 | réduit jusqu'à 12 pt ; l'application y met le libellé de l'activation, une chaîne vide le supprime |
-| Bandeau | 373–397 | SemiBold 10 blanc sur marine | texte fixe |
-| Nom | 321 | Poppins SemiBold 30 | réduit jusqu'à 17 pt ; absent → indicatif en ExtraBold 44 |
-| Filet | 305 | — | |
-| Indicatif + locator | 277 | ExtraBold 30 rouge (réduit jusqu'à 18) + SemiBold 0,42× | centrés ensemble |
-| Phrase d'attribution | 259 | Regular 9,5 | 2 lignes max, centrée |
-| Tableau QSO | sous la phrase | en-tête 16 pt, lignes 13,5 pt | colonnes : date, UTC, bande, fréquence, mode (badge), RST env., RST reçu |
-| Synthèse | 18 pt sous le tableau | Medium 8 + ExtraBold 11 | QSO, bandes, modes, points (rouge) |
-| Pied | 56 / 50 / 37 | SemiBold 10,5 / filet / Medium 8,5 | gestionnaire (x 268), n° (x 585), date (x 735) — **pas de signature** |
-| Mention | 14 | Regular 6 | optionnelle |
+| Title | 445 | Poppins ExtraBold 60 | default "CERTIFICAT"; the application puts the special callsign there |
+| Morse underline | 435 | gold blocks, computed unit | the title in Morse (or `activation.morse`), fitted to its width |
+| Subtitle | 415 | Poppins SemiBold 20 | shrunk down to 12 pt; the application puts the activation label there, an empty string removes it |
+| Band | 373–397 | SemiBold 10 white on navy | fixed text |
+| Name | 321 | Poppins SemiBold 30 | shrunk down to 17 pt; missing → callsign in ExtraBold 44 |
+| Rule | 305 | — | |
+| Callsign + locator | 277 | ExtraBold 30 red (shrunk down to 18) + SemiBold 0.42× | centred together |
+| Award sentence | 259 | Regular 9.5 | 2 lines max, centred |
+| QSO table | below the sentence | header 16 pt, rows 13.5 pt | columns: date, UTC, band, frequency, mode (badge), RST sent, RST received |
+| Summary | 18 pt below the table | Medium 8 + ExtraBold 11 | QSOs, bands, modes, points (red) |
+| Footer | 56 / 50 / 37 | SemiBold 10.5 / rule / Medium 8.5 | manager (x 268), number (x 585), date (x 735) — **no signature** |
+| Footnote | 14 | Regular 6 | optional |
 
-## Options de l'appelant (`options`)
-| Clé | Défaut | Effet |
+## Caller options (`options`)
+| Key | Default | Effect |
 |---|---|---|
-| `max_qso` | 10 | contacts listés sur la page principale (1 à 14) |
-| `annexe` | vrai | produire le journal complet en annexe quand ça déborde |
+| `max_qso` | 10 | contacts listed on the main page (1 to 14) |
+| `appendix` | true | add the full log as an appendix when it overflows |
 
-## Emblème et symbole (sous le poste de radio, optionnels)
-| Clé de données | Effet |
+## Emblem and symbol (below the radio set, optional)
+| Data key | Effect |
 |---|---|
-| `embleme: {texte}` | pylône à éclairs dans un arc or, banderole marine ailée portant `texte` en Poppins Bold blanc le long de la courbe (9 pt, réduit jusqu'à 4,5 pt) ; défaut « HAM RADIO ». Milieu de banderole en (745, 176), (733, 176) avec le symbole |
-| `symbole_ra: true` | symbole international du radioamateur (losange marine/or, antenne-bobine-masse) : 46 pt de haut en (808, 205) à côté de l'emblème, 70 pt en (745, 205) seul |
+| `emblem: {text}` | mast with lightning bolts inside a gold arc, winged navy banner carrying `text` in white Poppins Bold along the curve (9 pt, shrunk down to 4.5 pt); default "HAM RADIO". Banner middle at (745, 176), (733, 176) with the symbol |
+| `ham_symbol: true` | international amateur radio symbol (navy/gold diamond, antenna-coil-ground): 46 pt high at (808, 205) next to the emblem, 70 pt at (745, 205) alone |
 
-Dessinés en vectoriel (`decor.emblem`, `decor.symbole_ra`), aucune image externe.
+Drawn as vectors (`decor.emblem`, `decor.ham_symbol`), no external image.
 
-## Règles de données
-- QSO triés par date/heure UTC ; bande déduite de la fréquence si absente.
-- Fréquence affichée en MHz, 3 décimales, virgule décimale.
-- Dates affichées JJ/MM/AAAA (entrée ISO AAAA-MM-JJ).
-- Points = ceux fournis par l'appelant (`qso[].points`) s'ils sont là, sinon le barème
-  par mode (`*` = défaut, 1 si absent). Total = somme des points des QSO.
-- Suffixe de rang : 1 → « er », sinon « e ».
+## Data rules
+- QSOs sorted by UTC date/time; band derived from the frequency when missing.
+- Frequency shown in MHz, 3 decimals, decimal comma.
+- Dates shown DD/MM/YYYY (ISO YYYY-MM-DD input).
+- Points = the ones given by the caller (`qso[].points`) when present, otherwise the
+  per-mode `scoring` (`*` = default, 1 if missing). Total = sum of the QSO points.
+- Rank suffix: 1 → "er", otherwise "e" (French ordinals).
 
-## Débordement
-- Page 1 : `options.max_qso` QSO au maximum (défaut 10, borné à 14). Au-delà :
-  `max_qso - 1` QSO + ligne « … et N autres QSO », suivie de « — journal complet en annexe »
-  quand l'annexe est demandée.
-- Annexe(s) : produites si `options.annexe` (défaut vrai) — 28 QSO par page, bandeau marine
-  « JOURNAL DES CONTACTS · INDICATIF », pagination « annexe n/N ».
+## Overflow
+- Page 1: at most `options.max_qso` QSOs (default 10, capped at 14). Beyond that:
+  `max_qso - 1` QSOs + a "… et N autres QSO" line, followed by "— journal complet en annexe"
+  when the appendix is requested.
+- Appendix page(s): produced if `options.appendix` (default true) — 28 QSOs per page, navy band
+  "JOURNAL DES CONTACTS · CALLSIGN", numbered "annexe n/N".
 
 ## Logo
-Source PNG transparent carré ~600 px. Le moteur utilise `logo.jpg` (PNG aplati sur `#E9C46A`,
-qualité 88) découpé en disque de diamètre 176 pt centré en (100, 318) : PDF ~190 Ko au lieu de ~900 Ko.
+Square transparent PNG source, ~600 px. A PNG is drawn as is, with its transparency, on the
+gold disc (diameter 172 pt, centred at (100, 318)). A JPEG is clipped to the disc: flattening
+the PNG on `#E9C46A` gives a much lighter PDF (~190 KB instead of ~900 KB):
 ```python
 from PIL import Image
 im = Image.open("logo.png").convert("RGBA")
 bg = Image.new("RGBA", im.size, (0xE9, 0xC4, 0x6A, 255)); bg.alpha_composite(im)
 bg.convert("RGB").save("logo.jpg", quality=88)
 ```
+
+## Command line
+```bash
+python -m app.tmcert data.json -o certificate.pdf
+python -m app.tmcert --adif log.adi --config activation.json -o folder/
+```
+With `--adif`, `activation.json` holds `activation`, `scoring`,
+`certificate: {number_prefix, manager}`, and optionally `footnote` and
+`names: {CALL: name}`. One certificate per contacted callsign, ranked by points,
+then QSO count, then earliest first QSO.

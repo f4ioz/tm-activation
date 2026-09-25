@@ -2033,9 +2033,9 @@ def test_hunter_certificate(monkeypatch, tmp_path) -> None:
     assert activation.get_certificate_options()["enabled"] is False
     assert public.get("/tm25test/certificat?call=ON4ZZ").status_code == 404   # pas encore ouvert
     data = certificate.hunter_data("ON4ZZ", "TM25TEST")
-    assert data["destinataire"] == {"indicatif": "ON4ZZ", "nom": "", "locator": "JO20"}
-    assert [q["bande"] for q in data["qso"]] == ["20 m", "40 m"]   # présentation du kit
-    assert data["certificat"]["numero"] == "TM25TEST-ON4ZZ"
+    assert data["recipient"] == {"callsign": "ON4ZZ", "name": "", "locator": "JO20"}
+    assert [q["band"] for q in data["qso"]] == ["20 m", "40 m"]   # présentation du kit
+    assert data["certificate"]["number"] == "TM25TEST-ON4ZZ"
     assert certificate.hunter_data("XX9ZZZ", "TM25TEST") is None
 
     # L'admin peut produire le certificat avant de l'ouvrir au public.
@@ -2070,20 +2070,20 @@ def test_certificate_flag_and_border(monkeypatch, tmp_path) -> None:
                data={"enabled": "1", "flag": "auto", "border": "1",
                      "border1": "#0055A4", "border2": "#FFFFFF", "border3": "#EF3340"})
     data = certificate.hunter_data("ON4ZZ")
-    assert data["drapeau"].endswith("/fr.png")          # TM25TEST → France
-    assert data["liseret"] == ["#0055A4", "#FFFFFF", "#EF3340"]
+    assert data["flag"].endswith("/fr.png")          # TM25TEST → France
+    assert data["border"] == ["#0055A4", "#FFFFFF", "#EF3340"]
     # Sous le gros indicatif : le libellé de l'activation, en capitales.
-    assert data["activation"]["sous_titre"] == activation.current_station()["label"].upper()
+    assert data["activation"]["subtitle"] == activation.current_station()["label"].upper()
 
     admin.post("/activation/settings/certificate", data={"enabled": "1", "flag": "BE"})
-    assert certificate.hunter_data("ON4ZZ")["drapeau"].endswith("/be.png")
-    assert "liseret" not in certificate.hunter_data("ON4ZZ")   # case décochée
+    assert certificate.hunter_data("ON4ZZ")["flag"].endswith("/be.png")
+    assert "border" not in certificate.hunter_data("ON4ZZ")   # case décochée
     # Entité inconnue ou couleur bricolée : on retombe sur des valeurs saines.
     admin.post("/activation/settings/certificate",
                data={"enabled": "1", "flag": "ZZ9", "border": "1", "border1": "bleu"})
     options = activation.get_certificate_options()
     assert options["flag"] == "" and options["border_colors"][0] == "#0055A4"
-    assert "drapeau" not in certificate.hunter_data("ON4ZZ")
+    assert "flag" not in certificate.hunter_data("ON4ZZ")
     # Le PDF sort avec tout ça.
     admin.post("/activation/settings/certificate",
                data={"enabled": "1", "flag": "auto", "border": "1"})
@@ -2137,8 +2137,8 @@ def test_certificate_page_options(monkeypatch, tmp_path) -> None:
                                qso_date="20260910", time_on=f"10{i:02d}")
     assert activation.get_certificate_options()["max_qso"] == 10      # défaut demandé
     data = certificate.hunter_data("ON4ZZ")
-    assert data["options"] == {"max_qso": 10, "annexe": True}
-    assert data["activation"]["titre"] == "TM25TEST"                  # l'indicatif en gros
+    assert data["options"] == {"max_qso": 10, "appendix": True}
+    assert data["activation"]["title"] == "TM25TEST"                  # l'indicatif en gros
     assert data["activation"]["morse"] == "TM25TEST"
 
     pages = lambda pdf: len(re.findall(rb"/Type\s*/Page[^s]", pdf))   # noqa: E731
@@ -2150,13 +2150,24 @@ def test_certificate_page_options(monkeypatch, tmp_path) -> None:
                data={"enabled": "1", "max_qso": "14"})                # annexe décochée
     assert activation.get_certificate_options() == {
         "enabled": True, "names": False, "ranking": False, "mention": "",
-        "max_qso": 14, "annexe": False, "flag": "", "border": False,
+        "max_qso": 14, "appendix": False, "flag": "", "border": False,
         "border_colors": activation.DEFAULT_CERTIFICATE["border_colors"],
         "emblem": False, "emblem_text": "", "ham_symbol": False, "qr_url": ""}
     assert pages(certificate.build_certificate("ON4ZZ")) == 1         # tout tient, pas d'annexe
     # Valeur absurde : bornée.
     admin.post("/activation/settings/certificate", data={"enabled": "1", "max_qso": "99"})
     assert activation.get_certificate_options()["max_qso"] == 14
+
+
+def test_certificate_appendix_reads_legacy_key() -> None:
+    """Réglages enregistrés avant la 1.40 : la clé s'appelait « annexe »."""
+    data = activation.load_settings()
+    data["certificate"] = {"enabled": True, "annexe": False}
+    activation._save_settings(data)
+    assert activation.get_certificate_options()["appendix"] is False
+    activation.set_certificate_options({"enabled": "1", "appendix": "1"})
+    saved = activation.load_settings()["certificate"]
+    assert saved["appendix"] is True and "annexe" not in saved
 
 
 def test_admin_can_try_a_certificate_from_settings(monkeypatch, tmp_path) -> None:
@@ -2192,9 +2203,9 @@ def test_certificate_name_is_opt_in(monkeypatch, tmp_path) -> None:
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
     activation.qrz_lookup("DL1ABC", _FakeQrz({"DL1ABC": _rec("DL1ABC")}))
     activation.set_certificate_options({"enabled": "1", "ranking": "1"})
-    assert certificate.hunter_data("DL1ABC")["destinataire"]["nom"] == ""
+    assert certificate.hunter_data("DL1ABC")["recipient"]["name"] == ""
     activation.set_certificate_options({"enabled": "1", "names": "1"})
-    assert certificate.hunter_data("DL1ABC")["destinataire"]["nom"] == "Hans MUSTER"
+    assert certificate.hunter_data("DL1ABC")["recipient"]["name"] == "Hans MUSTER"
 
 
 def test_certificate_emblem_and_ham_symbol(monkeypatch, tmp_path) -> None:
@@ -2206,8 +2217,8 @@ def test_certificate_emblem_and_ham_symbol(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(auth_mod, "auth_password", lambda: "secret")
     activation.add_contact(call="DL1ABC", band="20M", mode="SSB", operator_call="F4IOZ")
     data = certificate.hunter_data("DL1ABC")
-    assert data["embleme"] == {"texte": "HAM RADIO"}          # par défaut
-    assert "symbole_ra" not in data
+    assert data["emblem"] == {"text": "HAM RADIO"}            # par défaut
+    assert "ham_symbol" not in data
 
     admin = _private_client()
     page = admin.get("/activation/settings").text
@@ -2220,12 +2231,12 @@ def test_certificate_emblem_and_ham_symbol(monkeypatch, tmp_path) -> None:
     assert opts["emblem_text"].startswith("Radio-club de Villeneuve")    # espaces resserrés
     assert len(opts["emblem_text"]) == activation.CERTIFICATE_EMBLEM_MAX
     data = certificate.hunter_data("DL1ABC")
-    assert data["embleme"]["texte"] == opts["emblem_text"] and data["symbole_ra"] is True
+    assert data["emblem"]["text"] == opts["emblem_text"] and data["ham_symbol"] is True
     assert certificate.build_certificate("DL1ABC").startswith(b"%PDF-")
 
     admin.post("/activation/settings/certificate", data={"enabled": "1"})   # tout décoché
     data = certificate.hunter_data("DL1ABC")
-    assert "embleme" not in data and "symbole_ra" not in data
+    assert "emblem" not in data and "ham_symbol" not in data
     assert certificate.build_certificate("DL1ABC").startswith(b"%PDF-")
 
 

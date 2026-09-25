@@ -1,2 +1,6 @@
-from .render import render, normaliser
-from .adif import lire_adif, certificats_depuis_adif
+"""TM Activation certificate engine (reportlab). Layout and data format: SPEC.md."""
+
+from .adif import certificates_from_adif, read_adif
+from .render import normalize, render
+
+__all__ = ["certificates_from_adif", "normalize", "read_adif", "render"]

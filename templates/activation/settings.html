@@ -289,7 +289,7 @@
         <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if certificate_options.enabled %} checked{% endif %}> {{ _("Proposer le certificat sur la page publique") }}</label>
         <label class="act-check"><input type="checkbox" name="ranking" value="1"{% if certificate_options.ranking %} checked{% endif %}> {{ _("Médaille avec la place au classement") }}</label>
         <label class="act-check"><input type="checkbox" name="names" value="1"{% if certificate_options.names %} checked{% endif %}> {{ _("Inscrire le nom du chasseur (fiche QRZ) en plus de son indicatif") }}</label>
-        <label class="act-check"><input type="checkbox" name="annexe" value="1"{% if certificate_options.annexe %} checked{% endif %}> {{ _("Joindre le journal complet en annexe quand il y a plus de contacts") }}</label>
+        <label class="act-check"><input type="checkbox" name="appendix" value="1"{% if certificate_options.appendix %} checked{% endif %}> {{ _("Joindre le journal complet en annexe quand il y a plus de contacts") }}</label>
         <label>{{ _("Contacts listés sur la page principale") }}
           <input type="number" name="max_qso" min="1" max="14" value="{{ certificate_options.max_qso }}"></label>
         <label>{{ _("Drapeau du pays de l'activation") }}
