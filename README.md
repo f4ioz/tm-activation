@@ -486,6 +486,8 @@ puis lancer la commande affichée et ouvrir <http://127.0.0.1:8000/>.
 
 Pour montrer l'application à d'autres clubs sans risquer un vrai log :
 
+![Instance de démonstration : bandeau, compte à rebours et comptes de démo](docs/images/demo.png)
+
 ```bash
 sudo ./install.sh --demo --domain demo.mon-club.fr --email moi@example.org
 sudo ./install.sh --demo --lan --demo-hours 12      # sur le réseau local, remise à zéro toutes les 12 h

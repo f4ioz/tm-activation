@@ -472,6 +472,8 @@ then run the command shown and open <http://127.0.0.1:8000/>.
 
 To show the application to other clubs without risking a real log:
 
+![Demo instance: banner, countdown and demo accounts](docs/images/demo.png)
+
 ```bash
 sudo ./install.sh --demo --domain demo.my-club.org --email me@example.org
 sudo ./install.sh --demo --lan --demo-hours 12      # local network, reset every 12 h
