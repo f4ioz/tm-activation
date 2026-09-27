@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from app import activation
 from app.main import app
+from app.routers import activation as activation_router
 
 WEBM = b"\x1a\x45\xdf\xa3" + b"\x00" * 200          # EBML header: enough for the check
 OGG = b"OggS" + b"\x00" * 200
@@ -171,3 +172,84 @@ def test_upload_refused_when_disabled(operator) -> None:
     r = operator.post("/activation/audio", params={"start": now_ms() - 20_000, "dur": 20_000, "now": now_ms()},
                       content=WEBM, headers={"Content-Type": "audio/webm"})
     assert r.status_code == 400
+
+
+# ── Public listening (option) ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def public_station():
+    st = activation.update_station(activation.callsign(), public=1)
+    return st
+
+
+def _qso_with_audio(op: str = "F4ABC", call: str = "DL1ABC") -> tuple[int, int]:
+    seg = _segment(op)
+    return activation.add_contact(call=call, band="20M", mode="SSB", operator_call=op), seg
+
+
+def test_public_listening_off_by_default(audio_on, public_station) -> None:
+    qso, _seg = _qso_with_audio()
+    client = TestClient(app)
+    assert client.get(f"/{public_station['slug']}/qso/{qso}/audio").status_code == 404
+    page = client.get(f"/{public_station['slug']}?call=DL1ABC").text
+    assert "data-audio=" not in page and "activation-audio.js" not in page
+
+
+def test_public_listening(audio_on, public_station) -> None:
+    activation.set_audio_options({**activation.get_audio_options(), "public": "1"})
+    slug = public_station["slug"]
+    qso, seg = _qso_with_audio()
+    silent = activation.add_contact(call="DL1ABC", band="40M", mode="CW", operator_call="F4ABC",
+                                    qso_date="20250101", time_on="1200")     # no recording back then
+    client = TestClient(app)
+    page = client.get(f"/{slug}?call=DL1ABC").text
+    assert f'data-audio="/{slug}/qso/{qso}/audio"' in page and f"/qso/{silent}/audio" not in page
+    assert "activation-audio.js" in page
+    clip = client.get(f"/{slug}/qso/{qso}/audio")
+    assert clip.status_code == 200 and clip.headers["x-robots-tag"].startswith("noindex")
+    url = clip.json()["segments"][0]["url"]
+    assert url == f"/{slug}/qso/{qso}/audio/{seg}"
+    assert client.get(url).content == WEBM
+    assert client.get(f"/{slug}/qso/{silent}/audio").status_code == 404
+
+
+def test_public_serves_only_the_segments_of_the_excerpt(audio_on, public_station) -> None:
+    activation.set_audio_options({**activation.get_audio_options(), "public": "1"})
+    slug = public_station["slug"]
+    elsewhere = _segment(start=now_ms() - 600_000)         # 10 min earlier: chatter between QSOs
+    qso, _seg = _qso_with_audio()
+    client = TestClient(app)
+    assert client.get(f"/{slug}/qso/{qso}/audio/{elsewhere}").status_code == 404
+    # Another special callsign's page does not serve this station's QSOs.
+    other = activation.create_station("TM9ZZZ", public=1)
+    assert client.get(f"/{other['slug']}/qso/{qso}/audio").status_code == 404
+
+
+def test_admin_hides_a_qso_from_the_public(audio_on, public_station, operator, monkeypatch) -> None:
+    activation.set_audio_options({**activation.get_audio_options(), "public": "1"})
+    slug = public_station["slug"]
+    qso, _seg = _qso_with_audio()
+    # A plain operator cannot.
+    assert operator.post(f"/activation/contacts/{qso}/audio-public", data={"hidden": "1"}).status_code == 403
+    assert operator.get(f"/activation/contacts/{qso}/audio").json()["can_hide"] is False
+    monkeypatch.setattr(activation_router, "_is_admin", lambda request: True)
+    assert operator.get(f"/activation/contacts/{qso}/audio").json()["can_hide"] is True
+    r = operator.post(f"/activation/contacts/{qso}/audio-public", data={"hidden": "1"})
+    assert r.json() == {"hidden": True}
+    public = TestClient(app)
+    assert public.get(f"/{slug}/qso/{qso}/audio").status_code == 404
+    assert "data-audio=" not in public.get(f"/{slug}?call=DL1ABC").text
+    internal = operator.get(f"/activation/contacts/{qso}/audio").json()     # still there inside
+    assert internal["hidden"] is True and internal["segments"]
+    operator.post(f"/activation/contacts/{qso}/audio-public", data={"hidden": "0"})
+    assert public.get(f"/{slug}/qso/{qso}/audio").status_code == 200
+
+
+def test_public_listening_is_rate_limited(audio_on, public_station, monkeypatch) -> None:
+    activation.set_audio_options({**activation.get_audio_options(), "public": "1"})
+    monkeypatch.setattr(activation_router, "PUBLIC_AUDIO_PER_MINUTE", 2)
+    qso, _seg = _qso_with_audio()
+    client = TestClient(app)
+    codes = [client.get(f"/{public_station['slug']}/qso/{qso}/audio").status_code for _ in range(3)]
+    assert codes == [200, 200, 429]

@@ -39,16 +39,17 @@
     {% endif %}
   </div>
   <table class="act-table">
-    <thead><tr><th>{{ _("Date") }}</th><th>{{ tz_label }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>{{ _("Opérateur") }}</th></tr></thead>
+    <thead><tr><th>{{ _("Date") }}</th><th>{{ tz_label }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>{{ _("Opérateur") }}</th>{% if audio_ids %}<th>{{ _("Audio") }}</th>{% endif %}</tr></thead>
     <tbody>
       {% for q in search.contacts %}
         {% set d = cdt(q) %}
-        <tr>
+        <tr{% if q.id in audio_ids %} data-audio="/{{ slug }}/qso/{{ q.id }}/audio"{% endif %}>
           <td>{{ date_short(d) if d else q.qso_date }}</td>
           <td>{{ d.strftime('%H:%M') if d else q.time_on }}</td>
           <td>{{ q.band }}</td><td>{{ q.mode }}</td>
           <td class="act-sat-tag">{{ q.sat_name or '' }}</td>
           <td class="act-call">{{ q.operator_call }}</td>
+          {% if audio_ids %}<td class="act-actions"></td>{% endif %}
         </tr>
       {% endfor %}
     </tbody>
@@ -213,5 +214,6 @@
 <p class="act-muted act-map-note"><a href="/activations">{{ _("Tous les indicatifs spéciaux") }}{% if club.name %} — {{ club.name }}{% endif %} →</a></p>
 
 <script src="{{ asset('/static/js/activation-countdown.js') }}"></script>
+{% if audio_ids %}<script src="{{ asset('/static/js/activation-audio.js') }}"></script>{% endif %}
 {% if show_map_stats %}<script src="{{ asset('/static/js/activation-map.js') }}"></script>{% endif %}
 {% endblock %}

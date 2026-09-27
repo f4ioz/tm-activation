@@ -6,14 +6,15 @@
  * At each cut the next recorder starts before the previous one stops: nothing
  * is lost between two segments.
  *
- * Player: a ▶ button on each QSO of the log. The segments around the QSO are
- * decoded and laid out on one time line (gaps stay silent), drawn as a
- * waveform with a marker at the instant the QSO was logged; a click seeks.
+ * Player: a ▶ button on each QSO of the log (operators) and, when public
+ * listening is on, on the hunter's own QSOs of the public page (rows carrying
+ * data-audio). The segments around the QSO are decoded and laid out on one
+ * time line (gaps stay silent), drawn as a waveform with a marker at the
+ * instant the QSO was logged; a click seeks.
  */
 (function () {
   'use strict';
-  var box = document.getElementById('act-audio');
-  if (!box) return;
+  var box = document.getElementById('act-audio');      // recorder: log page only
 
   var SEGMENT_MS = window.ACT_AUDIO_SEGMENT_MS || 20000;   // ~60 kB at 24 kbit/s
   var BITRATE = 24000;
@@ -36,7 +37,9 @@
   // ── Recorder ───────────────────────────────────────────────────────────
 
   var canRecord = window.isSecureContext && navigator.mediaDevices && window.MediaRecorder;
-  if (!window.isSecureContext) {
+  if (!box) {
+    /* public page: player only */
+  } else if (!window.isSecureContext) {
     box.innerHTML = '<p class="act-muted act-cat-note">' + esc(t('Audio : la page doit être ouverte en HTTPS.')) + '</p>';
   } else if (!canRecord) {
     box.innerHTML = '<p class="act-muted act-cat-note">' + esc(t('Audio : ce navigateur ne sait pas enregistrer.')) + '</p>';
@@ -242,16 +245,23 @@
 
   // ── Player ─────────────────────────────────────────────────────────────
 
+  /* Excerpt URL of a row: given by the page (public), or the operators'
+   * route for the log's rows. */
+  function clipUrl(tr) {
+    if (tr.dataset.audio) return tr.dataset.audio;
+    return box && tr.dataset.qso ? '/activation/contacts/' + encodeURIComponent(tr.dataset.qso) + '/audio' : '';
+  }
+
   function enhance() {
-    document.querySelectorAll('tr[data-qso]').forEach(function (tr) {
-      var td = tr.querySelector('.act-actions');
-      if (!td || td.querySelector('.act-play')) return;
+    document.querySelectorAll('tr[data-audio], tr[data-qso]').forEach(function (tr) {
+      var td = tr.querySelector('.act-actions'), url = clipUrl(tr);
+      if (!td || !url || td.querySelector('.act-play')) return;
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'act-play';
       b.title = t('Écouter le QSO');
       b.textContent = '▶';
-      b.dataset.qso = tr.dataset.qso;
+      b.dataset.url = url;
       td.insertBefore(b, td.firstChild);
     });
   }
@@ -270,9 +280,11 @@
       '<button type="button" class="act-player-close" title="' + esc(t('Fermer')) + '">✕</button></div>' +
       '<div class="act-player-body"><button type="button" class="act-player-toggle">▶</button>' +
       '<canvas class="act-player-wave" height="64"></canvas></div>' +
-      '<div class="act-player-foot"><span class="act-player-time"></span><span class="act-player-msg"></span></div>';
+      '<div class="act-player-foot"><span class="act-player-time"></span><span class="act-player-msg"></span>' +
+      '<button type="button" class="act-player-hide" hidden></button></div>';
     document.body.appendChild(player);
     player.querySelector('.act-player-close').addEventListener('click', closePlayer);
+    player.querySelector('.act-player-hide').addEventListener('click', toggleHidden);
     player.querySelector('.act-player-toggle').addEventListener('click', function () { if (source) pause(); else play(); });
     player.querySelector('canvas').addEventListener('click', function (e) {
       if (!buffer) return;
@@ -294,10 +306,32 @@
     clip = buffer = null;
   }
 
-  async function openClip(id) {
+  function renderHide(data) {
+    var b = player.querySelector('.act-player-hide');
+    b.hidden = !(data && data.can_hide);
+    if (data) b.textContent = data.hidden ? t('Montrer au public') : t('Masquer au public');
+  }
+
+  /* Admins: keep this QSO's recording off the public page (or put it back). */
+  async function toggleHidden() {
+    if (!clip) return;
+    var body = new FormData();
+    body.append('hidden', clip.hidden ? '0' : '1');
+    try {
+      var r = await fetch('/activation/contacts/' + clip.id + '/audio-public',
+                          { method: 'POST', body: body, credentials: 'same-origin' });
+      if (!r.ok) throw new Error(String(r.status));
+      clip.hidden = (await r.json()).hidden;
+      renderHide(clip);
+      message(clip.hidden ? t('Masqué au public.') : '');
+    } catch (e) { message(t('Audio indisponible.')); }
+  }
+
+  async function openClip(url) {
     if (!player) buildPlayer();
     pause();
     clip = buffer = null; pos = 0;
+    renderHide(null);
     player.hidden = false;
     player.querySelector('.act-player-title').textContent = '…';
     player.querySelector('.act-player-time').textContent = '';
@@ -305,7 +339,7 @@
     draw();
     var data;
     try {
-      var r = await fetch('/activation/contacts/' + encodeURIComponent(id) + '/audio', { credentials: 'same-origin' });
+      var r = await fetch(url, { credentials: 'same-origin' });
       if (!r.ok || r.redirected) throw new Error(String(r.status));
       data = await r.json();
     } catch (e) {
@@ -317,6 +351,8 @@
       data.call + ' · ' + data.band + ' ' + data.mode + ' · ' + data.operator + ' · ' +
       pad(d.getUTCDate()) + '/' + pad(d.getUTCMonth() + 1) + ' ' + utc(data.at_ms) + ' UTC';
     if (!data.segments.length) { message(t('Pas d’audio enregistré autour de ce QSO.')); return; }
+    clip = data;
+    renderHide(data);
     try {
       playCtx = playCtx || new AudioContext();
       var rate = playCtx.sampleRate;
@@ -332,7 +368,7 @@
         var from = Math.max(0, -offset), to = Math.min(src.length, total - offset);
         for (var k = from; k < to; k++) out[offset + k] = src[k];
       }
-      clip = data; buffer = buf;
+      buffer = buf;
       // Start where the recording starts, not in the silence before it.
       pos = Math.max(0, Math.min(buf.duration, (data.segments[0].start_ms - data.from_ms) / 1000));
       message('');
@@ -413,6 +449,6 @@
 
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('.act-play');
-    if (b) openClip(b.dataset.qso);
+    if (b) openClip(b.dataset.url);
   });
 })();

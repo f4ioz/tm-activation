@@ -1396,7 +1396,20 @@ async def contact_audio(request: Request, contact_id: int) -> Response:
     clip = activation.audio_clip(contact_id) if activation.audio_enabled() else None
     if clip is None:
         return JSONResponse({"error": "not found"}, status_code=404)
+    # Admins can keep a recording off the public page.
+    clip["can_hide"] = activation.audio_public() and _is_admin(request)
     return JSONResponse(clip, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/contacts/{contact_id}/audio-public")
+async def contact_audio_public(request: Request, contact_id: int, hidden: str = Form("")) -> Response:
+    """Hide (or show again) a QSO's recording on the public page — admins."""
+    if not _is_admin(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    if activation.get_contact(contact_id) is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    activation.set_audio_hidden(contact_id, hidden == "1")
+    return JSONResponse({"hidden": hidden == "1"})
 
 
 @router.get("/audio/{seg_id}")
@@ -1516,6 +1529,53 @@ class _CallSlugConvertor(Convertor):
 register_url_convertor("callslug", _CallSlugConvertor())
 
 
+# ── Public listening of a QSO (option) ─────────────────────────────────────
+
+PUBLIC_AUDIO_PER_MINUTE = 120      # requests per IP (excerpt + segments)
+_NOINDEX = {"X-Robots-Tag": "noindex, nofollow"}
+
+
+def _public_station(slug: str) -> dict:
+    low = slug.lower()
+    st = activation.station_by_slug(low) if _RE_SLUG.match(low) else None
+    if st is None or not st["public"]:
+        raise HTTPException(status_code=404)
+    return st
+
+
+def _audio_rate_limited(request: Request) -> bool:
+    return security.rate_limited(f"public-audio:{visits.client_ip(request)}", PUBLIC_AUDIO_PER_MINUTE, 60)
+
+
+@public_router.get("/{slug:callslug}/qso/{contact_id}/audio")
+async def public_qso_audio(request: Request, slug: str, contact_id: int) -> Response:
+    """Excerpt of a QSO for the hunter who looked up their callsign."""
+    st = _public_station(slug)
+    if _audio_rate_limited(request):
+        return JSONResponse({"error": "too many requests"}, status_code=429, headers=_NOINDEX)
+    clip = activation.public_audio_clip(contact_id, st["callsign"])
+    if clip is None:
+        return JSONResponse({"error": "not found"}, status_code=404, headers=_NOINDEX)
+    return JSONResponse(clip, headers={"Cache-Control": "no-store", **_NOINDEX})
+
+
+@public_router.get("/{slug:callslug}/qso/{contact_id}/audio/{seg_id}")
+async def public_qso_audio_segment(request: Request, slug: str, contact_id: int, seg_id: int) -> Response:
+    """One segment — only if it belongs to THIS QSO's excerpt: the others
+    (operators talking between two QSOs…) are never served publicly."""
+    st = _public_station(slug)
+    if _audio_rate_limited(request):
+        return Response(status_code=429, headers=_NOINDEX)
+    clip = activation.public_audio_clip(contact_id, st["callsign"])
+    if clip is None or seg_id not in {s["id"] for s in clip["segments"]}:
+        raise HTTPException(status_code=404)
+    found = activation.audio_segment(seg_id)
+    if found is None:
+        raise HTTPException(status_code=404)
+    path, mime = found
+    return FileResponse(path, media_type=mime, headers={"Cache-Control": "public, max-age=3600", **_NOINDEX})
+
+
 @public_router.get("/{slug:callslug}/certificat")
 async def hunter_certificate(request: Request, slug: str, call: str = "",
                              back: str = "") -> Response:
@@ -1573,6 +1633,7 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
         return RedirectResponse(f"/{low}{query}", status_code=301)
     cs = st["callsign"]
     search = activation.contacts_for_call(call, cs) if call.strip() else None
+    audio_ids = activation.contacts_with_public_audio(search["contacts"], cs) if search and search["found"] else set()
     mode = _tz_mode(request)
     return templates.TemplateResponse(
         request,
@@ -1593,6 +1654,7 @@ async def public_board(request: Request, slug: str, call: str = "") -> Response:
             "recent": activation.list_contacts(limit=50, station=cs),
             "search": search,
             "search_call": call.strip().upper(),
+            "audio_ids": audio_ids,
             "show_contacts": activation.show_contacts(),
             "certificates": activation.certificates_on(),
             "cert_flash": request.query_params.get("cert"),

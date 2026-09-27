@@ -86,15 +86,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.47.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.47.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.47.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.tar.gz
 ```
 
 ## Features
@@ -247,6 +247,13 @@ instant the QSO was logged**, click to seek, UTC time and offset from the QSO
 ("QSO −00:42").
 
 - **Internal listening**: reserved to the operators area (operators and admins).
+- **Public listening** (an extra box to tick): a hunter who looks up their
+  callsign on the public page gets an **Audio** column and listens to their
+  QSOs in the same player. Only the excerpt around THEIR QSO is served, never
+  the rest of the recording (chatter between two QSOs…), with a request limit
+  per IP address and responses kept out of search engines. From the log's
+  player, an admin can **hide a QSO's audio from the public** (internal
+  listening remains).
 - **Retention**: 30 days by default, plus a quota (2 GB by default) beyond
   which the oldest recordings are erased. "Erase all audio" button.
 - **Browser**: recent Chrome, Edge or Firefox, page served over **HTTPS** (like
@@ -361,22 +368,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.47.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.48.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.47.0.tar.gz
-   cd tm-activation-1.47.0
+   tar xzf tm-activation-1.48.0.tar.gz
+   cd tm-activation-1.48.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.47.0.zip
-   cd tm-activation-1.47.0
+   unzip tm-activation-1.48.0.zip
+   cd tm-activation-1.48.0
    sudo bash install.sh --lan
    ```
 
@@ -464,8 +471,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.47.0.tar.gz
-cd tm-activation-1.47.0
+tar xzf tm-activation-1.48.0.tar.gz
+cd tm-activation-1.48.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

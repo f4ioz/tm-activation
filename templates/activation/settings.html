@@ -357,6 +357,7 @@
       <p class="act-muted">{{ _("Le navigateur de l'opérateur enregistre la sortie audio du poste (carte son USB) pendant qu'il logue. Chaque QSO du carnet a alors un bouton ▶ qui fait réécouter le contact, avec un repère à l'instant où il a été enregistré. Écoute réservée à l'espace opérateurs.") }}</p>
       <form method="post" action="/activation/settings/audio" class="act-form">
         <label class="act-check"><input type="checkbox" name="enabled" value="1"{% if audio_options.enabled %} checked{% endif %}> {{ _("Proposer l'enregistrement sur la page de log") }}</label>
+        <label class="act-check"><input type="checkbox" name="public" value="1"{% if audio_options.public %} checked{% endif %}> {{ _("Écoute publique : un chasseur qui retrouve ses QSO sur la page publique peut les réécouter") }}</label>
         <div class="act-mode-grid">
           <label>{{ _("Conservation (jours)") }} <input type="number" name="retention_days" min="1" max="365" value="{{ audio_options.retention_days }}"></label>
           <label>{{ _("Quota (Mo)") }} <input type="number" name="quota_mb" min="10" max="100000" value="{{ audio_options.quota_mb }}"></label>
@@ -365,6 +366,7 @@
         </div>
         <button type="submit">{{ _("Enregistrer") }}</button>
       </form>
+      <p class="act-muted act-map-note">{{ _("Écoute publique : seul l'extrait autour du QSO du chasseur est servi, jamais le reste de l'enregistrement. Un admin peut masquer au public l'audio d'un QSO depuis le lecteur du carnet.") }}</p>
       <p class="act-muted act-map-note">{{ _("Occupé : {size} Mo, {hours} h d'audio en {n} segments", size=(audio_usage.bytes / 1048576)|round(1), hours=audio_usage.hours, n=audio_usage.segments) }}{% if audio_usage.oldest %} · {{ _("depuis le {date}", date=audio_usage.oldest) }}{% endif %}. {{ _("Environ 10 Mo par heure d'écoute. Au-delà de la durée de conservation, puis du quota, les plus anciens enregistrements sont effacés.") }}</p>
       {% if audio_usage.segments %}
       <form method="post" action="/activation/settings/audio/clear" class="act-form"

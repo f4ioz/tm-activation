@@ -816,6 +816,8 @@ def init_db() -> None:
         cols = {row[1] for row in c.execute("PRAGMA table_info(contacts)").fetchall()}
         if "sat_name" not in cols:
             c.execute("ALTER TABLE contacts ADD COLUMN sat_name TEXT DEFAULT ''")
+        if "audio_hidden" not in cols:       # recording kept away from the public page
+            c.execute("ALTER TABLE contacts ADD COLUMN audio_hidden INTEGER DEFAULT 0")
         if "source" not in {row[1] for row in c.execute("PRAGMA table_info(slots)").fetchall()}:
             c.execute("ALTER TABLE slots ADD COLUMN source TEXT DEFAULT 'manual'")
         # Photo from the QRZ record (thumbnail shown while logging).
@@ -3024,8 +3026,8 @@ AUDIO_SEGMENT_MAX_MS = 65_000
 AUDIO_SEGMENT_MIN_MS = 300
 AUDIO_LATE_MAX_MS = 15 * 60_000             # a segment sent later than this is refused
 AUDIO_TYPES = {"audio/webm": ("webm", b"\x1a\x45\xdf\xa3"), "audio/ogg": ("ogg", b"OggS")}
-DEFAULT_AUDIO: dict[str, Any] = {"enabled": False, "retention_days": 30, "quota_mb": 2000,
-                                 "before": 90, "after": 20}
+DEFAULT_AUDIO: dict[str, Any] = {"enabled": False, "public": False, "retention_days": 30,
+                                 "quota_mb": 2000, "before": 90, "after": 20}
 AUDIO_RETENTION_MAX = 365
 AUDIO_QUOTA_MAX_MB = 100_000
 AUDIO_CLIP_MAX_S = 600
@@ -3036,6 +3038,7 @@ def get_audio_options() -> dict[str, Any]:
     d = DEFAULT_AUDIO
     return {
         "enabled": bool(saved.get("enabled", d["enabled"])),
+        "public": bool(saved.get("public", d["public"])),
         "retention_days": _clamp_int(saved.get("retention_days"), 1, AUDIO_RETENTION_MAX, d["retention_days"]),
         "quota_mb": _clamp_int(saved.get("quota_mb"), 10, AUDIO_QUOTA_MAX_MB, d["quota_mb"]),
         "before": _clamp_int(saved.get("before"), 0, AUDIO_CLIP_MAX_S, d["before"]),
@@ -3048,6 +3051,7 @@ def set_audio_options(form: dict[str, Any]) -> dict[str, Any]:
     d = DEFAULT_AUDIO
     data["audio"] = {
         "enabled": bool(form.get("enabled")),
+        "public": bool(form.get("public")),
         "retention_days": _clamp_int(form.get("retention_days"), 1, AUDIO_RETENTION_MAX, d["retention_days"]),
         "quota_mb": _clamp_int(form.get("quota_mb"), 10, AUDIO_QUOTA_MAX_MB, d["quota_mb"]),
         "before": _clamp_int(form.get("before"), 0, AUDIO_CLIP_MAX_S, d["before"]),
@@ -3060,6 +3064,12 @@ def set_audio_options(form: dict[str, Any]) -> dict[str, Any]:
 
 def audio_enabled() -> bool:
     return get_audio_options()["enabled"]
+
+
+def audio_public() -> bool:
+    """Hunters can listen to their QSOs on the public page."""
+    opts = get_audio_options()
+    return opts["enabled"] and opts["public"]
 
 
 def _audio_file(rel: str) -> Path | None:
@@ -3193,9 +3203,43 @@ def audio_clip(contact_id: int) -> dict[str, Any] | None:
     return {
         "id": q["id"], "call": q["call"], "band": q["band"], "mode": q["mode"],
         "operator": q["operator_call"], "at_ms": at, "from_ms": frm, "to_ms": to,
+        "hidden": bool(q.get("audio_hidden")),
         "segments": [{"id": r["id"], "start_ms": r["start_ms"], "end_ms": r["end_ms"],
                       "url": f"/activation/audio/{r['id']}"} for r in rows],
     }
+
+
+def set_audio_hidden(contact_id: int, hidden: bool) -> None:
+    """Keep a QSO's recording off the public page (internal listening stays)."""
+    init_db()
+    with conn() as c:
+        c.execute("UPDATE contacts SET audio_hidden=? WHERE id=?", (1 if hidden else 0, int(contact_id)))
+
+
+def public_audio_clip(contact_id: int, station: str) -> dict[str, Any] | None:
+    """Excerpt a hunter may listen to: public option on, QSO of this station,
+    not hidden, with some audio. Segment URLs point to the public route, which
+    only serves the segments of THIS excerpt."""
+    if not audio_public():
+        return None
+    q = get_contact(contact_id)
+    if q is None or q["station"] != station or q.get("audio_hidden"):
+        return None
+    clip = audio_clip(contact_id)
+    if clip is None or not clip["segments"]:
+        return None
+    slug = slugify_call(station)
+    for seg in clip["segments"]:
+        seg["url"] = f"/{slug}/qso/{contact_id}/audio/{seg['id']}"
+    clip["operator"] = q["operator_call"]
+    return clip
+
+
+def contacts_with_public_audio(contacts: list[dict[str, Any]], station: str) -> set[int]:
+    """Among these QSOs (a hunter's), those that can be listened to."""
+    if not audio_public():
+        return set()
+    return {q["id"] for q in contacts if public_audio_clip(q["id"], station) is not None}
 
 
 def audio_segment(seg_id: int) -> tuple[Path, str] | None:
