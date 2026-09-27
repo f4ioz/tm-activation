@@ -68,6 +68,7 @@
   </form>
   {% endif %}
   {% if not current_op %}<p class="act-warn">{{ _("Sélectionne ton indicatif avant de logger.") }}</p>{% endif %}
+  <div id="act-cat" class="act-cat"></div>
   </div>
   <div id="act-spots" hx-get="/activation/spots" hx-include="[name=band], [name=mode]"
        hx-trigger="load, every 60s, act-band from:body, act-qso from:body" hx-swap="innerHTML"></div>
@@ -372,8 +373,10 @@
     if (window.actStationClear) window.actStationClear();
     workedData = null; workedCall = ''; showWorked();
     checkSlot();
+    window.dispatchEvent(new Event('act-cat-refresh'));   // CAT: frequency back in
   };
 })();
 </script>
 <script src="{{ asset('/static/js/activation-station.js') }}" defer></script>
+<script src="{{ asset('/static/js/activation-cat.js') }}" defer></script>
 {% endblock %}

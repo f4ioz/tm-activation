@@ -19,6 +19,10 @@ en direct sur une page publique.
   cadence** (QSO/h et 10 min, avec la tendance), **panneau des spots DX**
   (« suis-je spotté ? ») et **drapeaux des pays contactés** qui s'ajoutent au
   fil des QSO.
+- **Lecture du poste (CAT)** en option : fréquence, bande et mode remplis tout
+  seuls depuis le poste branché sur le PC de l'opérateur (Icom CI-V, Kenwood /
+  TS-2000, SDR via Thetis ou SparkSDR), sans logiciel à installer
+  ([détails](#lecture-du-poste-cat)).
 - **ADIF** : import avec aperçu, export complet ou d'une sélection, prêt pour
   TQSL / LoTW.
 - **Certificat pour les chasseurs** : celui qui retrouve ses QSO sur la page
@@ -82,15 +86,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.46.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.46.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.46.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -211,6 +215,31 @@ wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45
   **surveillance** (`/admin/surveillance`, administrateur) montre le journal des
   connexions, les IP aux essais répétés et les robots bloqués.
 
+### Lecture du poste (CAT)
+
+Sur la page de log, **Connecter le poste** lit en direct la fréquence, la bande
+et le mode du poste branché en USB sur le PC de l'opérateur, et remplit le
+formulaire : les spots DX, le verrou de créneau et la détection des doublons
+suivent le VFO. Après chaque QSO, la fréquence revient d'elle-même.
+
+- **Navigateur** : Chrome ou Edge sur ordinateur (Web Serial), page en **HTTPS**
+  (modes Internet). Firefox, les téléphones et le mode réseau local en `http://`
+  gardent la saisie manuelle.
+- **Postes** : Icom en CI-V (IC-9700, IC-7300, IC-705, IC-7610, IC-7100,
+  IC-905, IC-9100 ; adresse trouvée automatiquement) et Kenwood / TS-2000. Un
+  SDR (Brick2, ANAN…) passe par le CAT de Thetis ou SparkSDR, qui imitent un
+  TS-2000 sur un port série virtuel.
+- **Lecture seule** : seules des commandes de lecture partent vers le poste
+  (fréquence, mode, identifiant) ; rien ne peut changer la fréquence ni passer
+  en émission.
+- **Modes** : CW, FM, AM et SSB sont repris du poste. En numérique, le mode
+  choisi dans le formulaire (FT8, FT4…) est conservé : le poste ne distingue
+  pas FT8 de PSK31.
+- **Un seul logiciel par port série** : si WSJT-X occupe déjà le port CAT du
+  poste, utiliser un autre port (Thetis en propose plusieurs) ou déconnecter
+  l'un des deux. Le port autorisé une fois est reconnecté seul à la visite
+  suivante.
+
 ### Rôles et droits
 
 | | Opérateur | Admin | Superadmin | Administrateur (`/login`) |
@@ -317,22 +346,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.45.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.46.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.45.0.tar.gz
-   cd tm-activation-1.45.0
+   tar xzf tm-activation-1.46.0.tar.gz
+   cd tm-activation-1.46.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.45.0.zip
-   cd tm-activation-1.45.0
+   unzip tm-activation-1.46.0.zip
+   cd tm-activation-1.46.0
    sudo bash install.sh --lan
    ```
 
@@ -423,8 +452,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.45.0.tar.gz
-cd tm-activation-1.45.0
+tar xzf tm-activation-1.46.0.tar.gz
+cd tm-activation-1.46.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

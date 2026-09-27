@@ -181,6 +181,24 @@ JS_MESSAGES: tuple[str, ...] = (
     "✓ Terminé",
     "{n} / {total} sélectionné",
     "{n} / {total} sélectionnés",
+    # activation-cat.js (radio read through Web Serial)
+    "CAT : la page doit être ouverte en HTTPS.",
+    "CAT : ouvrir cette page dans Chrome ou Edge, sur un ordinateur.",
+    "Poste (CAT)",
+    "lecture seule",
+    "Réglages CAT",
+    "Protocole",
+    "Icom CI-V (IC-9700, IC-7300, IC-705…)",
+    "Kenwood / TS-2000 (Thetis, SparkSDR…)",
+    "Vitesse (bauds)",
+    "Adresse CI-V",
+    "automatique",
+    "Déconnecter",
+    "Connecter le poste",
+    "Pas de réponse du poste : vérifiez la vitesse (bauds) et le réglage CI-V ou CAT.",
+    "Poste déconnecté.",
+    "Port occupé ou inaccessible : un autre logiciel l’utilise peut-être (WSJT-X…).",
+    "Recherche du poste…",
 )
 
 

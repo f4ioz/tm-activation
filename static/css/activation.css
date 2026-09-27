@@ -742,3 +742,23 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 /* Fixed callsign (non-admin operator account): shown, not chosen. */
 .act-op-me { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
 .act-op-me .act-call { font-size: 1rem; }
+
+/* CAT (radio read through Web Serial) — log page, "Operator at the mic" card */
+.act-cat { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
+.act-cat-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.act-cat-ro { color: var(--text-muted, #6b7280); font-size: 0.75rem; }
+.act-cat-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.act-cat-btn { cursor: pointer; background: var(--accent); color: var(--bg); border: 1px solid var(--accent);
+  border-radius: 3px; padding: 0.3rem 0.7rem; font-family: var(--font-mono, monospace); font-weight: 600;
+  font-size: 0.8rem; }
+.act-cat-cfg select { background: var(--bg-2, #0a0f1a); color: var(--text, #e4e4e7);
+  border: 1px solid var(--border, #1f2a44); border-radius: 3px; padding: 0.25rem; }
+.act-cat.is-on .act-cat-btn { background: transparent; color: var(--text-dim, #9ca3af);
+  border: 1px solid var(--border-strong, #2a3654); }
+.act-cat-status { font-family: var(--font-mono, monospace); }
+.act-cat-status.is-ok { color: var(--green, #4dffa7); }
+.act-cat-status.is-warn { color: var(--warn, #fbbf24); }
+.act-cat-cfg summary { cursor: pointer; color: var(--accent, #4d9eff); }
+.act-cat-cfg label { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.35rem; }
+.act-cat-cfg select { max-width: 100%; }
+.act-cat-note { margin: 0; font-size: 0.8rem; }
