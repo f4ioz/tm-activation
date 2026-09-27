@@ -762,3 +762,28 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-cat-cfg label { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.35rem; }
 .act-cat-cfg select { max-width: 100%; }
 .act-cat-note { margin: 0; font-size: 0.8rem; }
+
+/* QSO audio: recorder (log page) and player (▶ on each QSO) */
+.act-audio-level { display: inline-block; width: 4.5rem; height: 0.45rem; border-radius: 2px;
+  background: var(--border, #1f2a44); overflow: hidden; vertical-align: middle; }
+.act-audio-level i { display: block; height: 100%; width: 0; background: var(--green, #4dffa7); transition: width 80ms linear; }
+.act-audio-level i.is-clip { background: var(--red, #ef4444); }
+.act-cat-status.is-rec { color: var(--red, #ef4444); }
+.act-play { cursor: pointer; background: none; border: none; color: var(--accent, #4d9eff);
+  font-size: 0.85rem; padding: 0 0.3rem; }
+.act-player { --wave: #4d9eff; --marker: #ef4444; --head: #e4e4e7;
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 50; width: min(40rem, calc(100vw - 2rem));
+  background: var(--panel, #0d1220); border: 1px solid var(--border-strong, #2a3654); border-radius: 6px;
+  padding: 0.6rem 0.8rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45); font-size: 0.85rem; }
+[data-theme="light"] .act-player { --head: #111827; }
+.act-player-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.act-player-title { font-family: var(--font-mono, monospace); }
+.act-player-close { cursor: pointer; background: none; border: none; color: var(--text-dim, #9ca3af); font-size: 1rem; }
+.act-player-body { display: flex; align-items: center; gap: 0.6rem; margin: 0.4rem 0 0.2rem; }
+.act-player-toggle { cursor: pointer; flex: 0 0 2.2rem; height: 2.2rem; border-radius: 50%; border: none;
+  background: var(--accent, #4d9eff); color: var(--bg, #060910); font-size: 0.9rem; }
+.act-player-wave { flex: 1 1 auto; width: 100%; height: 64px; cursor: pointer;
+  background: var(--bg-2, #0a0f1a); border-radius: 3px; }
+.act-player-foot { display: flex; justify-content: space-between; gap: 0.5rem; color: var(--text-dim, #9ca3af);
+  font-family: var(--font-mono, monospace); font-size: 0.78rem; }
+.act-player-msg { color: var(--warn, #fbbf24); }

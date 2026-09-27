@@ -786,6 +786,18 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_contact_call ON contacts(call);
             CREATE INDEX IF NOT EXISTS idx_contact_date ON contacts(qso_date DESC);
+            CREATE TABLE IF NOT EXISTS audio_segments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                station TEXT NOT NULL,
+                operator_call TEXT NOT NULL,   -- whose browser recorded it
+                start_ms INTEGER NOT NULL,     -- UTC, server clock
+                end_ms INTEGER NOT NULL,
+                file TEXT NOT NULL,            -- relative to var/audio/
+                bytes INTEGER NOT NULL,
+                mime TEXT NOT NULL,
+                created_at INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_audio_start ON audio_segments(station, start_ms);
             CREATE TABLE IF NOT EXISTS callbook (
                 call TEXT PRIMARY KEY,
                 status TEXT NOT NULL,          -- ok / notfound / error
@@ -2997,6 +3009,203 @@ def to_csv(contacts: list[dict[str, Any]] | None = None) -> str:
     for q in contacts:
         w.writerow({k: q.get(k, "") for k in _CSV_COLS})
     return buf.getvalue()
+
+
+# ── QSO audio (optional) ───────────────────────────────────────────────────
+# The operator's browser records the radio's audio output (USB sound card)
+# and sends it in short Opus segments. Each QSO then gets its own excerpt:
+# the minute and a half before it was logged and a few seconds after. Files
+# live in var/audio/<station>/<day>/, the index in the audio_segments table;
+# old recordings go after N days, and the oldest ones first beyond a quota.
+
+AUDIO_DIR = ROOT / "var" / "audio"
+AUDIO_SEGMENT_MAX_BYTES = 1024 * 1024       # 30 s of Opus is ~100 kB
+AUDIO_SEGMENT_MAX_MS = 65_000
+AUDIO_SEGMENT_MIN_MS = 300
+AUDIO_LATE_MAX_MS = 15 * 60_000             # a segment sent later than this is refused
+AUDIO_TYPES = {"audio/webm": ("webm", b"\x1a\x45\xdf\xa3"), "audio/ogg": ("ogg", b"OggS")}
+DEFAULT_AUDIO: dict[str, Any] = {"enabled": False, "retention_days": 30, "quota_mb": 2000,
+                                 "before": 90, "after": 20}
+AUDIO_RETENTION_MAX = 365
+AUDIO_QUOTA_MAX_MB = 100_000
+AUDIO_CLIP_MAX_S = 600
+
+
+def get_audio_options() -> dict[str, Any]:
+    saved = load_settings().get("audio") or {}
+    d = DEFAULT_AUDIO
+    return {
+        "enabled": bool(saved.get("enabled", d["enabled"])),
+        "retention_days": _clamp_int(saved.get("retention_days"), 1, AUDIO_RETENTION_MAX, d["retention_days"]),
+        "quota_mb": _clamp_int(saved.get("quota_mb"), 10, AUDIO_QUOTA_MAX_MB, d["quota_mb"]),
+        "before": _clamp_int(saved.get("before"), 0, AUDIO_CLIP_MAX_S, d["before"]),
+        "after": _clamp_int(saved.get("after"), 0, AUDIO_CLIP_MAX_S, d["after"]),
+    }
+
+
+def set_audio_options(form: dict[str, Any]) -> dict[str, Any]:
+    data = load_settings()
+    d = DEFAULT_AUDIO
+    data["audio"] = {
+        "enabled": bool(form.get("enabled")),
+        "retention_days": _clamp_int(form.get("retention_days"), 1, AUDIO_RETENTION_MAX, d["retention_days"]),
+        "quota_mb": _clamp_int(form.get("quota_mb"), 10, AUDIO_QUOTA_MAX_MB, d["quota_mb"]),
+        "before": _clamp_int(form.get("before"), 0, AUDIO_CLIP_MAX_S, d["before"]),
+        "after": _clamp_int(form.get("after"), 0, AUDIO_CLIP_MAX_S, d["after"]),
+    }
+    _save_settings(data)
+    purge_audio()
+    return get_audio_options()
+
+
+def audio_enabled() -> bool:
+    return get_audio_options()["enabled"]
+
+
+def _audio_file(rel: str) -> Path | None:
+    """Absolute path of a stored segment, never outside var/audio/."""
+    path = (AUDIO_DIR / rel).resolve()
+    root = AUDIO_DIR.resolve()
+    return path if root in path.parents else None
+
+
+def add_audio_segment(data: bytes, content_type: str, operator_call: str, start_ms: int,
+                      duration_ms: int, client_now_ms: int, station: str | None = None) -> int:
+    """Store one recorded segment. Times come from the browser's clock and are
+    shifted onto the server's (the one that timestamps the QSOs): the browser
+    sends its own "now" with the segment."""
+    if not audio_enabled():
+        raise ValueError(_("enregistrement audio désactivé"))
+    mime = (content_type or "").split(";")[0].strip().lower()
+    kind = AUDIO_TYPES.get(mime)
+    if kind is None or not data.startswith(kind[1]):
+        raise ValueError(_("format audio non reconnu (Opus WebM ou Ogg attendu)"))
+    if len(data) > AUDIO_SEGMENT_MAX_BYTES:
+        raise ValueError(_("segment audio trop volumineux"))
+    if not AUDIO_SEGMENT_MIN_MS <= int(duration_ms) <= AUDIO_SEGMENT_MAX_MS:
+        raise ValueError(_("durée de segment invalide"))
+    op = (operator_call or "").strip().upper()
+    if not valid_callsign(op):
+        raise ValueError(_("indicatif opérateur invalide"))
+    now = int(time.time() * 1000)
+    start = int(start_ms) + (now - int(client_now_ms))
+    end = start + int(duration_ms)
+    if end > now + 5_000 or end < now - AUDIO_LATE_MAX_MS:
+        raise ValueError(_("segment audio hors délai"))
+    cs = _st(station)
+    day = datetime.fromtimestamp(start / 1000, UTC).strftime("%Y%m%d")
+    rel = f"{slugify_call(cs)}/{day}/{start}-{slugify_call(op)}-{secrets.token_hex(4)}.{kind[0]}"
+    path = _audio_file(rel)
+    if path is None:
+        raise ValueError(_("chemin invalide"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    init_db()
+    with conn() as c:
+        cur = c.execute(
+            "INSERT INTO audio_segments(station, operator_call, start_ms, end_ms, file, bytes, mime, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (cs, op, start, end, rel, len(data), mime, int(time.time())),
+        )
+        seg_id = int(cur.lastrowid)
+    purge_audio()
+    return seg_id
+
+
+def _drop_segments(c: sqlite3.Connection, rows: list[sqlite3.Row]) -> None:
+    for row in rows:
+        path = _audio_file(row["file"])
+        if path is not None:
+            path.unlink(missing_ok=True)
+        c.execute("DELETE FROM audio_segments WHERE id=?", (row["id"],))
+
+
+def purge_audio() -> int:
+    """Past the retention period, then the oldest ones beyond the quota."""
+    opts = get_audio_options()
+    init_db()
+    limit = int(time.time() * 1000) - opts["retention_days"] * 86_400_000
+    with conn() as c:
+        old = c.execute("SELECT id, file FROM audio_segments WHERE end_ms < ?", (limit,)).fetchall()
+        _drop_segments(c, old)
+        quota = opts["quota_mb"] * 1024 * 1024
+        total = c.execute("SELECT COALESCE(SUM(bytes), 0) FROM audio_segments").fetchone()[0]
+        extra: list[sqlite3.Row] = []
+        if total > quota:
+            for row in c.execute("SELECT id, file, bytes FROM audio_segments ORDER BY start_ms"):
+                if total <= quota:
+                    break
+                extra.append(row)
+                total -= row["bytes"]
+        _drop_segments(c, extra)
+    return len(old) + len(extra)
+
+
+def audio_usage() -> dict[str, Any]:
+    init_db()
+    with conn() as c:
+        n, size, dur, oldest = c.execute(
+            "SELECT COUNT(*), COALESCE(SUM(bytes), 0), COALESCE(SUM(end_ms - start_ms), 0), MIN(start_ms) "
+            "FROM audio_segments").fetchone()
+    return {"segments": int(n), "bytes": int(size), "hours": round(dur / 3_600_000, 1),
+            "oldest": datetime.fromtimestamp(oldest / 1000, UTC).strftime("%d/%m/%Y") if oldest else ""}
+
+
+def clear_audio() -> None:
+    """Delete every recording (the files, then the index)."""
+    init_db()
+    with conn() as c:
+        _drop_segments(c, c.execute("SELECT id, file FROM audio_segments").fetchall())
+
+
+def qso_instant_ms(contact: dict[str, Any]) -> int | None:
+    """When the QSO took place, in ms. The log keeps the minute; when the QSO
+    was logged "now", the record time gives the second."""
+    minutes = _utc_minutes(contact.get("qso_date", ""), contact.get("time_on", ""))
+    if minutes is None:
+        return None
+    minute_ms = minutes * 60_000
+    created = int(contact.get("created_at") or 0) * 1000
+    if created and minute_ms <= created < minute_ms + 120_000:
+        return created
+    return minute_ms + 30_000
+
+
+def audio_clip(contact_id: int) -> dict[str, Any] | None:
+    """Excerpt of a QSO: the segments covering [QSO − before, QSO + after].
+
+    The operator of the QSO's recordings first; failing that, any recording of
+    the station over that time (another operator's browser)."""
+    q = get_contact(contact_id)
+    if q is None:
+        return None
+    at = qso_instant_ms(q)
+    if at is None:
+        return None
+    opts = get_audio_options()
+    frm, to = at - opts["before"] * 1000, at + opts["after"] * 1000
+    sql = ("SELECT id, start_ms, end_ms, operator_call FROM audio_segments "
+           "WHERE station=? AND end_ms > ? AND start_ms < ? {} ORDER BY start_ms")
+    with conn() as c:
+        rows = c.execute(sql.format("AND operator_call=?"), (q["station"], frm, to, q["operator_call"])).fetchall()
+        if not rows:
+            rows = c.execute(sql.format(""), (q["station"], frm, to)).fetchall()
+    return {
+        "id": q["id"], "call": q["call"], "band": q["band"], "mode": q["mode"],
+        "operator": q["operator_call"], "at_ms": at, "from_ms": frm, "to_ms": to,
+        "segments": [{"id": r["id"], "start_ms": r["start_ms"], "end_ms": r["end_ms"],
+                      "url": f"/activation/audio/{r['id']}"} for r in rows],
+    }
+
+
+def audio_segment(seg_id: int) -> tuple[Path, str] | None:
+    init_db()
+    with conn() as c:
+        row = c.execute("SELECT file, mime FROM audio_segments WHERE id=?", (seg_id,)).fetchone()
+    if row is None:
+        return None
+    path = _audio_file(row["file"])
+    return (path, row["mime"]) if path is not None and path.is_file() else None
 
 
 # ── Backups ────────────────────────────────────────────────────────────────

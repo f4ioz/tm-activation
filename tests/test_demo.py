@@ -115,6 +115,7 @@ def test_roles_work_with_demo_accounts(demo_on) -> None:
     ("/activation/settings/qrz", {"username": "F1ABC", "password": "secret"}),
     ("/activation/settings/backup", {}),
     ("/activation/settings/logo/delete", {}),
+    ("/activation/settings/audio", {"enabled": "1"}),
     ("/activation/settings/operators/TM0DEMO2", {"action": "disable"}),
     ("/activation/settings/operators/m0demo1", {"action": "password", "password": "Hack-123!"}),
 ])

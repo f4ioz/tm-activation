@@ -34,7 +34,7 @@
     <thead><tr><th>{{ _("Date") }}</th><th>UTC</th><th>{{ _("Indicatif") }}</th><th>{{ _("Bande") }}</th><th>{{ _("Mode") }}</th><th>Sat</th><th>RST</th><th>Op</th><th></th></tr></thead>
     <tbody>
       {% for q in contacts %}
-        <tr>
+        <tr data-qso="{{ q.id }}">
           <td class="act-log-date">{{ q.qso_date[6:8] }}/{{ q.qso_date[4:6] }}</td><td>{{ q.time_on }}</td>
           <td class="act-call act-dxcc-cell">{{ call_flag(q.call) }} {{ q.call }}</td>
           <td>{{ q.band }}</td><td>{{ q.mode }}</td>

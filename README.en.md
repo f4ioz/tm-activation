@@ -23,6 +23,9 @@ from a phone or a PC, while hunters follow the activation live on a public page.
   radio plugged into the operator's PC (Icom CI-V, Kenwood / TS-2000, SDR
   through Thetis or SparkSDR), nothing to install
   ([details](#radio-reading-cat)).
+- Optional **QSO playback**: the operator's browser records the radio's audio,
+  and each QSO of the log gets a ▶ button with the waveform and a marker at the
+  instant of the contact ([details](#qso-playback-audio)).
 - **ADIF**: import with a preview, full or selective export, ready for
   TQSL / LoTW.
 - **A certificate for hunters**: whoever finds their QSOs on the public page
@@ -83,15 +86,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.46.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.46.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.47.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.47.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.46.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.47.0.tar.gz
 ```
 
 ## Features
@@ -229,6 +232,30 @@ the frequency comes back by itself.
   port, use another port (Thetis offers several) or disconnect one of them.
   A port allowed once is reconnected by itself on the next visit.
 
+### QSO playback (audio)
+
+An option to turn on in **Settings → Audio recording** (off by default). On
+the log page, **Record audio** captures the radio's audio output: the built-in
+USB sound card of Icoms ("USB Audio CODEC", picked automatically), the audio
+interface of a TS-2000, or the virtual audio cable of Thetis / SparkSDR. The
+sound goes to the server in 20 s Opus segments (about 10 MB per hour); a meter
+shows the level.
+
+In the log, **▶** on a QSO opens a player: waveform of the minute and a half
+before the QSO and the seconds after it (adjustable), **red marker at the
+instant the QSO was logged**, click to seek, UTC time and offset from the QSO
+("QSO −00:42").
+
+- **Internal listening**: reserved to the operators area (operators and admins).
+- **Retention**: 30 days by default, plus a quota (2 GB by default) beyond
+  which the oldest recordings are erased. "Erase all audio" button.
+- **Browser**: recent Chrome, Edge or Firefox, page served over **HTTPS** (like
+  the CAT). The browser's echo cancelling, noise reduction and automatic gain
+  are turned off: the radio's sound is recorded as it is.
+- **Network outage**: segments wait in the browser and go as soon as the
+  connection is back (up to 15 minutes late).
+- **Demo instance**: recording is disabled there.
+
 ### Roles and permissions
 
 | | Operator | Admin | Superadmin | Administrator (`/login`) |
@@ -334,22 +361,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.46.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.47.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.46.0.tar.gz
-   cd tm-activation-1.46.0
+   tar xzf tm-activation-1.47.0.tar.gz
+   cd tm-activation-1.47.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.46.0.zip
-   cd tm-activation-1.46.0
+   unzip tm-activation-1.47.0.zip
+   cd tm-activation-1.47.0
    sudo bash install.sh --lan
    ```
 
@@ -437,8 +464,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.46.0.tar.gz
-cd tm-activation-1.46.0
+tar xzf tm-activation-1.47.0.tar.gz
+cd tm-activation-1.47.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

@@ -427,6 +427,9 @@ def _settings_page(request: Request, status_code: int = 200, **extra: object) ->
             logo=activation.logo_info(),
             logo_on_pages=activation.logo_on_pages(),
             log_view=activation.get_log_view(),
+            audio_options=activation.get_audio_options(),
+            audio_usage=activation.audio_usage(),
+            ad_flash=request.query_params.get("ad"),
             certificate_options=activation.get_certificate_options(),
             certificate_engine=certificate.engine_ready(),
             ce_flash=request.query_params.get("ce"),
@@ -1077,6 +1080,7 @@ async def log_page(request: Request) -> Response:
             stats=activation.stats(),
             entities=activation.worked_entities(),
             now_input=activation.now_input(_tz_mode(request)),
+            audio_on=activation.audio_enabled(),
         ),
     )
 
@@ -1359,6 +1363,71 @@ async def export_adif(request: Request) -> Response:
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ── QSO audio (optional, internal) ─────────────────────────────────────────
+
+
+@router.post("/audio")
+async def audio_upload(request: Request, start: int = 0, dur: int = 0, now: int = 0) -> Response:
+    """One segment recorded by the operator's browser (raw body, Opus)."""
+    if (g := _guard(request)) is not None:
+        return g
+    length = request.headers.get("content-length", "")
+    if not length.isdigit() or int(length) > activation.AUDIO_SEGMENT_MAX_BYTES:
+        return JSONResponse({"error": _("segment audio trop volumineux")}, status_code=413)
+    op = _current_op(request)
+    data = await request.body()
+    try:
+        seg_id = await run_in_threadpool(
+            activation.add_audio_segment, data, request.headers.get("content-type", ""),
+            op, start, dur, now,
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"id": seg_id})
+
+
+@router.get("/contacts/{contact_id}/audio")
+async def contact_audio(request: Request, contact_id: int) -> Response:
+    """Excerpt of a QSO: segments to play and the QSO instant (ms, UTC)."""
+    if (g := _guard(request)) is not None:
+        return g
+    clip = activation.audio_clip(contact_id) if activation.audio_enabled() else None
+    if clip is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse(clip, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/audio/{seg_id}")
+async def audio_file(request: Request, seg_id: int) -> Response:
+    if (g := _guard(request)) is not None:
+        return g
+    found = activation.audio_segment(seg_id)
+    if found is None:
+        raise HTTPException(status_code=404)
+    path, mime = found
+    return FileResponse(path, media_type=mime, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@router.post("/settings/audio")
+async def change_audio_options(
+    request: Request, enabled: str = Form(""), retention_days: str = Form(""),
+    quota_mb: str = Form(""), before: str = Form(""), after: str = Form(""),
+) -> Response:
+    if (g := _require_superadmin(request)) is not None:
+        return g
+    activation.set_audio_options({"enabled": enabled, "retention_days": retention_days,
+                                  "quota_mb": quota_mb, "before": before, "after": after})
+    return RedirectResponse("/activation/settings?ad=ok#audio", status_code=303)
+
+
+@router.post("/settings/audio/clear")
+async def clear_audio(request: Request) -> Response:
+    if (g := _require_superadmin(request)) is not None:
+        return g
+    activation.clear_audio()
+    return RedirectResponse("/activation/settings?ad=cleared#audio", status_code=303)
 
 
 @router.get("/export.csv")

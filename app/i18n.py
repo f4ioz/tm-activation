@@ -199,6 +199,27 @@ JS_MESSAGES: tuple[str, ...] = (
     "Poste déconnecté.",
     "Port occupé ou inaccessible : un autre logiciel l’utilise peut-être (WSJT-X…).",
     "Recherche du poste…",
+    # activation-audio.js (QSO audio: recorder and player)
+    "Arrêter",
+    "Audio",
+    "Audio : ce navigateur ne sait pas enregistrer.",
+    "Audio : la page doit être ouverte en HTTPS.",
+    "Audio illisible par ce navigateur.",
+    "Audio indisponible.",
+    "Chargement de l’audio…",
+    "Choisir la carte son du poste (USB Audio CODEC pour les Icom) ou le câble audio virtuel du logiciel SDR.",
+    "Enregistrer l’audio",
+    "Entrée",
+    "Fermer",
+    "Micro refusé ou introuvable : autoriser l’accès à l’entrée audio.",
+    "Pas d’audio enregistré autour de ce QSO.",
+    "QSO {t}",
+    "Source audio",
+    "par défaut",
+    "{n} en attente",
+    "{n} envoyés",
+    "Écouter le QSO",
+    "écoute interne",
 )
 
 

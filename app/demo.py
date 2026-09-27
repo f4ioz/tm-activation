@@ -88,6 +88,10 @@ BLOCKED_POST = frozenset({
     "/activation/settings/logo",
     "/activation/settings/logo/show",
     "/activation/settings/logo/delete",
+    # QSO audio: anonymous visitors would record their microphone on the server.
+    "/activation/audio",
+    "/activation/settings/audio",
+    "/activation/settings/audio/clear",
 })
 BLOCKED_GET = frozenset({"/activation/settings/backup.sqlite"})
 # Default names of the fictitious station and club (install.sh --demo): shown
@@ -220,6 +224,7 @@ def _install_seed(work: Path) -> None:
     for logo in activation.LOGO_DIR.glob("logo.*") if activation.LOGO_DIR.is_dir() else ():
         logo.unlink(missing_ok=True)
     shutil.rmtree(activation.IMPORT_TMP_DIR, ignore_errors=True)
+    shutil.rmtree(activation.AUDIO_DIR, ignore_errors=True)
 
 
 def _loop() -> None:
