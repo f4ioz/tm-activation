@@ -489,6 +489,11 @@ no question; for a demo on the Internet, take choice 1 (guided) and answer "Demo
 - **Accounts shown on every page** (shared password `Demo-73!`, key
   `demo.password`): `M0DEMO1` and `TM0DEMO2` (operators), `TM0ADM11` (admin),
   `TM0SADM1` (superadmin). Clicking an account fills in the login form.
+- **Bilingual down to the fictitious names**: the station label ("Station de
+  démonstration") and the club name ("Radio-club de démonstration") follow the
+  visitor's language ("Demo station", "Demo radio club" in English). The
+  database keeps the French text; a label typed by a visitor is shown as it is
+  until the next reset.
 - **"DEMO" banner** with the countdown to the next reset (24 h by default,
   `--demo-hours N` or `demo.reset_hours` in config.yml, 1 to 168).
 - **Restrictions**: passwords and login mode, QRZ account, logo, backups

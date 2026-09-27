@@ -504,6 +504,11 @@ prendre le choix 1 (guidée) et répondre « Démonstration ».
 - **Comptes affichés sur chaque page** (mot de passe commun `Demo-73!`, clé
   `demo.password`) : `M0DEMO1` et `TM0DEMO2` (opérateurs), `TM0ADM11` (admin),
   `TM0SADM1` (superadmin). Un clic sur un compte remplit le formulaire de connexion.
+- **Bilingue jusqu'aux noms fictifs** : le libellé de la station (« Station de
+  démonstration ») et le nom du club (« Radio-club de démonstration ») suivent la
+  langue du visiteur (« Demo station », « Demo radio club » en anglais). La base
+  garde le texte français ; un libellé saisi par un visiteur s'affiche tel quel
+  jusqu'à la remise à zéro.
 - **Bandeau « DÉMO »** avec le compte à rebours de la prochaine remise à zéro
   (24 h par défaut, `--demo-hours N` ou `demo.reset_hours` dans config.yml, 1 à 168).
 - **Limites** : mots de passe et mode de connexion, compte QRZ, logo, sauvegardes
