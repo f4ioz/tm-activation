@@ -47,6 +47,15 @@ load_en() {
   MSG["1) Guidée : les questions de TM Activation (réseau local, Internet par la"]="1) Guided: the TM Activation questions (local network, Internet through the"
   MSG["2) Test rapide : réseau local, sans question, mot de passe admin généré"]="2) Quick test: local network, no question, generated admin password"
   MSG["Admin       : /login avec le mot de passe généré affiché plus haut"]="Admin       : /login with the generated password shown above"
+  MSG["3) Démo : réseau local, sans question, données fictives remises à zéro"]="3) Demo: local network, no question, fictitious data reset"
+  MSG["régulièrement, comptes de démo publics (démo sur Internet : choix 1)"]="on a schedule, public demo accounts (demo on the Internet: choice 1)"
+  MSG["Remise à zéro des données toutes les … heures (1 à 168)"]="Reset the data every … hours (1 to 168)"
+  MSG["Nombre d'heures invalide."]="Invalid number of hours."
+  MSG["TM Activation : démo, réseau local, remise à zéro toutes les {1} h"]="TM Activation : demo, local network, reset every {1} h"
+  MSG["Installation de la démo TM Activation (réseau local)…"]="Installing the TM Activation demo (local network)…"
+  MSG["Démo        : M0DEMO1, TM0DEMO2 (opérateurs), TM0ADM11 (admin), TM0SADM1 (superadmin)"]="Demo        : M0DEMO1, TM0DEMO2 (operators), TM0ADM11 (admin), TM0SADM1 (superadmin)"
+  MSG["mot de passe Demo-73! ; données remises à zéro toutes les {1} h"]="password Demo-73!; data reset every {1} h"
+  MSG["Admin       : /login avec le mot de passe généré affiché plus haut (à garder pour vous)"]="Admin       : /login with the generated password shown above (keep it to yourself)"
   MSG["Adresse invalide."]="Invalid address."
   MSG["Annulé : rien n'a été créé."]="Cancelled: nothing has been created."
   MSG["Attente du réseau dans la CT…"]="Waiting for the network in the container…"
@@ -177,6 +186,7 @@ D_SWAP="512"         # MB
 D_BRIDGE="vmbr0"
 D_IP="dhcp"
 D_TEST_CALL="TM0TEST"
+D_DEMO_HOURS="24"
 
 # IDs are shared by VMs and CTs across the whole cluster: pvesh knows this,
 # pct status only sees the CTs of this node.
@@ -268,11 +278,24 @@ prompt_config() {
   say "  1) Guidée : les questions de TM Activation (réseau local, Internet par la"
   say "     box avec HTTPS, ou Cloudflare Tunnel ; indicatif, club, mots de passe)"
   say "  2) Test rapide : réseau local, sans question, mot de passe admin généré"
+  say "  3) Démo : réseau local, sans question, données fictives remises à zéro"
+  say "     régulièrement, comptes de démo publics (démo sur Internet : choix 1)"
   while :; do
     ask choice "Choix" "1"
-    case "$choice" in 1) INSTALL_MODE="guided"; break ;; 2) INSTALL_MODE="quick"; break ;; esac
+    case "$choice" in
+      1) INSTALL_MODE="guided"; break ;;
+      2) INSTALL_MODE="quick"; break ;;
+      3) INSTALL_MODE="demo"; break ;;
+    esac
   done
-  TEST_CALL=""
+  TEST_CALL="" DEMO_HOURS=""
+  if [[ $INSTALL_MODE == demo ]]; then
+    while :; do
+      ask DEMO_HOURS "Remise à zéro des données toutes les … heures (1 à 168)" "$D_DEMO_HOURS"
+      if [[ $DEMO_HOURS =~ ^[0-9]+$ ]] && (( DEMO_HOURS >= 1 && DEMO_HOURS <= 168 )); then break; fi
+      msg_warn "Nombre d'heures invalide."
+    done
+  fi
   if [[ $INSTALL_MODE == quick ]]; then
     while :; do
       ask TEST_CALL "Indicatif de test" "$D_TEST_CALL"
@@ -293,6 +316,8 @@ prompt_config() {
   fi
   if [[ $INSTALL_MODE == quick ]]; then
     say "  TM Activation : test rapide, réseau local, indicatif {1}" "$TEST_CALL"
+  elif [[ $INSTALL_MODE == demo ]]; then
+    say "  TM Activation : démo, réseau local, remise à zéro toutes les {1} h" "$DEMO_HOURS"
   else
     say "  TM Activation : installation guidée"
   fi
@@ -403,6 +428,9 @@ install_app() {
     msg_info "Installation de TM Activation (test rapide, réseau local)…"
     pct exec "$CTID" -- env "${env[@]}" TM_CALLSIGN="$TEST_CALL" TM_LABEL="Test Proxmox" TM_PUBLIC=1 \
       "$UPDATER" --lan --non-interactive
+  elif [[ $INSTALL_MODE == demo ]]; then
+    msg_info "Installation de la démo TM Activation (réseau local)…"
+    pct exec "$CTID" -- env "${env[@]}" "$UPDATER" --lan --demo --demo-hours "$DEMO_HOURS" --non-interactive
   else
     msg_info "Installation guidée de TM Activation (questions dans la CT)…"
     # lxc-attach gives the installer a real terminal (questions, passwords).
@@ -434,6 +462,12 @@ show_summary() {
     say "  Site        : http://{1}/  (ou http://{2}.local/)" "${ip:-$CT_HOST.local}" "$CT_HOST"
     say "  Admin       : /login avec le mot de passe généré affiché plus haut"
     say "  Supprimer la CT de test : pct stop {1} && pct destroy {1}" "$CTID"
+  elif [[ $INSTALL_MODE == demo ]]; then
+    echo
+    say "  Site        : http://{1}/  (ou http://{2}.local/)" "${ip:-$CT_HOST.local}" "$CT_HOST"
+    say "  Démo        : M0DEMO1, TM0DEMO2 (opérateurs), TM0ADM11 (admin), TM0SADM1 (superadmin)"
+    say "                mot de passe Demo-73! ; données remises à zéro toutes les {1} h" "$DEMO_HOURS"
+    say "  Admin       : /login avec le mot de passe généré affiché plus haut (à garder pour vous)"
   fi
   echo
 }

@@ -254,3 +254,17 @@ def test_lxc_asks_the_language_and_speaks_english(tmp_path, proxmox) -> None:
                      "TM Activation installed in container 102", "Delete the test container"):
         assert expected in r.stdout, expected
     assert "Récapitulatif" not in r.stdout and "Disque" not in r.stdout
+
+
+def test_lxc_demo_install(tmp_path, proxmox) -> None:
+    """Choice 3: local-network demo, no question inside the container."""
+    r = lxc(proxmox, [*CT_DEFAULTS, "", "", "pw", "pw", "3", "abc", "12", ""])
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Nombre d'heures invalide." in r.stderr + r.stdout
+    log = calls(tmp_path)
+    run = next(line for line in log.splitlines() if "/usr/local/sbin/tm-activation-update --lan" in line)
+    assert run.endswith("--lan --demo --demo-hours 12 --non-interactive")
+    assert "TM_CALLSIGN" not in run and "lxc-attach" not in log
+    assert "démo, réseau local, remise à zéro toutes les 12 h" in r.stdout
+    assert "TM0SADM1 (superadmin)" in r.stdout and "Demo-73!" in r.stdout
+    assert "pct destroy" not in r.stdout

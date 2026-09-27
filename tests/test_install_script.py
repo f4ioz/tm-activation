@@ -258,3 +258,26 @@ def test_demo_marker_and_state_written(tmp_path: Path) -> None:
     run(f'UI_LANG=fr; parse_args --lan --no-systemd --dir {plain}; resolve_context; resolve_ports; install_code')
     assert not (plain / "var" / "DEMO_INSTANCE").exists()
     assert "DEMO=0" in (plain / "install.env").read_text()
+
+
+@pytest.mark.parametrize("answers, expected", [
+    ("\n", "R=0|24"),                 # default: regular installation, no hours asked
+    ("1\n", "R=0|24"),
+    ("2\n\n", "R=1|24"),              # demo, default reset period
+    ("2\n0\n300\n12\n", "R=1|12"),    # out-of-range hours asked again
+])
+def test_ask_demo(answers: str, expected: str) -> None:
+    r = run('UI_LANG=fr; ask_demo; echo "R=$DEMO|$DEMO_HOURS"', stdin=answers)
+    assert r.returncode == 0 and expected in r.stdout
+    if expected.startswith("R=1") and "0\n300" in answers:
+        assert r.stdout.count("Nombre d'heures invalide.") == 2
+
+
+def test_guided_demo_skips_station_questions(tmp_path: Path) -> None:
+    """Demo chosen in the guided flow: collect_config asks only address + admin password."""
+    r = run(f'UI_LANG=fr; INTERACTIVE=yes; parse_args --lan --dir {tmp_path / "new"}; resolve_context; '
+            'ask_demo; resolve_ports; validate; collect_config; echo "R=$DEMO|$CALLSIGN|$BASE_URL"',
+            stdin="2\n6\nhttp://demo.local\n\n\n")
+    assert r.returncode == 0, r.stderr
+    assert "R=1|TM0DEMO|http://demo.local" in r.stdout
+    assert "Indicatif spécial" not in r.stdout

@@ -565,6 +565,25 @@ EOF
 EOF
 }
 
+ask_demo() {  # new installation: regular or public demo instance
+  local choice
+  title "Type d'installation"
+  menu choice "Choix" 1 \
+    "Normale : votre indicatif spécial, votre club, vos opérateurs" \
+    "Démonstration : données fictives remises à zéro régulièrement, comptes de démo publics"
+  if [[ $choice != 2 ]]; then return 0; fi
+  DEMO=1
+  echo
+  say "Tout est fictif : aucune question sur la station ni le club."
+  say "Ne mettez jamais un vrai log sur une instance de démonstration."
+  while :; do
+    ask DEMO_HOURS "Remise à zéro des données toutes les … heures (1 à 168)" "$DEMO_HOURS"
+    if [[ $DEMO_HOURS =~ ^[0-9]+$ ]] && (( DEMO_HOURS >= 1 && DEMO_HOURS <= 168 )); then break; fi
+    say "Nombre d'heures invalide."
+  done
+  ASKED=1
+}
+
 ask_mode() {
   local choice
   title "Utilisation"
@@ -1344,7 +1363,10 @@ main() {
   fi
 
   if [[ ! -f $DIR/config.yml ]]; then FIRST_CONFIG=1; fi
-  if [[ $INTERACTIVE == yes && $UPGRADE == 0 && $FIRST_CONFIG == 1 ]]; then welcome; fi
+  if [[ $INTERACTIVE == yes && $UPGRADE == 0 && $FIRST_CONFIG == 1 ]]; then
+    welcome
+    if [[ -z $CLI_DEMO ]]; then ask_demo; fi
+  fi
   if [[ -z $MODE ]]; then
     if [[ $UPGRADE == 0 && $INTERACTIVE == yes && $USE_SYSTEMD == yes ]]; then ask_mode; else MODE="manual"; fi
   elif [[ $MODE == internet && $INTERACTIVE == yes && $UPGRADE == 0 && $ASKED == 0 ]]; then
