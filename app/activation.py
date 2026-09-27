@@ -993,6 +993,11 @@ def utc_iso_to_parts(utc_iso: str) -> tuple[str, str] | None:
 
 
 def add_operator(call: str, name: str = "") -> None:
+    """Add a callsign to the roster (or set its name).
+
+    An existing operator keeps its state: a disabled account is NOT reactivated
+    here (any operator can call this route) — only an administrator can, with
+    ``set_operator_active``. An empty name leaves the known one in place."""
     cs = (call or "").strip().upper()
     if not valid_callsign(cs):
         raise ValueError(_("indicatif invalide"))
@@ -1000,7 +1005,8 @@ def add_operator(call: str, name: str = "") -> None:
     with conn() as c:
         c.execute(
             "INSERT INTO operators(callsign, name, active, created_at) VALUES (?, ?, 1, ?) "
-            "ON CONFLICT(callsign) DO UPDATE SET name=excluded.name, active=1",
+            "ON CONFLICT(callsign) DO UPDATE SET "
+            "name=CASE WHEN excluded.name != '' THEN excluded.name ELSE operators.name END",
             (cs, name.strip(), int(time.time())),
         )
     maybe_backup()

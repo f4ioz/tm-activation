@@ -218,3 +218,43 @@ def test_unknown_box_is_refused() -> None:
     r = subprocess.run(["bash", "install.sh", "--box", "minitel", "--check"], cwd=ROOT,
                        capture_output=True, text=True)
     assert r.returncode == 1 and "box inconnue" in r.stderr
+
+
+# ── Demo instance (--demo) ──────────────────────────────────────────────────
+
+
+def test_demo_refused_on_a_regular_installation(tmp_path: Path) -> None:
+    """The demo resets the database: never over an installation with a real log."""
+    (tmp_path / ".tm-activation").write_text("1.41.0")
+    (tmp_path / "install.env").write_text("MODE=lan\nUI_LANG=fr\n")
+    r = run(f'UI_LANG=fr; parse_args --demo --dir {tmp_path}; resolve_context; validate_demo; echo PASSED')
+    assert "PASSED" not in r.stdout and "installation normale" in r.stderr
+    (tmp_path / "install.env").write_text("MODE=lan\nUI_LANG=fr\nDEMO=1\n")   # already a demo: fine
+    r = run(f'UI_LANG=fr; parse_args --dir {tmp_path}; resolve_context; validate_demo; echo "R=$DEMO"')
+    assert "R=1" in r.stdout
+
+
+@pytest.mark.parametrize("hours, ok", [("24", True), ("1", True), ("168", True), ("0", False), ("200", False), ("x", False)])
+def test_demo_hours(tmp_path: Path, hours: str, ok: bool) -> None:
+    r = run(f'UI_LANG=fr; parse_args --demo --demo-hours {hours} --dir {tmp_path / "new"}; '
+            'resolve_context; validate_demo; echo "R=$DEMO_HOURS"')
+    assert (f"R={hours}" in r.stdout) is ok
+
+
+def test_demo_collect_config_needs_no_station_answers(tmp_path: Path) -> None:
+    r = run(f'UI_LANG=fr; INTERACTIVE=no; parse_args --demo --lan --dir {tmp_path / "new"}; resolve_context; '
+            'collect_config; echo "R=$CALLSIGN|$GRID|$QRZ_USER|$OPERATOR_PASSWORD"')
+    assert r.returncode == 0 and "R=TM0DEMO|JN18DU||" in r.stdout
+
+
+def test_demo_marker_and_state_written(tmp_path: Path) -> None:
+    target = tmp_path / "new"
+    r = run(f'UI_LANG=fr; parse_args --demo --lan --no-systemd --dir {target}; resolve_context; resolve_ports; '
+            'install_code')
+    assert r.returncode == 0, r.stderr
+    assert (target / "var" / "DEMO_INSTANCE").is_file()
+    assert "DEMO=1" in (target / "install.env").read_text()
+    plain = tmp_path / "plain"
+    run(f'UI_LANG=fr; parse_args --lan --no-systemd --dir {plain}; resolve_context; resolve_ports; install_code')
+    assert not (plain / "var" / "DEMO_INSTANCE").exists()
+    assert "DEMO=0" in (plain / "install.env").read_text()

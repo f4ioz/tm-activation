@@ -76,15 +76,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.41.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.41.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.42.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.42.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.41.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.42.0.tar.gz
 ```
 
 ## Features
@@ -303,22 +303,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.41.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.42.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.41.0.tar.gz
-   cd tm-activation-1.41.0
+   tar xzf tm-activation-1.42.0.tar.gz
+   cd tm-activation-1.42.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.41.0.zip
-   cd tm-activation-1.41.0
+   unzip tm-activation-1.42.0.zip
+   cd tm-activation-1.42.0
    sudo bash install.sh --lan
    ```
 
@@ -401,8 +401,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.41.0.tar.gz
-cd tm-activation-1.41.0
+tar xzf tm-activation-1.42.0.tar.gz
+cd tm-activation-1.42.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -458,6 +458,33 @@ separated list), `TM_ADMIN_PASSWORD` (generated if empty),
 
 Quick trial without root on a PC: `./install.sh --no-systemd --dir ~/tm-activation`,
 then run the command shown and open <http://127.0.0.1:8000/>.
+
+## Demo instance
+
+To show the application to other clubs without risking a real log:
+
+```bash
+sudo ./install.sh --demo --domain demo.my-club.org --email me@example.org
+sudo ./install.sh --demo --lan --demo-hours 12      # local network, reset every 12 h
+```
+
+- **Representative fictitious data**: callsign TM0DEMO, ~370 QSOs over 3 days
+  (mostly Europe, some DX, a satellite pass), a LIVE session, upcoming slots,
+  a hunters ranking and certificates.
+- **Accounts shown on every page** (shared password `Demo-73!`, key
+  `demo.password`): `M0DEMO1` and `TM0DEMO2` (operators), `TM0ADM11` (admin),
+  `TM0SADM1` (superadmin). Clicking an account fills in the login form.
+- **"DEMO" banner** with the countdown to the next reset (24 h by default,
+  `--demo-hours N` or `demo.reset_hours` in config.yml, 1 to 168).
+- **Restrictions**: passwords and login mode, QRZ account, logo, backups
+  (download included) and the rights of the 4 demo accounts are locked;
+  uploads limited to 256 KB, 40 writes/minute per IP, caps on QSOs, slots,
+  accounts and callsigns; certificate QR code frozen; QRZ never queried;
+  pages served `noindex`. The main administrator password (`/login`) stays
+  yours: do not publish it.
+- **Data safety**: the reset only runs on an installation created with `--demo`
+  (`var/DEMO_INSTANCE` file). `--demo` is refused on an existing regular
+  installation: install the demo in another folder or on another machine.
 
 ## Moving the Pi, diagnostics
 

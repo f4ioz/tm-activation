@@ -51,3 +51,14 @@ activation:
   operators: []             # initial list of operators, e.g. ["F1ABC", "F4XYZ"]
   qrz_enrich: true          # fill in QRZ records in the background
   qrz_interval_seconds: 10  # 1 callsign every N seconds
+
+demo:
+  # Public DEMO instance (install.sh --demo): fictitious data rebuilt every
+  # reset_hours, "DEMO" banner with a countdown, demo accounts M0DEMO1 and
+  # TM0DEMO2 (operators), TM0ADM11 (admin), TM0SADM1 (superadmin) sharing the
+  # password below, and restrictions (passwords, QRZ, logo, backups, volumes).
+  # The reset only runs on an installation made with --demo (var/DEMO_INSTANCE):
+  # NEVER enable this on an installation holding a real log.
+  enabled: false
+  reset_hours: 24           # 1 to 168
+  password: "Demo-73!"      # shown on every page: 8+ chars, uppercase, digit, special

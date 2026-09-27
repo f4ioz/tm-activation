@@ -1,0 +1,65 @@
+{#- Demo mode banner (install.sh --demo): fictitious data, reset countdown,
+    demo accounts. Included at the top of every page by _base.html. -#}
+{%- set demo = demo_info() -%}
+{%- if demo %}
+<style>
+  .demo-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem; padding: 0.5rem 1rem;
+    background: repeating-linear-gradient(135deg, rgba(251,191,36,0.14) 0 14px, rgba(251,191,36,0.06) 14px 28px);
+    border-bottom: 1px solid var(--warn, #fbbf24); color: var(--text, #e4e4e7); font-size: 0.9rem; }
+  .demo-tag { background: var(--warn, #fbbf24); color: #111; font-family: var(--font-display, sans-serif);
+    font-weight: 700; letter-spacing: 0.12em; padding: 0.1rem 0.55rem; border-radius: 3px; }
+  .demo-count { font-family: var(--font-mono, monospace); color: var(--warn, #fbbf24); font-weight: 600; }
+  .demo-banner details { flex-basis: 100%; }
+  .demo-banner summary { cursor: pointer; color: var(--accent, #4d9eff); }
+  .demo-accounts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0; padding: 0; list-style: none; }
+  .demo-accounts button { font: inherit; font-family: var(--font-mono, monospace); cursor: pointer; padding: 0.2rem 0.55rem;
+    border: 1px solid var(--border-strong, #2a3654); border-radius: 3px; background: var(--panel, #0d1220); color: var(--text, #e4e4e7); }
+  .demo-accounts button:hover { border-color: var(--warn, #fbbf24); }
+  .demo-accounts small { color: var(--text-dim, #9ca3af); margin-left: 0.3rem; }
+  .demo-pw { font-family: var(--font-mono, monospace); user-select: all; color: var(--warn, #fbbf24); }
+</style>
+<div class="demo-banner" role="note">
+  <span class="demo-tag">{{ _("DÉMO") }}</span>
+  <span>{{ _("Données fictives : essayez librement, tout est remis à zéro toutes les {h} h.", h=demo.hours) }}</span>
+  {%- if demo.next_reset_iso %}
+  <span>{{ _("Prochaine remise à zéro dans") }} <time class="demo-count" id="demo-count" datetime="{{ demo.next_reset_iso }}">{{ '%02d:%02d:%02d'|format(demo.remaining // 3600, demo.remaining % 3600 // 60, demo.remaining % 60) }}</time></span>
+  {%- endif %}
+  {%- set on_login = request.url.path in ('/activation/login', '/login') %}
+  <details{% if on_login %} open{% endif %}>
+    <summary>{{ _("Comptes de démonstration") }} — {{ _("mot de passe :") }} <span class="demo-pw">{{ demo.password }}</span></summary>
+    <ul class="demo-accounts">
+      {%- for acc in demo.accounts %}
+      <li><button type="button" data-call="{{ acc.call }}" title="{{ _("Remplir le formulaire de connexion") }}">{{ acc.call }}<small>{% if acc.role == 'superadmin' %}{{ _("superadmin") }}{% elif acc.role == 'admin' %}{{ _("admin") }}{% else %}{{ _("opérateur") }}{% endif %}</small></button></li>
+      {%- endfor %}
+    </ul>
+  </details>
+</div>
+<script>
+  (function () {
+    var out = document.getElementById('demo-count');
+    if (out) {
+      var end = Date.parse(out.getAttribute('datetime'));
+      var tick = function () {
+        var s = Math.max(0, Math.floor((end - Date.now()) / 1000));
+        var p = function (n) { return (n < 10 ? '0' : '') + n; };
+        out.textContent = p(Math.floor(s / 3600)) + ':' + p(Math.floor(s % 3600 / 60)) + ':' + p(s % 60);
+        if (s === 0) { clearInterval(timer); setTimeout(function () { location.reload(); }, 20000); }
+      };
+      var timer = setInterval(tick, 1000);
+      tick();
+    }
+    // A demo account button fills the operator login form (or leads to it).
+    var pw = {{ demo.password|tojson }};
+    document.querySelectorAll('.demo-accounts button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var form = document.querySelector('form[action="/activation/login"]');
+        if (!form) { location.href = '/activation/login'; return; }
+        form.querySelector('[name=callsign]').value = btn.getAttribute('data-call');
+        form.querySelector('[name=password]').value = pw;
+        var q = form.querySelector('[name=captcha]');
+        (q || form.querySelector('button[type=submit]')).focus();
+      });
+    });
+  })();
+</script>
+{%- endif %}

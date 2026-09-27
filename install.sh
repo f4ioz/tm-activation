@@ -9,6 +9,9 @@
 #   sudo ./install.sh --tunnel --domain tm.mon-club.fr
 #                                Internet via Cloudflare Tunnel: no port
 #                                opened on the router (works over 4G, shared IPv4)
+#   sudo ./install.sh --demo --domain demo.mon-club.fr --email moi@example.org
+#                                public DEMO instance: fictitious data reset
+#                                every 24 h (--demo-hours N), demo accounts
 #   sudo ./install.sh --check    diagnostics: service, network, DNS, certificate
 #                                (after moving the Pi, an outage…)
 #   ./install.sh --no-systemd --dir ~/tm-activation     no root, no service
@@ -36,7 +39,7 @@ RE_EMAIL='^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
 
 # Options (empty = not given: taken from install.env, else the mode default).
 CLI_DIR="" CLI_USER="" CLI_SERVICE="" CLI_HOST="" CLI_PORT="" CLI_MODE="" CLI_DOMAIN="" CLI_BOX="" CLI_EMAIL=""
-CLI_TUNNEL_NAME=""
+CLI_TUNNEL_NAME="" CLI_DEMO="" CLI_DEMO_HOURS=""
 USE_SYSTEMD="auto" INTERACTIVE="auto" CHECK=0
 PYTHON="${PYTHON:-python3}"
 
@@ -44,7 +47,9 @@ PYTHON="${PYTHON:-python3}"
 MODE="" DOMAIN="" BOX="" EMAIL="" HOST="" PORT="" SVC_USER="" SERVICE="" DIR="" TUNNEL_NAME=""
 UPGRADE=0 IS_ROOT=0 FIRST_CONFIG=0 ASKED=0 OLD_PORT="" TUNNEL_READY=1
 PREV_MODE="" PREV_HOST="" PREV_PORT="" PREV_SVC_USER="" PREV_SERVICE="" PREV_DOMAIN="" PREV_BOX="" PREV_EMAIL=""
-PREV_TUNNEL_NAME=""
+PREV_TUNNEL_NAME="" PREV_DEMO=""
+DEMO="0" DEMO_HOURS="24"
+DEMO_MARKER="var/DEMO_INSTANCE"   # the application resets the data ONLY with this file
 CF_CONF_DIR="${CF_CONF_DIR:-/etc/cloudflared}"     # tunnel configuration (overridable: tests)
 CF_LOGIN_DIR="${CF_LOGIN_DIR:-$HOME/.cloudflared}" # cert.pem and credentials created by "cloudflared tunnel login"
 VPY="" PORT_SUFFIX="" GENERATED_ADMIN_PW="" SHARED_IP=0
@@ -113,6 +118,11 @@ Mode:
   --tunnel-name NAME  Cloudflare tunnel name (default: from the domain)
   --manual            advanced: listens on 127.0.0.1:8000, reverse proxy is up to you
 
+Demo:
+  --demo              public DEMO instance (new installation only): fictitious
+                      data, "DEMO" banner, demo accounts, restrictions
+  --demo-hours N      with --demo: data reset every N hours (default: 24)
+
 Other options:
   --check             check the installation (nothing is changed)
   --dir DIR           installation folder             (default: /opt/tm-activation)
@@ -145,6 +155,11 @@ Mode :
                       ouvert sur la box, HTTPS assuré par Cloudflare
   --tunnel-name NOM   nom du tunnel Cloudflare (défaut : d'après le domaine)
   --manual            avancé : écoute sur 127.0.0.1:8000, reverse proxy à votre charge
+
+Démonstration :
+  --demo              instance de DÉMO publique (nouvelle installation seulement) :
+                      données fictives, bandeau « DÉMO », comptes de démo, limites
+  --demo-hours N      avec --demo : remise à zéro des données toutes les N heures (défaut : 24)
 
 Autres options :
   --check             diagnostic de l'installation (rien n'est modifié)
@@ -390,6 +405,8 @@ parse_args() {
       --email) CLI_EMAIL="${2:?--email demande une adresse}"; shift 2 ;;
       --box) CLI_BOX="${2:?--box demande un nom}"; shift 2 ;;
       --manual) CLI_MODE="manual"; shift ;;
+      --demo) CLI_DEMO="1"; shift ;;
+      --demo-hours) CLI_DEMO_HOURS="${2:?--demo-hours demande un nombre}"; shift 2 ;;
       --check) CHECK=1; shift ;;
       --dir) CLI_DIR="${2:?}"; shift 2 ;;
       --user) CLI_USER="${2:?}"; shift 2 ;;
@@ -442,7 +459,7 @@ resolve_context() {
   if [[ -f $DIR/$STATE ]]; then
     while IFS='=' read -r key value; do
       case "$key" in
-        MODE|HOST|PORT|SVC_USER|SERVICE|DOMAIN|BOX|EMAIL|TUNNEL_NAME|UI_LANG) printf -v "PREV_$key" '%s' "$value" ;;
+        MODE|HOST|PORT|SVC_USER|SERVICE|DOMAIN|BOX|EMAIL|TUNNEL_NAME|UI_LANG|DEMO) printf -v "PREV_$key" '%s' "$value" ;;
       esac
     done < "$DIR/$STATE"
   fi
@@ -455,6 +472,8 @@ resolve_context() {
   EMAIL="${CLI_EMAIL:-$PREV_EMAIL}"
   TUNNEL_NAME="${CLI_TUNNEL_NAME:-$PREV_TUNNEL_NAME}"
   UI_LANG="${CLI_LANG:-${UI_LANG:-$PREV_UI_LANG}}"
+  DEMO="${CLI_DEMO:-${PREV_DEMO:-0}}"
+  if [[ -n $CLI_DEMO_HOURS ]]; then DEMO_HOURS="$CLI_DEMO_HOURS"; fi
   if [[ -n $UI_LANG ]] && ! in_list "$UI_LANG" fr en; then die "$(t "langue inconnue : {1} (fr ou en)" "$UI_LANG")"; fi
   return 0
 }
@@ -495,9 +514,25 @@ validate() {
     [[ $USE_SYSTEMD == yes ]] || die "le mode Cloudflare Tunnel demande root et systemd"
     [[ $TUNNEL_NAME == "" || $TUNNEL_NAME =~ ^[a-zA-Z0-9_-]+$ ]] || die "$(t "nom de tunnel invalide : {1}" "$TUNNEL_NAME")"
   fi
+  validate_demo
   if [[ -n $EMAIL ]]; then
     [[ $EMAIL =~ $RE_EMAIL ]] || die "$(t "e-mail invalide : {1}" "$EMAIL")"
     [[ $MODE == internet ]] || die "--email ne sert qu'avec --domain"
+  fi
+  return 0
+}
+
+validate_demo() {
+  if [[ -n $CLI_DEMO_HOURS && $DEMO != 1 ]]; then die "--demo-hours ne sert qu'avec --demo"; fi
+  if ! [[ $DEMO_HOURS =~ ^[0-9]+$ ]] || (( DEMO_HOURS < 1 || DEMO_HOURS > 168 )); then
+    die "$(t "durée de démo invalide : {1} (1 à 168 heures)" "$DEMO_HOURS")"
+  fi
+  if [[ $DEMO == 1 && $UPGRADE == 1 && $PREV_DEMO != 1 ]]; then
+    # The demo resets the database: never on an installation holding a real log.
+    die "$(t "{1} est une installation normale : le mode démo effacerait son log. Installez la démo dans un autre dossier (--dir) ou une autre machine." "$DIR")"
+  fi
+  if [[ -n $CLI_DEMO_HOURS && -f $DIR/config.yml ]]; then
+    die "$(t "config.yml existe déjà : changez plutôt demo.reset_hours dans {1}/config.yml, puis redémarrez le service" "$DIR")"
   fi
   return 0
 }
@@ -594,8 +629,23 @@ collect_config() {
   ADMIN_PASSWORD="${TM_ADMIN_PASSWORD:-}"; OPERATOR_PASSWORD="${TM_OPERATOR_PASSWORD:-}"
   QRZ_USER="${TM_QRZ_USER:-}"; QRZ_PASSWORD="${TM_QRZ_PASSWORD:-}"
   TRUSTED_PROXIES="${TM_TRUSTED_PROXIES:-}"
+  if [[ $DEMO == 1 ]]; then
+    # Everything is fictitious: nothing to ask about the station or the club.
+    CALLSIGN="${CALLSIGN:-TM0DEMO}"; GRID="${GRID:-JN18DU}"
+    LABEL="${LABEL:-Station de démonstration}"
+    CLUB_NAME="${CLUB_NAME:-Radio-club de démonstration}"
+    OPERATORS=""; OPERATOR_PASSWORD=""; QRZ_USER=""; QRZ_PASSWORD=""
+  fi
 
-  if [[ $INTERACTIVE == yes ]]; then
+  if [[ $INTERACTIVE == yes && $DEMO == 1 ]]; then
+    title "Accès"
+    ask BASE_URL "Adresse de ce site" "$BASE_URL"
+    say "Administrateur principal : gardez son mot de passe pour vous, les visiteurs ont les comptes de démo."
+    ask_password ADMIN_PASSWORD "Mot de passe administrateur (vide = généré)"
+    if [[ $MODE == manual && $HOST != 127.0.0.1 && $HOST != localhost && -z $TRUSTED_PROXIES ]]; then
+      ask TRUSTED_PROXIES "IP du reverse proxy nginx (autre machine)" ""
+    fi
+  elif [[ $INTERACTIVE == yes ]]; then
     title "Station"
     while :; do
       ask CALLSIGN "Indicatif spécial à activer (ex. TM50ABC)" "$CALLSIGN"
@@ -663,6 +713,9 @@ recap() {
       line "Accès Internet" "$(t "Cloudflare Tunnel (aucun port ouvert sur la box)")"
       line "Nom du tunnel" "$(tunnel_name)" ;;
   esac
+  if [[ $DEMO == 1 ]]; then
+    line "Démonstration" "$(t "oui — données fictives remises à zéro toutes les {1} h" "$DEMO_HOURS")"
+  fi
   if [[ $FIRST_CONFIG == 1 ]]; then
     line "Indicatif spécial" "$CALLSIGN${LABEL:+ — $LABEL}"
     line "Locator" "${GRID:-—}"
@@ -753,8 +806,13 @@ PY
   fi
   echo "$VERSION" > "$DIR/$MARKER"
   chmod 755 "$DIR/install.sh"
-  printf 'MODE=%s\nHOST=%s\nPORT=%s\nSVC_USER=%s\nSERVICE=%s\nDOMAIN=%s\nBOX=%s\nEMAIL=%s\nTUNNEL_NAME=%s\nUI_LANG=%s\n' \
-    "$MODE" "$HOST" "$PORT" "$SVC_USER" "$SERVICE" "$DOMAIN" "$BOX" "$EMAIL" "$TUNNEL_NAME" "${UI_LANG:-fr}" \
+  # Demo marker: only on a NEW installation (validate_demo refused the others)
+  # or an installation that already was a demo.
+  if [[ $DEMO == 1 && ( $UPGRADE == 0 || $PREV_DEMO == 1 ) ]]; then
+    echo "demo instance: data reset every few hours — never put a real log here" > "$DIR/$DEMO_MARKER"
+  fi
+  printf 'MODE=%s\nHOST=%s\nPORT=%s\nSVC_USER=%s\nSERVICE=%s\nDOMAIN=%s\nBOX=%s\nEMAIL=%s\nTUNNEL_NAME=%s\nUI_LANG=%s\nDEMO=%s\n' \
+    "$MODE" "$HOST" "$PORT" "$SVC_USER" "$SERVICE" "$DOMAIN" "$BOX" "$EMAIL" "$TUNNEL_NAME" "${UI_LANG:-fr}" "$DEMO" \
     > "$DIR/$STATE"
 }
 
@@ -783,6 +841,7 @@ write_config() {
   TMCFG_CLUB_WEBSITE="$CLUB_WEBSITE" TMCFG_BASE_URL="$BASE_URL" TMCFG_OPERATORS="$OPERATORS" \
   TMCFG_ADMIN_PASSWORD="$ADMIN_PASSWORD" TMCFG_OPERATOR_PASSWORD="$OPERATOR_PASSWORD" \
   TMCFG_QRZ_USER="$QRZ_USER" TMCFG_QRZ_PASSWORD="$QRZ_PASSWORD" TMCFG_TRUSTED_PROXIES="$TRUSTED_PROXIES" \
+  TMCFG_DEMO="$DEMO" TMCFG_DEMO_HOURS="$DEMO_HOURS" \
     "$VPY" "$DIR/deploy/make_config.py" "$DIR/config.yml.example" "$DIR/config.yml"
   info "config.yml créé"
 }
@@ -1018,6 +1077,11 @@ summary() {
     say "(à noter ; il reste lisible dans {1}/config.yml, clé auth.password)" "$DIR"
   fi
   line "Données" "$(t "{1}/var/ (sauvegardes automatiques : var/backups/)" "$DIR")"
+  if [[ $DEMO == 1 ]]; then
+    echo
+    say "Instance de DÉMO : données fictives remises à zéro toutes les {1} h (demo.reset_hours)." "$DEMO_HOURS"
+    say "Comptes affichés sur chaque page : M0DEMO1, TM0DEMO2 (opérateurs), TM0ADM11 (admin), TM0SADM1 (superadmin)."
+  fi
   line "Diagnostic" "sudo $DIR/install.sh --check"
   if [[ -x /usr/local/sbin/tm-activation-update ]]; then
     line "Mise à jour" "$(t "/usr/local/sbin/tm-activation-update (root ; dernière version GitHub, réglages repris)")"

@@ -65,6 +65,30 @@ def test_seed_and_add_operator() -> None:
     assert "F6ABC" in {o["callsign"] for o in activation.list_operators()}
 
 
+def test_add_operator_never_reactivates_a_disabled_account() -> None:
+    """Any operator can add to the roster: that must not undo an admin's decision."""
+    activation.add_operator("F5DIS", "Paul")
+    activation.set_operator_active("F5DIS", False)
+    activation.add_operator("F5DIS")
+    row = activation.get_operator("F5DIS")
+    assert not row["active"] and row["name"] == "Paul"      # empty name keeps the known one
+    activation.add_operator("F5DIS", "Paul D.")
+    assert activation.get_operator("F5DIS")["name"] == "Paul D."
+
+
+def test_disabled_operator_refused_with_shared_password(monkeypatch) -> None:
+    monkeypatch.setattr(activation, "operator_password", lambda: "commun")
+    activation.add_operator("F5DIS")
+    activation.set_operator_active("F5DIS", False)
+    client = TestClient(app, follow_redirects=False)
+    r = client.post("/activation/login", data={"callsign": "F5DIS", "password": "commun"})
+    assert r.status_code == 401 and not activation.get_operator("F5DIS")["active"]
+    guard = TestClient(app, follow_redirects=False)
+    guard.post("/activation/login", data={"callsign": "F5ONE", "password": "commun"})
+    guard.post("/activation/operators", data={"callsign": "F5DIS"})
+    assert not activation.get_operator("F5DIS")["active"]
+
+
 def test_active_operators_excludes_dormant_roster() -> None:
     activation.add_operator("F9ZZZ")  # on the roster but no activity
     activation.add_slot("F5RRO", "2026-09-07T10:00", "2026-09-07T12:00", "20M", "SSB")

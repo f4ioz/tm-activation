@@ -251,6 +251,9 @@ async def operator_login_submit(
         error = _("Accès opérateur non configuré — voir l'admin du site")
     elif not password or password != expected:
         error = _("Mot de passe incorrect")
+    elif (row := activation.get_operator(op)) is not None and not row.get("active"):
+        # Disabled by an administrator: the shared password does not bring it back.
+        error = _("Compte désactivé : voir un administrateur.")
 
     if not blocked:
         visits.record_auth(request, "operator", op, error is None)

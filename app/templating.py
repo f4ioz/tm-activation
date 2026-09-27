@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from app import activation, dxcc_flags, i18n
+from app import activation, demo, dxcc_flags, i18n
 from app.config import club_config
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -51,4 +51,6 @@ templates.env.globals["logo_version"] = lambda: (
 )
 templates.env.globals["dxcc_entity"] = dxcc_flags.entity_for_call
 templates.env.globals["dxcc_flag_file"] = dxcc_flags.flag_file
+# Demo mode banner (None outside demo mode): templates/activation/_demo_banner.html.
+templates.env.globals["demo_info"] = demo.info
 i18n.install(templates.env)

@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app import activation, security
+from app import activation, demo, security
 from app.config import server_config
 from app.routers import activation as activation_router
 from app.routers import admin as admin_router
@@ -33,11 +33,18 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001 — never block startup
         pass
     try:
+        # Demo: restrictions installed and data set built BEFORE the enricher
+        # (which must never query QRZ with the demo's data).
+        demo.start()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         activation.start_enricher()
     except Exception:  # noqa: BLE001
         pass
     yield
     activation.stop_enricher()
+    demo.stop()
 
 
 # No /docs, /redoc, /openapi.json: no point publishing the route map.
@@ -50,10 +57,14 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 async def shield_middleware(request: Request, call_next):
     """Temporary scanner blocking + security headers (security.py)."""
     blocked = security.check_request(request)
+    if blocked is None:
+        blocked = demo.guard(request)    # demo mode restrictions (no-op otherwise)
     if blocked is not None:
+        security.add_headers(request, blocked)
         return blocked
     response = await call_next(request)
     security.add_headers(request, response)
+    demo.add_headers(response)
     return response
 
 

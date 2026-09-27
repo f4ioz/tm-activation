@@ -47,6 +47,16 @@ def main(src: str, dst: str) -> int:
     act["password"] = env("OPERATOR_PASSWORD")
     act["operators"] = [c.upper() for c in re.split(r"[\s,;]+", env("OPERATORS")) if c]
 
+    if env("DEMO", "0") == "1":
+        # Demo instance: fictitious data, never the owner's QRZ account.
+        cfg["demo"] = {"enabled": True, "reset_hours": int(env("DEMO_HOURS", "24") or 24),
+                       "password": (cfg.get("demo") or {}).get("password") or "Demo-73!"}
+        qrz["username"] = qrz["password"] = ""
+        act["qrz_enrich"] = False
+        act["public"] = True
+        act["password"] = ""
+        act["operators"] = []
+
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     header = (
         f"# TM Activation — généré par install.sh le {stamp}.\n"

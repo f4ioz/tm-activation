@@ -78,15 +78,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.41.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.41.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.42.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.42.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.41.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.42.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -312,22 +312,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.41.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.42.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.41.0.tar.gz
-   cd tm-activation-1.41.0
+   tar xzf tm-activation-1.42.0.tar.gz
+   cd tm-activation-1.42.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.41.0.zip
-   cd tm-activation-1.41.0
+   unzip tm-activation-1.42.0.zip
+   cd tm-activation-1.42.0
    sudo bash install.sh --lan
    ```
 
@@ -414,8 +414,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.41.0.tar.gz
-cd tm-activation-1.41.0
+tar xzf tm-activation-1.42.0.tar.gz
+cd tm-activation-1.42.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -471,6 +471,34 @@ par des virgules), `TM_ADMIN_PASSWORD` (généré si vide), `TM_OPERATOR_PASSWOR
 
 Essai rapide sans root sur un PC : `./install.sh --no-systemd --dir ~/tm-activation`,
 puis lancer la commande affichée et ouvrir <http://127.0.0.1:8000/>.
+
+## Instance de démonstration
+
+Pour montrer l'application à d'autres clubs sans risquer un vrai log :
+
+```bash
+sudo ./install.sh --demo --domain demo.mon-club.fr --email moi@example.org
+sudo ./install.sh --demo --lan --demo-hours 12      # sur le réseau local, remise à zéro toutes les 12 h
+```
+
+- **Données fictives représentatives** : indicatif TM0DEMO, ~370 QSO sur 3 jours
+  (Europe majoritaire, un peu de DX, un passage satellite), une séance EN DIRECT,
+  des créneaux à venir, un classement de chasseurs et les certificats.
+- **Comptes affichés sur chaque page** (mot de passe commun `Demo-73!`, clé
+  `demo.password`) : `M0DEMO1` et `TM0DEMO2` (opérateurs), `TM0ADM11` (admin),
+  `TM0SADM1` (superadmin). Un clic sur un compte remplit le formulaire de connexion.
+- **Bandeau « DÉMO »** avec le compte à rebours de la prochaine remise à zéro
+  (24 h par défaut, `--demo-hours N` ou `demo.reset_hours` dans config.yml, 1 à 168).
+- **Limites** : mots de passe et mode de connexion, compte QRZ, logo, sauvegardes
+  (téléchargement compris) et droits des 4 comptes de démo sont verrouillés ;
+  envois limités à 256 Ko, 40 écritures/minute par IP, plafonds de QSO, créneaux,
+  comptes et indicatifs ; QR code des certificats figé ; jamais d'appel à QRZ ;
+  pages en `noindex`. Le mot de passe administrateur principal (`/login`) reste
+  le vôtre : ne le publiez pas.
+- **Sécurité des données** : la remise à zéro n'a lieu que sur une installation
+  créée avec `--demo` (fichier `var/DEMO_INSTANCE`). `--demo` est refusé sur une
+  installation existante normale : installez la démo dans un autre dossier ou
+  une autre machine.
 
 ## Déplacer le Pi, diagnostic
 

@@ -1,0 +1,13 @@
+{% extends "activation/_base.html" %}
+{% block title %}{{ callsign }} — {{ _("Mode démo") }}{% endblock %}
+
+{% block content %}
+<section class="act">
+  <div class="act-card">
+    <h2>{{ _("Mode démo") }}</h2>
+    <p class="act-alert act-alert-err">{{ message }}</p>
+    <p class="act-muted">{{ _("Cette instance de démonstration limite ce qui pourrait gêner les autres visiteurs ou le serveur : mots de passe, compte QRZ, logo, sauvegardes, volumes importants. Une installation normale n'a aucune de ces limites.") }}</p>
+    <p><a class="act-cancel-btn" href="/activation">{{ _("Espace opérateurs") }}</a></p>
+  </div>
+</section>
+{% endblock %}
