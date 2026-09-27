@@ -42,7 +42,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from app import activation, dxcc_flags, i18n, security, visits
 from app.config import activation_config, load_config
-from app.i18n import _
+from app.i18n import N_, _
 
 log = logging.getLogger(__name__)
 
@@ -90,6 +90,12 @@ BLOCKED_POST = frozenset({
     "/activation/settings/logo/delete",
 })
 BLOCKED_GET = frozenset({"/activation/settings/backup.sqlite"})
+# Default names of the fictitious station and club (install.sh --demo): shown
+# in the visitor's language. A label typed by a visitor is left as it is.
+DEMO_LABEL = N_("Station de démonstration")
+DEMO_CLUB = N_("Radio-club de démonstration")
+DEMO_NAMES = frozenset({DEMO_LABEL, DEMO_CLUB})
+
 HEAVY_SUFFIXES = ("/report.pdf", "/certificat", "/export.adi", "/export.csv", "/export-selection.adi")
 
 
@@ -228,6 +234,7 @@ def start() -> None:
     if not enabled():
         return
     install_limits()
+    install_translated_names()
     if not reset_allowed():
         log.warning("demo mode without %s: data will NOT be reset", MARKER_FILE)
         return
@@ -257,6 +264,61 @@ def _count(table: str) -> int:
 
 
 _installed = False
+
+
+def translated(value: Any) -> Any:
+    """The demo's default names in the current language (anything else as is)."""
+    return _(value) if isinstance(value, str) and value in DEMO_NAMES else value
+
+
+def _translate_station(st: Any) -> Any:
+    if isinstance(st, dict) and st.get("label") in DEMO_NAMES:
+        return {**st, "label": _(st["label"])}
+    return st
+
+
+class _Club(dict):
+    """The ``club`` template global, with the demo club name translated."""
+
+    def __getitem__(self, key: str) -> Any:
+        return translated(super().__getitem__(key))
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return translated(super().get(key, default))
+
+
+_names_installed = False
+
+
+def install_translated_names() -> None:
+    """Station label and club name of the demo follow the visitor's language.
+
+    Only the reads are wrapped: the database keeps the French text (the key of
+    the translation), so a reset or a language switch never mixes them up."""
+    global _names_installed
+    if _names_installed:
+        return
+    _names_installed = True
+    a = activation
+    raw_get = a.get_station
+    orig_update = a.update_station
+
+    def update_station(call: str, **fields: Any) -> dict[str, Any]:
+        # Written back in French (the translation key), whatever the reader's language.
+        label = fields.get("label")
+        if label is None:
+            fields["label"] = (raw_get(call) or {}).get("label", "")
+        elif str(label).strip() == _(DEMO_LABEL):
+            fields["label"] = DEMO_LABEL
+        return orig_update(call, **fields)
+    a.update_station = update_station
+    for name in ("get_station", "station_by_slug", "current_station"):
+        fn = getattr(a, name)
+        setattr(a, name, (lambda f: lambda *args, **kw: _translate_station(f(*args, **kw)))(fn))
+    orig_list = a.list_stations
+    a.list_stations = lambda *args, **kw: [_translate_station(st) for st in orig_list(*args, **kw)]
+    from app.templating import templates   # late import: templating imports this module
+    templates.env.globals["club"] = _Club(templates.env.globals.get("club") or {})
 
 
 def install_limits() -> None:

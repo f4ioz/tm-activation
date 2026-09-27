@@ -8,7 +8,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from app import activation, demo, security
+from app import activation, demo, i18n, security
+from app.templating import templates
 from app.main import app
 
 PW = demo.DEFAULT_PASSWORD
@@ -33,10 +34,14 @@ def demo_on(monkeypatch, tmp_path):
     monkeypatch.setattr(demo, "STATE_FILE", tmp_path / "demo_state.json")
     monkeypatch.setattr(demo, "WORK_DIR", tmp_path / "demo-seed")
     monkeypatch.setattr(demo, "_installed", False)
+    monkeypatch.setattr(demo, "_names_installed", False)
+    monkeypatch.setitem(templates.env.globals, "club", {"name": demo.DEMO_CLUB, "callsign": "", "city": "",
+                                                        "website": ""})
     monkeypatch.setattr(activation, "LOGO_DIR", tmp_path / "branding")
     monkeypatch.setattr(activation, "QRZ_ACCOUNT_FILE", tmp_path / "activation_qrz.json")
     demo.seed()
     demo.install_limits()
+    demo.install_translated_names()
     yield
     for name, value in saved.items():
         if getattr(activation, name, None) is not value:
@@ -202,3 +207,46 @@ def test_reset_rebuilds_the_data(demo_on) -> None:
     # The live database was overwritten in place (no file swap under the server).
     with sqlite3.connect(activation.DB_PATH) as c:
         assert c.execute("SELECT COUNT(*) FROM contacts").fetchone()[0] > 250
+
+
+# ── Names in the visitor's language ────────────────────────────────────────
+
+
+def _raw_label() -> str:
+    with sqlite3.connect(activation.DB_PATH) as c:
+        return c.execute("SELECT label FROM stations WHERE callsign=?", (activation.callsign(),)).fetchone()[0]
+
+
+def test_station_label_follows_the_language(demo_on) -> None:
+    i18n.use("en")
+    try:
+        assert activation.current_station()["label"] == "Demo station"
+        assert activation.label() == "Demo station"
+        assert activation.list_stations()[0]["label"] == "Demo station"
+    finally:
+        i18n.use("fr")
+    assert activation.current_station()["label"] == demo.DEMO_LABEL
+    assert _raw_label() == demo.DEMO_LABEL               # the database keeps the key
+
+
+def test_pages_show_translated_names(demo_on) -> None:
+    slug = activation.current_station()["slug"]
+    en = TestClient(app).get(f"/{slug}", headers={"Accept-Language": "en"}).text
+    assert "Demo station" in en and "Demo radio club" in en and demo.DEMO_LABEL not in en
+    fr = TestClient(app).get(f"/{slug}", headers={"Accept-Language": "fr"}).text
+    assert demo.DEMO_LABEL in fr and demo.DEMO_CLUB in fr
+
+
+def test_saving_in_english_keeps_the_french_key(demo_on) -> None:
+    cs = activation.callsign()
+    i18n.use("en")
+    try:
+        activation.update_station(cs, label="Demo station", public=1)
+        assert _raw_label() == demo.DEMO_LABEL
+        activation.update_station(cs, public=1)            # label not given: unchanged
+        assert _raw_label() == demo.DEMO_LABEL
+        activation.update_station(cs, label="Field Day 2026", public=1)
+        assert activation.current_station()["label"] == "Field Day 2026"   # a visitor's own label
+    finally:
+        i18n.use("fr")
+    assert _raw_label() == "Field Day 2026"
