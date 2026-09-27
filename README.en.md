@@ -47,6 +47,9 @@ from a phone or a PC, while hunters follow the activation live on a public page.
 - **Operator accounts**, your choice: one shared password, or one per operator
   with optional approval and several administrators.
 - **French and English**, picked by the visitor.
+- Optional **demo instance**: fictitious data reset every 24 h, public demo
+  accounts (operator, admin, superadmin) and safeguards — a way to let other
+  clubs try the application ([details](#demo-instance)).
 
 It installs in a few minutes on a **Raspberry Pi**, a **Proxmox container** or a
 Linux server, and runs on its own — including on a local network with **no
@@ -271,7 +274,8 @@ is forced on you.
 | Details | below | [docs/internet-raspberry-pi.en.md](docs/internet-raspberry-pi.en.md) | [docs/cloudflare-tunnel.en.md](docs/cloudflare-tunnel.en.md) |
 
 Run with no option, `sudo ./install.sh` is a **guided installation**. It first
-asks all the questions (usage, domain, router, callsign, club, passwords) and
+asks the installation type (**regular** or [**demo**](#demo-instance)), then
+all the questions (usage, domain, router, callsign, club, passwords) and
 shows a summary **before making any change**. In Internet mode, it then guides
 you through the router settings (Freebox, Livebox, SFR, Bbox), with the Pi's
 address and MAC. It also checks DNS, then makes a dry run with Let's Encrypt
@@ -380,6 +384,9 @@ optional SSH key), then offers:
 2. **Quick test**: local network, no questions, callsign `TM0TEST`,
    administrator password generated and shown at the end. Ideal to try it out,
    then throw the container away (`pct stop <ID> && pct destroy <ID>`).
+3. **Demo**: local network, no questions, fictitious data reset on a schedule
+   (period asked, 24 h by default) and public demo accounts. For a demo on the
+   Internet, take choice 1 and answer "Demo".
 
 The container is **unprivileged** (option `nesting=1`, required by the hardened
 service), starts with the node and takes its time from the host. Afterwards,
@@ -441,6 +448,8 @@ If you already manage nginx yourself, use `--manual` and start from
 | `--python BIN` | Python interpreter | `python3` |
 | `--no-systemd` | without service or root (trial, development) | — |
 | `--non-interactive` | no questions: values read from the `TM_*` variables | — |
+| `--demo` | demo instance (new installation only) | asked |
+| `--demo-hours N` | with `--demo`: reset every N hours (1 to 168) | `24` |
 
 Installation with no questions (automation):
 
@@ -543,6 +552,7 @@ sudo systemctl restart tm-activation
 | `qrz` | default QRZ.com XML account (optional); an account entered in **Settings → QRZ Callbook** takes precedence |
 | `activation` | first special callsign, read **at first start-up only**; after that everything is set in the interface |
 | `server.trusted_proxies` | addresses of the reverse proxy allowed to pass on the visitors' IP |
+| `demo` | demo instance: `enabled`, `reset_hours`, `password` of the demo accounts |
 
 ## Update
 

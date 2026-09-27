@@ -48,6 +48,10 @@ en direct sur une page publique.
 - **Comptes opérateurs** au choix : un mot de passe commun, ou un par opérateur
   avec validation facultative et plusieurs administrateurs.
 - **Français et anglais**, au choix du visiteur.
+- **Instance de démonstration** en option : données fictives remises à zéro
+  toutes les 24 h, comptes de démo publics (opérateur, admin, superadmin) et
+  garde-fous — de quoi faire essayer l'application à d'autres clubs
+  ([détails](#instance-de-démonstration)).
 
 Elle s'installe en quelques minutes sur un **Raspberry Pi**, un **conteneur
 Proxmox** ou un serveur Linux, et fonctionne de façon autonome — y compris sur
@@ -279,7 +283,8 @@ n'est imposé.
 | Détails | ci-dessous | [docs/internet-raspberry-pi.md](docs/internet-raspberry-pi.md) | [docs/cloudflare-tunnel.md](docs/cloudflare-tunnel.md) |
 
 Lancé sans option, `sudo ./install.sh` est une **installation guidée**. Elle
-pose d'abord toutes les questions (utilisation, domaine, box, indicatif, club,
+demande d'abord le type d'installation (**normale** ou
+[**démonstration**](#instance-de-démonstration)), puis pose toutes les questions (utilisation, domaine, box, indicatif, club,
 mots de passe) et affiche un récapitulatif **avant toute modification**. En
 mode Internet, elle guide ensuite le réglage de la box (Freebox, Livebox, SFR,
 Bbox), avec l'adresse et la MAC du Pi. Elle vérifie aussi le DNS, puis fait un
@@ -392,6 +397,9 @@ clé SSH facultative), puis propose :
 2. **Test rapide** : réseau local, sans question, indicatif `TM0TEST`, mot de
    passe administrateur généré et affiché à la fin. Idéal pour essayer, puis
    jeter le conteneur (`pct stop <ID> && pct destroy <ID>`).
+3. **Démo** : réseau local, sans question, données fictives remises à zéro
+   (délai demandé, 24 h par défaut) et comptes de démo publics. Pour une démo
+   sur Internet, prendre le choix 1 et répondre « Démonstration ».
 
 Le conteneur est **non privilégié** (option `nesting=1`, nécessaire au service
 durci), démarre avec le nœud et prend l'heure de l'hôte. Ensuite, depuis le
@@ -454,6 +462,8 @@ Si vous gérez déjà nginx vous-même, utilisez `--manual` et partez de
 | `--python BIN` | interpréteur Python | `python3` |
 | `--no-systemd` | sans service ni root (essai, développement) | — |
 | `--non-interactive` | aucune question : valeurs lues dans les variables `TM_*` | — |
+| `--demo` | instance de démonstration (nouvelle installation seulement) | question |
+| `--demo-hours N` | avec `--demo` : remise à zéro toutes les N heures (1 à 168) | `24` |
 
 Installation sans question (automatisation) :
 
@@ -559,6 +569,7 @@ sudo systemctl restart tm-activation
 | `qrz` | compte QRZ.com XML par défaut (facultatif) ; un compte saisi dans **Réglages → Callbook QRZ** est prioritaire |
 | `activation` | premier indicatif spécial, lu **au premier démarrage uniquement** ; ensuite tout se règle dans l'interface |
 | `server.trusted_proxies` | adresses du reverse proxy autorisées à transmettre l'IP des visiteurs |
+| `demo` | instance de démonstration : `enabled`, `reset_hours`, `password` des comptes de démo |
 
 ## Mise à jour
 
