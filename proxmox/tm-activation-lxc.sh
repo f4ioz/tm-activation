@@ -47,8 +47,15 @@ load_en() {
   MSG["1) Guidée : les questions de TM Activation (réseau local, Internet par la"]="1) Guided: the TM Activation questions (local network, Internet through the"
   MSG["2) Test rapide : réseau local, sans question, mot de passe admin généré"]="2) Quick test: local network, no question, generated admin password"
   MSG["Admin       : /login avec le mot de passe généré affiché plus haut"]="Admin       : /login with the generated password shown above"
-  MSG["3) Démo : réseau local, sans question, données fictives remises à zéro"]="3) Demo: local network, no question, fictitious data reset"
-  MSG["régulièrement, comptes de démo publics (démo sur Internet : choix 1)"]="on a schedule, public demo accounts (demo on the Internet: choice 1)"
+  MSG["3) Démo : données fictives remises à zéro régulièrement, comptes de démo"]="3) Demo: fictitious data reset on a schedule, public demo"
+  MSG["publics ; en réseau local (sans question) ou sur Internet"]="accounts; on the local network (no question) or on the Internet"
+  MSG["Accès à la démo :"]="Demo access:"
+  MSG["1) Réseau local : sans question, http://<nom>.local"]="1) Local network: no question, http://<name>.local"
+  MSG["2) Internet : box avec HTTPS ou Cloudflare Tunnel (domaine, e-mail :"]="2) Internet: router with HTTPS or Cloudflare Tunnel (domain, e-mail:"
+  MSG["questions de l'installeur dans la CT)"]="the installer asks inside the container)"
+  MSG["TM Activation : démo sur Internet (questions dans la CT), remise à zéro toutes les {1} h"]="TM Activation : demo on the Internet (questions inside the container), reset every {1} h"
+  MSG["Installation de la démo TM Activation sur Internet (questions dans la CT)…"]="Installing the TM Activation demo on the Internet (questions inside the container)…"
+  MSG["Site        : adresse Internet indiquée par l'installeur ci-dessus"]="Site        : Internet address given by the installer above"
   MSG["Remise à zéro des données toutes les … heures (1 à 168)"]="Reset the data every … hours (1 to 168)"
   MSG["Nombre d'heures invalide."]="Invalid number of hours."
   MSG["TM Activation : démo, réseau local, remise à zéro toutes les {1} h"]="TM Activation : demo, local network, reset every {1} h"
@@ -278,8 +285,8 @@ prompt_config() {
   say "  1) Guidée : les questions de TM Activation (réseau local, Internet par la"
   say "     box avec HTTPS, ou Cloudflare Tunnel ; indicatif, club, mots de passe)"
   say "  2) Test rapide : réseau local, sans question, mot de passe admin généré"
-  say "  3) Démo : réseau local, sans question, données fictives remises à zéro"
-  say "     régulièrement, comptes de démo publics (démo sur Internet : choix 1)"
+  say "  3) Démo : données fictives remises à zéro régulièrement, comptes de démo"
+  say "     publics ; en réseau local (sans question) ou sur Internet"
   while :; do
     ask choice "Choix" "1"
     case "$choice" in
@@ -288,8 +295,17 @@ prompt_config() {
       3) INSTALL_MODE="demo"; break ;;
     esac
   done
-  TEST_CALL="" DEMO_HOURS=""
+  TEST_CALL="" DEMO_HOURS="" DEMO_NET=""
   if [[ $INSTALL_MODE == demo ]]; then
+    echo
+    say "  Accès à la démo :"
+    say "  1) Réseau local : sans question, http://<nom>.local"
+    say "  2) Internet : box avec HTTPS ou Cloudflare Tunnel (domaine, e-mail :"
+    say "     questions de l'installeur dans la CT)"
+    while :; do
+      ask choice "Choix" "1"
+      case "$choice" in 1) DEMO_NET="lan"; break ;; 2) DEMO_NET="internet"; break ;; esac
+    done
     while :; do
       ask DEMO_HOURS "Remise à zéro des données toutes les … heures (1 à 168)" "$D_DEMO_HOURS"
       if [[ $DEMO_HOURS =~ ^[0-9]+$ ]] && (( DEMO_HOURS >= 1 && DEMO_HOURS <= 168 )); then break; fi
@@ -317,7 +333,11 @@ prompt_config() {
   if [[ $INSTALL_MODE == quick ]]; then
     say "  TM Activation : test rapide, réseau local, indicatif {1}" "$TEST_CALL"
   elif [[ $INSTALL_MODE == demo ]]; then
-    say "  TM Activation : démo, réseau local, remise à zéro toutes les {1} h" "$DEMO_HOURS"
+    if [[ $DEMO_NET == lan ]]; then
+      say "  TM Activation : démo, réseau local, remise à zéro toutes les {1} h" "$DEMO_HOURS"
+    else
+      say "  TM Activation : démo sur Internet (questions dans la CT), remise à zéro toutes les {1} h" "$DEMO_HOURS"
+    fi
   else
     say "  TM Activation : installation guidée"
   fi
@@ -428,9 +448,14 @@ install_app() {
     msg_info "Installation de TM Activation (test rapide, réseau local)…"
     pct exec "$CTID" -- env "${env[@]}" TM_CALLSIGN="$TEST_CALL" TM_LABEL="Test Proxmox" TM_PUBLIC=1 \
       "$UPDATER" --lan --non-interactive
-  elif [[ $INSTALL_MODE == demo ]]; then
+  elif [[ $INSTALL_MODE == demo && $DEMO_NET == lan ]]; then
     msg_info "Installation de la démo TM Activation (réseau local)…"
     pct exec "$CTID" -- env "${env[@]}" "$UPDATER" --lan --demo --demo-hours "$DEMO_HOURS" --non-interactive
+  elif [[ $INSTALL_MODE == demo ]]; then
+    msg_info "Installation de la démo TM Activation sur Internet (questions dans la CT)…"
+    # Demo already chosen: the installer skips that question and asks the
+    # Internet mode, the domain, the e-mail and the admin password.
+    lxc-attach -n "$CTID" -- env "${env[@]}" "$UPDATER" --demo --demo-hours "$DEMO_HOURS"
   else
     msg_info "Installation guidée de TM Activation (questions dans la CT)…"
     # lxc-attach gives the installer a real terminal (questions, passwords).
@@ -464,7 +489,11 @@ show_summary() {
     say "  Supprimer la CT de test : pct stop {1} && pct destroy {1}" "$CTID"
   elif [[ $INSTALL_MODE == demo ]]; then
     echo
-    say "  Site        : http://{1}/  (ou http://{2}.local/)" "${ip:-$CT_HOST.local}" "$CT_HOST"
+    if [[ $DEMO_NET == lan ]]; then
+      say "  Site        : http://{1}/  (ou http://{2}.local/)" "${ip:-$CT_HOST.local}" "$CT_HOST"
+    else
+      say "  Site        : adresse Internet indiquée par l'installeur ci-dessus"
+    fi
     say "  Démo        : M0DEMO1, TM0DEMO2 (opérateurs), TM0ADM11 (admin), TM0SADM1 (superadmin)"
     say "                mot de passe Demo-73! ; données remises à zéro toutes les {1} h" "$DEMO_HOURS"
     say "  Admin       : /login avec le mot de passe généré affiché plus haut (à garder pour vous)"

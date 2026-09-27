@@ -258,7 +258,7 @@ def test_lxc_asks_the_language_and_speaks_english(tmp_path, proxmox) -> None:
 
 def test_lxc_demo_install(tmp_path, proxmox) -> None:
     """Choice 3: local-network demo, no question inside the container."""
-    r = lxc(proxmox, [*CT_DEFAULTS, "", "", "pw", "pw", "3", "abc", "12", ""])
+    r = lxc(proxmox, [*CT_DEFAULTS, "", "", "pw", "pw", "3", "1", "abc", "12", ""])
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Nombre d'heures invalide." in r.stderr + r.stdout
     log = calls(tmp_path)
@@ -268,3 +268,16 @@ def test_lxc_demo_install(tmp_path, proxmox) -> None:
     assert "démo, réseau local, remise à zéro toutes les 12 h" in r.stdout
     assert "TM0SADM1 (superadmin)" in r.stdout and "Demo-73!" in r.stdout
     assert "pct destroy" not in r.stdout
+
+
+def test_lxc_demo_on_the_internet_uses_a_terminal(tmp_path, proxmox) -> None:
+    """Choice 3 then Internet: demo already chosen, the installer asks the rest in the CT."""
+    r = lxc(proxmox, [*CT_DEFAULTS, "", "", "pw", "pw", "3", "2", "", ""])
+    assert r.returncode == 0, r.stdout + r.stderr
+    log = calls(tmp_path)
+    attach = next(line for line in log.splitlines() if line.startswith("lxc-attach"))
+    assert attach.endswith("/usr/local/sbin/tm-activation-update --demo --demo-hours 24")
+    assert "--lan" not in attach and "--non-interactive" not in attach
+    assert "démo sur Internet (questions dans la CT), remise à zéro toutes les 24 h" in r.stdout
+    assert "adresse Internet indiquée par l'installeur" in r.stdout and "TM0SADM1 (superadmin)" in r.stdout
+    assert ".local/)" not in r.stdout.split("Démo        :")[0].split("Journal")[-1]

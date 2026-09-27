@@ -281,3 +281,10 @@ def test_guided_demo_skips_station_questions(tmp_path: Path) -> None:
     assert r.returncode == 0, r.stderr
     assert "R=1|TM0DEMO|http://demo.local" in r.stdout
     assert "Indicatif spécial" not in r.stdout
+
+
+def test_demo_given_on_the_command_line_skips_the_demo_question(tmp_path: Path) -> None:
+    """Proxmox "3) Demo → Internet" runs the installer with --demo: only the mode is asked."""
+    r = run(f'UI_LANG=fr; parse_args --demo --demo-hours 12 --dir {tmp_path / "new"}; resolve_context; '
+            'if [[ -z $CLI_DEMO ]]; then ask_demo; fi; echo "R=$DEMO|$DEMO_HOURS"', stdin="")
+    assert "R=1|12" in r.stdout and "Type d'installation" not in r.stdout

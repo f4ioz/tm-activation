@@ -79,15 +79,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.44.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.44.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.44.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.45.0.tar.gz
 ```
 
 ## Features
@@ -307,22 +307,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.44.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.45.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.44.0.tar.gz
-   cd tm-activation-1.44.0
+   tar xzf tm-activation-1.45.0.tar.gz
+   cd tm-activation-1.45.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.44.0.zip
-   cd tm-activation-1.44.0
+   unzip tm-activation-1.45.0.zip
+   cd tm-activation-1.45.0
    sudo bash install.sh --lan
    ```
 
@@ -384,9 +384,11 @@ optional SSH key), then offers:
 2. **Quick test**: local network, no questions, callsign `TM0TEST`,
    administrator password generated and shown at the end. Ideal to try it out,
    then throw the container away (`pct stop <ID> && pct destroy <ID>`).
-3. **Demo**: local network, no questions, fictitious data reset on a schedule
-   (period asked, 24 h by default) and public demo accounts. For a demo on the
-   Internet, take choice 1 and answer "Demo".
+3. **Demo**: fictitious data reset on a schedule (period asked, 24 h by
+   default) and public demo accounts. Access of your choice: **local network**,
+   with no questions at all, or **Internet** (router with HTTPS or Cloudflare
+   Tunnel): the installer then asks the mode, domain and e-mail inside the
+   container.
 
 The container is **unprivileged** (option `nesting=1`, required by the hardened
 service), starts with the node and takes its time from the host. Afterwards,
@@ -408,8 +410,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.44.0.tar.gz
-cd tm-activation-1.44.0
+tar xzf tm-activation-1.45.0.tar.gz
+cd tm-activation-1.45.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 
@@ -480,8 +482,8 @@ sudo ./install.sh --demo --lan --demo-hours 12      # local network, reset every
 ```
 
 In the guided installation, the first question also offers "Demo" (with the
-reset period). On Proxmox, the container script offers "3) Demo": local network,
-no question; for a demo on the Internet, take choice 1 (guided) and answer "Demo".
+reset period). On Proxmox, the container script offers "3) Demo", on the local
+network (no questions) or on the Internet (router with HTTPS or Cloudflare Tunnel).
 
 - **Representative fictitious data**: callsign TM0DEMO, ~370 QSOs over 3 days
   (mostly Europe, some DX, a satellite pass), a LIVE session, upcoming slots,
