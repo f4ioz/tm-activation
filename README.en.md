@@ -10,7 +10,7 @@ Web application for the activation of amateur radio **special callsigns** (TM…
 TO…, etc.) by a radio club: each operator books their slots and logs their QSOs
 from a phone or a PC, while hunters follow the activation live on a public page.
 
-![Public activation page](docs/images/public.png)
+![Public activation page](docs/images/public.en.png)
 
 - **Shared schedule**: who is on air, when, on which band and mode, with an
   overlap warning, countdowns and the QSO count of each slot.
@@ -59,18 +59,18 @@ background, the QRZ lookups and the DX spots need a connection).
 The log page during an activation: current slot, DX spots, rate gauges,
 countries already worked, and the log book right next to the entry form.
 
-![The log page during an activation](docs/images/log.png)
+![The log page during an activation](docs/images/log.en.png)
 
 | Slot schedule | Settings: accounts and public display |
 |---|---|
-| ![Slot schedule](docs/images/planning.png) | ![Settings: operator accounts and public display](docs/images/settings.png) |
+| ![Slot schedule](docs/images/planning.en.png) | ![Settings: operator accounts and public display](docs/images/settings.en.png) |
 
-![DXCC worked and hunter ranking](docs/images/dxcc.png)
+![DXCC worked and hunter ranking](docs/images/dxcc.en.png)
 
 The contact map: one colour per mode, one shape per band, and the legend
 doubles as a filter.
 
-![Contacts map](docs/images/map.jpg)
+![Contacts map](docs/images/map.en.jpg)
 
 Developed by Olivier F4IOZ, then extracted from his website to be shared with
 radio clubs.
