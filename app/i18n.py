@@ -217,6 +217,7 @@ JS_MESSAGES: tuple[str, ...] = (
     "Montrer au public",
     "Masquer au public",
     "Masqué au public.",
+    "Fichier audio de cet indicatif (tous ses QSO)",
     "Source audio",
     "par défaut",
     "{n} en attente",

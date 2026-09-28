@@ -89,15 +89,15 @@ avec les radio-clubs.
 
 Code source et dernières versions : **<https://github.com/f4ioz/tm-activation>**
 
-- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.zip>
-- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.tar.gz>
+- Archive zip : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.49.0.zip>
+- Archive tar.gz : <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.49.0.tar.gz>
 - Empreintes SHA-256 et versions précédentes : dossier
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases)
 
 Si le Pi a accès à Internet, l'archive peut être téléchargée directement dessus :
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.49.0.tar.gz
 ```
 
 ## Fonctionnalités
@@ -273,6 +273,13 @@ demie qui précède le QSO et des secondes qui suivent (réglable), **repère ro
   sont coupés : on enregistre le son du poste tel quel.
 - **Coupure réseau** : les tranches attendent dans le navigateur et repartent
   dès que la connexion revient (jusqu'à 15 minutes de retard).
+- **Un fichier par indicatif** : page **ADIF → Audio par indicatif**, ou
+  bouton **⬇ .ogg** du lecteur. Tous les QSO d'un indicatif à la suite, chacun
+  pris de N secondes avant à M secondes après (20 s et 5 s par défaut,
+  réglables), dans un fichier Ogg Opus (`tm50abc-DL1ABC.ogg`) lisible par VLC,
+  les navigateurs et les téléphones. Indicatif laissé vide (admins) : un zip
+  avec un fichier par indicatif contacté. Le découpage se fait sans réencodage
+  ni ffmpeg (paquets Opus recopiés tels quels, précision de 20 à 60 ms).
 - **Instance de démonstration** : l'enregistrement y est désactivé.
 
 ### Rôles et droits
@@ -381,22 +388,22 @@ L'application occupe environ 80 Mo de mémoire.
 2. Démarrer le Pi, puis s'y connecter depuis un PC du même réseau :
    `ssh utilisateur@tm50abc.local`
 3. Copier l'archive sur le Pi, depuis le PC :
-   `scp tm-activation-1.48.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.49.0.tar.gz utilisateur@tm50abc.local:`
    (ou la télécharger directement sur le Pi avec `wget`, voir
    [Téléchargement](#téléchargement))
 4. Sur le Pi :
 
    ```bash
-   tar xzf tm-activation-1.48.0.tar.gz
-   cd tm-activation-1.48.0
+   tar xzf tm-activation-1.49.0.tar.gz
+   cd tm-activation-1.49.0
    sudo ./install.sh --lan
    ```
 
    Depuis le zip (envoi par mail, passage par Windows) :
 
    ```bash
-   unzip tm-activation-1.48.0.zip
-   cd tm-activation-1.48.0
+   unzip tm-activation-1.49.0.zip
+   cd tm-activation-1.49.0
    sudo bash install.sh --lan
    ```
 
@@ -487,8 +494,8 @@ serveur (enregistrement DNS A/AAAA), et les ports 80 et 443 doivent être
 ouverts.
 
 ```bash
-tar xzf tm-activation-1.48.0.tar.gz
-cd tm-activation-1.48.0
+tar xzf tm-activation-1.49.0.tar.gz
+cd tm-activation-1.49.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

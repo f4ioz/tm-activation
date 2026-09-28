@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Iterator
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from app import auth as _auth, dxcc_flags
+from app import auth as _auth, dxcc_flags, opus_cut
 from app.config import activation_config, qrz_config, site_config
 from app.i18n import N_, _
 from app.qrz_xml import QrzXmlClient, get_shared_client
@@ -3240,6 +3240,91 @@ def contacts_with_public_audio(contacts: list[dict[str, Any]], station: str) -> 
     if not audio_public():
         return set()
     return {q["id"] for q in contacts if public_audio_clip(q["id"], station) is not None}
+
+
+# One audio file per worked callsign: the excerpts of all its QSOs, from a few
+# seconds before to a few seconds after each one, cut without re-encoding
+# (app/opus_cut.py) into a single Ogg Opus file.
+
+AUDIO_EXPORT_DEFAULT = (20, 5)          # seconds before / after each QSO
+AUDIO_EXPORT_MAX_S = 600
+AUDIO_EXPORT_DIR = ROOT / "var" / "cache" / "audio-export"
+
+
+def _export_windows(contacts: list[dict[str, Any]], before_s: int, after_s: int) -> list[tuple[int, int]]:
+    windows = []
+    for q in contacts:
+        at = qso_instant_ms(q)
+        if at is not None:
+            windows.append((at - before_s * 1000, at + after_s * 1000))
+    return windows
+
+
+def _segments_in(station: str, windows: list[tuple[int, int]]) -> list[opus_cut.Segment]:
+    """Stored segments overlapping at least one window, read from disk."""
+    found: dict[int, opus_cut.Segment] = {}
+    init_db()
+    with conn() as c:
+        for frm, to in windows:
+            for r in c.execute("SELECT id, start_ms, file FROM audio_segments "
+                               "WHERE station=? AND end_ms > ? AND start_ms < ?", (station, frm, to)):
+                if r["id"] in found:
+                    continue
+                path = _audio_file(r["file"])
+                if path is not None and path.is_file():
+                    found[r["id"]] = opus_cut.Segment(r["start_ms"], path.read_bytes())
+    return list(found.values())
+
+
+def export_file_name(call: str, station: str | None = None, ext: str = "ogg") -> str:
+    return f"{slugify_call(_st(station))}-{(call or '').strip().upper().replace('/', '-')}.{ext}"
+
+
+def audio_for_call(call: str, before_s: int = AUDIO_EXPORT_DEFAULT[0], after_s: int = AUDIO_EXPORT_DEFAULT[1],
+                   station: str | None = None) -> bytes | None:
+    """Ogg Opus file of every QSO with ``call`` (None: no audio for them)."""
+    cs = (call or "").strip().upper()
+    st = _st(station)
+    before_s = _clamp_int(before_s, 0, AUDIO_EXPORT_MAX_S, AUDIO_EXPORT_DEFAULT[0])
+    after_s = _clamp_int(after_s, 0, AUDIO_EXPORT_MAX_S, AUDIO_EXPORT_DEFAULT[1])
+    init_db()
+    with conn() as c:
+        contacts = [dict(r) for r in c.execute(
+            "SELECT * FROM contacts WHERE station=? AND call=? ORDER BY qso_date, time_on", (st, cs))]
+    windows = _export_windows(contacts, before_s, after_s)
+    if not windows:
+        return None
+    return opus_cut.cut(_segments_in(st, windows), windows, title=f"{cs} · {st}")
+
+
+def audio_export_zip(before_s: int = AUDIO_EXPORT_DEFAULT[0], after_s: int = AUDIO_EXPORT_DEFAULT[1],
+                     station: str | None = None) -> tuple[Path, int] | None:
+    """Zip holding one Ogg Opus file per worked callsign that has audio.
+
+    Written to var/cache/audio-export/ (the caller deletes it once sent);
+    returns (path, number of files), or None if no QSO has any audio."""
+    import zipfile
+
+    st = _st(station)
+    init_db()
+    with conn() as c:
+        calls = [r[0] for r in c.execute("SELECT DISTINCT call FROM contacts WHERE station=? ORDER BY call", (st,))]
+    AUDIO_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    for old in AUDIO_EXPORT_DIR.glob("*.zip"):              # left over by an interrupted download
+        if old.stat().st_mtime < time.time() - 3600:
+            old.unlink(missing_ok=True)
+    path = AUDIO_EXPORT_DIR / f"{secrets.token_hex(8)}.zip"
+    count = 0
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as zf:    # Opus is compressed already
+        for cs in calls:
+            data = audio_for_call(cs, before_s, after_s, st)
+            if data:
+                zf.writestr(export_file_name(cs, st), data)
+                count += 1
+    if not count:
+        path.unlink(missing_ok=True)
+        return None
+    return path, count
 
 
 def audio_segment(seg_id: int) -> tuple[Path, str] | None:

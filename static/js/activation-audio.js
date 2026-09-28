@@ -281,7 +281,8 @@
       '<div class="act-player-body"><button type="button" class="act-player-toggle">▶</button>' +
       '<canvas class="act-player-wave" height="64"></canvas></div>' +
       '<div class="act-player-foot"><span class="act-player-time"></span><span class="act-player-msg"></span>' +
-      '<button type="button" class="act-player-hide" hidden></button></div>';
+      '<button type="button" class="act-player-hide" hidden></button>' +
+      '<a class="act-player-dl" hidden download title="' + esc(t('Fichier audio de cet indicatif (tous ses QSO)')) + '">⬇ .ogg</a></div>';
     document.body.appendChild(player);
     player.querySelector('.act-player-close').addEventListener('click', closePlayer);
     player.querySelector('.act-player-hide').addEventListener('click', toggleHidden);
@@ -332,6 +333,7 @@
     pause();
     clip = buffer = null; pos = 0;
     renderHide(null);
+    player.querySelector('.act-player-dl').hidden = true;
     player.hidden = false;
     player.querySelector('.act-player-title').textContent = '…';
     player.querySelector('.act-player-time').textContent = '';
@@ -353,6 +355,10 @@
     if (!data.segments.length) { message(t('Pas d’audio enregistré autour de ce QSO.')); return; }
     clip = data;
     renderHide(data);
+    // Operators' log only: the callsign's file (every QSO, cut around each).
+    var dl = player.querySelector('.act-player-dl');
+    dl.hidden = !box;
+    if (box) dl.href = '/activation/audio-export?call=' + encodeURIComponent(data.call);
     try {
       playCtx = playCtx || new AudioContext();
       var rate = playCtx.sampleRate;

@@ -790,3 +790,5 @@ body.act-site .air-datepicker-cell.-year-.-other-decade- { color: var(--text-mut
 .act-player-hide { cursor: pointer; background: none; border: 1px solid var(--border-strong, #2a3654);
   border-radius: 3px; color: var(--text-dim, #9ca3af); font-family: var(--font-mono, monospace);
   font-size: 0.72rem; padding: 0.1rem 0.45rem; }
+.act-player-dl { color: var(--accent, #4d9eff); font-family: var(--font-mono, monospace); font-size: 0.75rem;
+  text-decoration: none; margin-left: 0.4rem; }

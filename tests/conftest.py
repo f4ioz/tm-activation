@@ -26,4 +26,5 @@ def _isolate_data(tmp_path, monkeypatch):
     monkeypatch.setattr(activation, "SETTINGS_FILE", tmp_path / "activation_settings.json")
     monkeypatch.setattr(activation, "IMPORT_TMP_DIR", tmp_path / "import")
     monkeypatch.setattr(activation, "AUDIO_DIR", tmp_path / "audio")
+    monkeypatch.setattr(activation, "AUDIO_EXPORT_DIR", tmp_path / "audio-export")
     monkeypatch.setattr(activation, "qrz_client", lambda: None)  # never the real QRZ in tests

@@ -86,15 +86,15 @@ radio clubs.
 
 Source code and latest versions: **<https://github.com/f4ioz/tm-activation>**
 
-- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.zip>
-- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.tar.gz>
+- zip archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.49.0.zip>
+- tar.gz archive: <https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.49.0.tar.gz>
 - SHA-256 checksums and previous versions: the
   [`releases/`](https://github.com/f4ioz/tm-activation/tree/main/releases) folder
 
 If the Pi has Internet access, the archive can be downloaded straight onto it:
 
 ```bash
-wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.48.0.tar.gz
+wget https://github.com/f4ioz/tm-activation/raw/main/releases/tm-activation-1.49.0.tar.gz
 ```
 
 ## Features
@@ -261,6 +261,13 @@ instant the QSO was logged**, click to seek, UTC time and offset from the QSO
   are turned off: the radio's sound is recorded as it is.
 - **Network outage**: segments wait in the browser and go as soon as the
   connection is back (up to 15 minutes late).
+- **One file per callsign**: **ADIF → Audio per callsign** page, or the
+  player's **⬇ .ogg** button. All the QSOs of a callsign one after another,
+  each taken from N seconds before to M seconds after (20 s and 5 s by
+  default, adjustable), in one Ogg Opus file (`tm50abc-DL1ABC.ogg`) that plays
+  in VLC, browsers and phones. Callsign left empty (admins): a zip with one
+  file per worked callsign. Cut without re-encoding or ffmpeg (Opus packets
+  copied as they are, 20 to 60 ms precision).
 - **Demo instance**: recording is disabled there.
 
 ### Roles and permissions
@@ -368,22 +375,22 @@ The application uses about 80 MB of memory.
 2. Start the Pi, then connect to it from a PC on the same network:
    `ssh utilisateur@tm50abc.local`
 3. Copy the archive onto the Pi, from the PC:
-   `scp tm-activation-1.48.0.tar.gz utilisateur@tm50abc.local:`
+   `scp tm-activation-1.49.0.tar.gz utilisateur@tm50abc.local:`
    (or download it straight onto the Pi with `wget`, see
    [Download](#download))
 4. On the Pi:
 
    ```bash
-   tar xzf tm-activation-1.48.0.tar.gz
-   cd tm-activation-1.48.0
+   tar xzf tm-activation-1.49.0.tar.gz
+   cd tm-activation-1.49.0
    sudo ./install.sh --lan
    ```
 
    From the zip (sent by email, passed through Windows):
 
    ```bash
-   unzip tm-activation-1.48.0.zip
-   cd tm-activation-1.48.0
+   unzip tm-activation-1.49.0.zip
+   cd tm-activation-1.49.0
    sudo bash install.sh --lan
    ```
 
@@ -471,8 +478,8 @@ Beforehand: the domain name (e.g. `tm.mon-club.fr`) must point to the server
 (DNS A/AAAA record), and ports 80 and 443 must be open.
 
 ```bash
-tar xzf tm-activation-1.48.0.tar.gz
-cd tm-activation-1.48.0
+tar xzf tm-activation-1.49.0.tar.gz
+cd tm-activation-1.49.0
 sudo ./install.sh --domain tm.mon-club.fr --email vous@exemple.fr
 ```
 

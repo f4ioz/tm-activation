@@ -22,6 +22,7 @@ from fastapi.responses import (
     RedirectResponse,
     Response,
 )
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from urllib.parse import quote, unquote
@@ -879,7 +880,10 @@ def _adif_page(request: Request, preview: dict | None = None) -> Response:
             },
             flash=flash,
             err=q.get("err"),
+            err_call=(q.get("call") or "").strip().upper()[:14],
             preview=preview,
+            audio_on=activation.audio_enabled(),
+            audio_export=activation.AUDIO_EXPORT_DEFAULT,
             import_status=activation.IMPORT_STATUS,
             import_checked=activation.IMPORT_DEFAULT_CHECKED,
         ),
@@ -1421,6 +1425,39 @@ async def audio_file(request: Request, seg_id: int) -> Response:
         raise HTTPException(status_code=404)
     path, mime = found
     return FileResponse(path, media_type=mime, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@router.get("/audio-export")
+async def audio_export(request: Request, call: str = "", before: str = "", after: str = "") -> Response:
+    """One Ogg Opus file per worked callsign: its QSOs, cut from ``before``
+    seconds before to ``after`` seconds after each one. With a callsign: that
+    file; without: a zip of all of them (admins)."""
+    if (g := _guard(request)) is not None:
+        return g
+    if not activation.audio_enabled():
+        raise HTTPException(status_code=404)
+    b, a = activation.AUDIO_EXPORT_DEFAULT
+    before_s = int(before) if before.strip().isdigit() else b
+    after_s = int(after) if after.strip().isdigit() else a
+    cs = call.strip().upper()
+    if cs:
+        if not activation.valid_callsign(cs):
+            return RedirectResponse("/activation/adif?err=audio#audio", status_code=303)
+        data = await run_in_threadpool(activation.audio_for_call, cs, before_s, after_s)
+        if data is None:
+            return RedirectResponse(f"/activation/adif?err=noaudio&call={quote(cs)}#audio", status_code=303)
+        return Response(data, media_type="audio/ogg", headers={
+            "Content-Disposition": f'attachment; filename="{activation.export_file_name(cs)}"',
+            "Cache-Control": "no-store"})
+    if (g := _require_admin(request)) is not None:
+        return g
+    done = await run_in_threadpool(activation.audio_export_zip, before_s, after_s)
+    if done is None:
+        return RedirectResponse("/activation/adif?err=noaudio#audio", status_code=303)
+    path, _count = done
+    name = f"{activation.slugify_call(activation.callsign())}-audio.zip"
+    return FileResponse(path, media_type="application/zip", filename=name,
+                        background=BackgroundTask(path.unlink, missing_ok=True))
 
 
 @router.post("/settings/audio")

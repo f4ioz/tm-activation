@@ -25,6 +25,10 @@
 <p class="act-alert act-alert-err">{{ _("Aperçu expiré ou déjà importé : recharge le fichier.") }}</p>
 {% elif err == 'empty' %}
 <p class="act-alert act-alert-dupe">{{ _("Aucun QSO sélectionné pour l'export.") }}</p>
+{% elif err == 'noaudio' %}
+<p class="act-alert act-alert-dupe">{% if err_call %}{{ _("Pas d'audio enregistré pour les QSO avec {call}.", call=err_call) }}{% else %}{{ _("Aucun QSO n'a d'audio enregistré.") }}{% endif %}</p>
+{% elif err == 'audio' %}
+<p class="act-alert act-alert-err">{{ _("Indicatif invalide") }}</p>
 {% endif %}
 
 {% if preview %}
@@ -98,6 +102,23 @@
     <p class="act-muted">{% if locked_op %}{{ _("Vos {n} QSO, prêts pour TQSL / LoTW.", n=contacts|length) }}{% else %}{{ _("Tout le log ({n} QSO), prêt pour TQSL / LoTW.", n=contacts|length) }}{% endif %}</p>
     <p class="act-inline"><a class="act-cancel-btn" href="/activation/export.adi">{{ _("ADIF complet") }}</a> <a class="act-cancel-btn" href="/activation/export.csv">CSV</a></p>
   </div>
+
+  {% if audio_on %}
+  <div class="act-card" id="audio">
+    <h2>{{ _("Audio par indicatif") }}</h2>
+    <p class="act-muted">{{ _("Un fichier par indicatif contacté (Ogg Opus, lisible par VLC, les navigateurs et les téléphones) : tous ses QSO à la suite, chacun pris quelques secondes avant et après. Découpé sans réencodage, donc sans perte.") }}</p>
+    <form method="get" action="/activation/audio-export" class="act-form">
+      <div class="act-mode-grid">
+        <label>{{ _("Indicatif") }} <input type="text" name="call" autocapitalize="characters" autocomplete="off"
+               placeholder="{{ _("vide = tous (zip)") if is_admin else 'DL1ABC' }}"{% if not is_admin %} required{% endif %}></label>
+        <label>{{ _("Avant le QSO (s)") }} <input type="number" name="before" min="0" max="600" value="{{ audio_export[0] }}"></label>
+        <label>{{ _("Après le QSO (s)") }} <input type="number" name="after" min="0" max="600" value="{{ audio_export[1] }}"></label>
+      </div>
+      <button type="submit">{{ _("Télécharger") }}</button>
+    </form>
+    {% if is_admin %}<p class="act-muted act-map-note">{{ _("Indicatif laissé vide : un zip avec un fichier par indicatif (peut prendre un moment sur une grosse activation).") }}</p>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <div class="act-card">
